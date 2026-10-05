@@ -1,0 +1,154 @@
+/* reports-pdf.css — used only inside the Dompdf-rendered PDF export.
+   Dompdf's CSS engine is CSS2.1 + a little CSS3: no custom properties, no
+   flexbox/grid. Every value here is a literal so it renders reliably. */
+
+body {
+    font-family: "DejaVu Sans", sans-serif;
+    color: #1f1a1d;
+    font-size: 9px;
+    margin: 0;
+    padding: var(--space-18px, 18px);
+}
+
+.pdf-heading {
+    margin-bottom: var(--space-12px, 12px);
+}
+
+.pdf-heading h1 {
+    font-size: 18px;
+    margin: 0 0 4px;
+    color: #4b0818;
+}
+
+.pdf-heading p {
+    color: #70676b;
+    margin: 0 0 2px;
+    font-size: 10px;
+}
+
+.pdf-heading .pdf-meta {
+    color: #9a9490;
+    font-size: 8px;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th {
+    background: #4b0818;
+    color: #fdf6ec;
+    text-align: left;
+    font-size: 8.5px;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+}
+
+th,
+td {
+    padding: 5px 6px;
+    border: 1px solid #e3d9cc;
+    vertical-align: top;
+}
+
+td.num {
+    text-align: right;
+    font-weight: bold;
+}
+
+tr:nth-child(even) td {
+    background: #faf5ed;
+}
+
+.pill,
+.tag {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: var(--radius-8px, 8px);
+    font-size: 8px;
+    font-weight: bold;
+}
+
+.pill-primary { background: #e4d6dc; color: #6a2036; }
+.pill-success { background: #d3ece2; color: #187e5b; }
+.pill-warning { background: #f7e6b0; color: #8a6100; }
+.pill-danger { background: #f0d4d7; color: #a3313c; }
+.pill-info { background: #d3e3ea; color: #276884; }
+.pill-neutral { background: #e6e3e1; color: #625956; }
+
+.tag-club { background: #ecdfc9; color: #9c6b1f; }
+.tag-digital { background: #cdeaec; color: #0f8a93; }
+.tag-team { background: #e2d9ef; color: #6b4fa0; }
+.tag-match { background: #f1d7e5; color: #a83a72; }
+.tag-player { background: #d9e6d9; color: #3f6b3f; }
+
+/* Sponsor showcase — grouped card layout. Dompdf has no flexbox/grid, so each row of
+   packages is a real <table> with one equal-width <td> per package (width set inline
+   per row), instead of the CSS grid the live page uses for the same structure. */
+
+.showcase-category {
+    margin-bottom: var(--space-14px, 14px);
+}
+
+.showcase-category--isolated {
+    page-break-before: always;
+    page-break-after: always;
+}
+
+.showcase-category__title {
+    margin: 0 0 6px;
+    padding: 5px 8px;
+    font-size: 12px;
+}
+
+.showcase-category__count {
+    font-size: 8.5px;
+    font-weight: normal;
+}
+
+.showcase-category__title--club { background: #ecdfc9; color: #9c6b1f; }
+.showcase-category__title--digital { background: #cdeaec; color: #0f8a93; }
+.showcase-category__title--team { background: #e2d9ef; color: #6b4fa0; }
+.showcase-category__title--match { background: #f1d7e5; color: #a83a72; }
+.showcase-category__title--player { background: #d9e6d9; color: #3f6b3f; }
+.showcase-category__title--neutral { background: #e6e3e1; color: #625956; }
+
+table.showcase-row {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: var(--space-6px, 6px);
+}
+
+.showcase-row td {
+    border: none;
+    padding: 3px 10px 3px 0;
+    vertical-align: top;
+}
+
+.showcase-package__title {
+    font-size: 8.5px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+    color: #6a2036;
+    border-bottom: 1px solid #e3d9cc;
+    padding-bottom: var(--space-3px, 3px);
+    margin-bottom: var(--space-4px, 4px);
+}
+
+.showcase-package__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.showcase-package__list li {
+    padding: 1.5px 0;
+    font-size: 9px;
+}
+
+.showcase-package__empty {
+    font-style: italic;
+    color: #9a9490;
+}

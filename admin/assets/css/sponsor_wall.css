@@ -1,0 +1,141 @@
+.sponsor-wall-shell {
+        width: 100%;
+        max-width: 1680px;
+        margin: 0 auto;
+        padding-bottom: var(--space-6, 1.5rem);
+    }
+
+    .wall-canvas {
+        padding: var(--space-4, 1rem);
+        border-radius: var(--radius-1rem, 1rem);
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        background: #fff;
+        box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.02);
+        overflow: auto;
+    }
+
+    .layout-editor {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+        gap: var(--space-4, 1rem);
+        align-items: start;
+    }
+
+    .layout-editor-empty {
+        grid-column: 1 / -1;
+        padding: var(--space-4, 1rem);
+        border-radius: var(--radius-1rem, 1rem);
+        border: 1px dashed rgba(0, 0, 0, 0.14);
+        background: rgba(0, 0, 0, 0.02);
+        color: rgba(33, 37, 41, 0.72);
+    }
+
+    .layout-tile {
+        position: relative;
+        border-radius: var(--radius-1rem, 1rem);
+        border: 1px solid rgba(0, 0, 0, 0.12);
+        background: #fff;
+        overflow: hidden;
+        cursor: grab;
+        min-height: 150px;
+        box-shadow: 0 10px 26px rgba(0, 0, 0, 0.12);
+    }
+
+    .layout-tile.dragging {
+        opacity: 0.55;
+        cursor: grabbing;
+    }
+
+    .layout-tile__image {
+        width: 100%;
+        height: 150px;
+        object-fit: contain;
+        display: block;
+        background: #fff;
+    }
+
+    .layout-tile__overlay {
+        position: absolute;
+        inset: auto 0 0 0;
+        display: flex;
+        justify-content: space-between;
+        gap: var(--space-4rem, 0.4rem);
+        padding: var(--space-065rem, 0.65rem);
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0), rgba(0, 0, 0, 0.72));
+    }
+
+    .layout-tile__overlay .btn {
+        flex: 1 1 0;
+    }
+
+    .upload-dropzone {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        gap: var(--space-2, 0.5rem);
+        min-height: 180px;
+        border: 2px dashed rgba(0, 0, 0, 0.18);
+        border-radius: var(--radius-1rem, 1rem);
+        background: linear-gradient(180deg, rgba(255,255,255,0.92), rgba(248, 249, 250, 0.96));
+        text-align: center;
+        padding: var(--space-5, 1.25rem);
+        cursor: pointer;
+    }
+
+    .upload-dropzone input {
+        display: none;
+    }
+
+    .upload-dropzone__icon {
+        width: 56px;
+        height: 56px;
+        border-radius: var(--radius-1rem, 1rem);
+        display: grid;
+        place-items: center;
+        font-size: var(--fs-14, 1.4rem);
+        color: #fff;
+        background: linear-gradient(135deg, #6c757d, #343a40);
+        box-shadow: 0 10px 22px rgba(0, 0, 0, 0.24);
+    }
+
+    .upload-dropzone__hint {
+        color: #6c757d;
+    }
+
+    .files-table img {
+        width: 96px;
+        height: 64px;
+        object-fit: contain;
+        display: block;
+        background: #fff;
+        border: 1px solid rgba(0, 0, 0, 0.12);
+        border-radius: var(--radius-075rem, 0.75rem);
+    }
+
+    .files-table .badge {
+        min-width: 76px;
+    }
+
+    .wall-size-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.35rem 0.65rem;
+        border-radius: var(--radius-pill, 999px);
+        background: rgba(106, 32, 54, 0.08);
+        color: var(--brand-primary);
+        border: 1px solid rgba(106, 32, 54, 0.18);
+        font-weight: 600;
+    }
+
+    @media (max-width: 767.98px) {
+        .layout-tile__overlay {
+            position: static;
+            background: transparent;
+            padding: var(--space-065rem, 0.65rem);
+        }
+
+        .layout-tile__overlay .btn {
+            flex: 1 1 auto;
+        }
+    }

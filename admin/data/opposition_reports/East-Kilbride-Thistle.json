@@ -1,0 +1,4120 @@
+{
+  "team": "East Kilbride Thistle",
+  "competition": "West of Scotland Third Division 26/27",
+  "competitionId": 53881079,
+  "collectedAt": "2026-09-24T17:27:51.672Z",
+  "totalMatches": 6,
+  "completedMatches": 6,
+  "matches": [
+    {
+      "matchId": 54097552,
+      "dateTimeUTC": 1788008400000,
+      "competition": "West of Scotland Third Division 26/27",
+      "round": "6",
+      "matchNumber": 41,
+      "homeTeam": "East Kilbride Thistle F.C.",
+      "awayTeam": "Royal Albert F.C.",
+      "score": {
+        "home": 2,
+        "away": 0
+      },
+      "status": "PLAYED",
+      "facility": "Showpark",
+      "description": "East Kilbride Thistle F.C. - Royal Albert F.C. 2:0",
+      "homeLineup": [
+        {
+          "shirtNumber": 1,
+          "name": "Jordan Brown",
+          "image": "https://www.scottishfacomet.co.uk/file?id=2371ae03-e477-4690-ba7f-d540d878f71d",
+          "goalkeeper": true,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 1,
+          "rowEvents": []
+        },
+        {
+          "shirtNumber": 2,
+          "name": "Jay Agnew Blair",
+          "image": "https://www.scottishfacomet.co.uk/file?id=bac56253-cf4a-49fa-be27-af1461d65e27",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 2,
+          "rowEvents": []
+        },
+        {
+          "shirtNumber": 3,
+          "name": "Patrick McLaughlin",
+          "image": "https://www.scottishfacomet.co.uk/file?id=4e027a51-8001-4bf7-bf90-b515fc5ce349",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 3,
+          "rowEvents": []
+        },
+        {
+          "shirtNumber": 5,
+          "name": "Keirin Coleman",
+          "image": "https://www.scottishfacomet.co.uk/file?id=98331d5b-4a24-4e0b-862d-5d259ae75965",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 4,
+          "rowEvents": [
+            {
+              "type": "yellow_card",
+              "minute": "70'",
+              "linkedShirtNumber": null,
+              "alt": "Yellow card",
+              "icon": "event.yellowcard.svg"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 6,
+          "name": "Macauley Kennedy",
+          "image": "https://www.scottishfacomet.co.uk/file?id=597bad3b-93a0-4388-b1d2-edea8b6508f1",
+          "goalkeeper": false,
+          "captain": true,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": true,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": "80'",
+          "lineupOrder": 5,
+          "rowEvents": [
+            {
+              "type": "yellow_card",
+              "minute": "55'",
+              "linkedShirtNumber": null,
+              "alt": "Yellow card",
+              "icon": "event.yellowcard.svg"
+            },
+            {
+              "type": "substitution",
+              "minute": "80'",
+              "linkedShirtNumber": 20,
+              "alt": "Substitution",
+              "icon": "event.substitution-out.png"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 7,
+          "name": "Jamie Scullion",
+          "image": "https://www.scottishfacomet.co.uk/file?id=42d4e664-83fe-4662-9cb3-249c63fa87a7",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 6,
+          "rowEvents": []
+        },
+        {
+          "shirtNumber": 8,
+          "name": "Conor Boyle",
+          "image": "https://www.scottishfacomet.co.uk/file?id=91928413-6434-4082-9e54-132089b6cc7f",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 7,
+          "rowEvents": [
+            {
+              "type": "goal",
+              "minute": "63'",
+              "linkedShirtNumber": null,
+              "alt": "Goal",
+              "icon": "event.goal.svg"
+            },
+            {
+              "type": "yellow_card",
+              "minute": "84'",
+              "linkedShirtNumber": null,
+              "alt": "Yellow card",
+              "icon": "event.yellowcard.svg"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 9,
+          "name": "Gary Stewart",
+          "image": "https://www.scottishfacomet.co.uk/file?id=9ad65119-892d-40ed-b634-cf63c7e17fa7",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": true,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": "73'",
+          "lineupOrder": 8,
+          "rowEvents": [
+            {
+              "type": "substitution",
+              "minute": "73'",
+              "linkedShirtNumber": 14,
+              "alt": "Substitution",
+              "icon": "event.substitution-out.png"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 10,
+          "name": "Connor McKenzie",
+          "image": "https://www.scottishfacomet.co.uk/file?id=cecbcd83-691f-46ec-838a-5f10aa8fb41c",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": true,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": "84'",
+          "lineupOrder": 9,
+          "rowEvents": [
+            {
+              "type": "yellow_card",
+              "minute": "43'",
+              "linkedShirtNumber": null,
+              "alt": "Yellow card",
+              "icon": "event.yellowcard.svg"
+            },
+            {
+              "type": "substitution",
+              "minute": "84'",
+              "linkedShirtNumber": 16,
+              "alt": "Substitution",
+              "icon": "event.substitution-out.png"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 11,
+          "name": "William McLaren",
+          "image": "https://www.scottishfacomet.co.uk/file?id=91355d59-e380-44e5-8ece-6e2b6a8fe557",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": true,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": "80'",
+          "lineupOrder": 10,
+          "rowEvents": [
+            {
+              "type": "yellow_card",
+              "minute": "50'",
+              "linkedShirtNumber": null,
+              "alt": "Yellow card",
+              "icon": "event.yellowcard.svg"
+            },
+            {
+              "type": "substitution",
+              "minute": "80'",
+              "linkedShirtNumber": 17,
+              "alt": "Substitution",
+              "icon": "event.substitution-out.png"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 19,
+          "name": "Jordan Grant",
+          "image": "https://www.scottishfacomet.co.uk/file?id=1e83e03f-eb0f-4364-935a-2647dc5d1c49",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 11,
+          "rowEvents": []
+        }
+      ],
+      "awayLineup": [
+        {
+          "shirtNumber": 1,
+          "name": "Nathan Wharton",
+          "image": "https://www.scottishfacomet.co.uk/file?id=65c43656-afa5-48b7-9cd6-09f93804ca6b",
+          "goalkeeper": true,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 1,
+          "rowEvents": []
+        },
+        {
+          "shirtNumber": 2,
+          "name": "Sean Docherty",
+          "image": "https://www.scottishfacomet.co.uk/file?id=f15a0c3f-7071-4255-a601-282718ccd8ec",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 2,
+          "rowEvents": []
+        },
+        {
+          "shirtNumber": 3,
+          "name": "Stewart Anderson",
+          "image": "https://www.scottishfacomet.co.uk/file?id=2c050c21-bec4-4c0b-8b0f-ec9b2be35459",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": true,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": "70'",
+          "lineupOrder": 3,
+          "rowEvents": [
+            {
+              "type": "substitution",
+              "minute": "70'",
+              "linkedShirtNumber": 21,
+              "alt": "Substitution",
+              "icon": "event.substitution-out.png"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 4,
+          "name": "David Collins",
+          "image": "https://www.scottishfacomet.co.uk/file?id=e08ac64d-cac6-43c9-a241-b43b0dac5c64",
+          "goalkeeper": false,
+          "captain": true,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 4,
+          "rowEvents": [
+            {
+              "type": "yellow_card",
+              "minute": "85'",
+              "linkedShirtNumber": null,
+              "alt": "Yellow card",
+              "icon": "event.yellowcard.svg"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 5,
+          "name": "Liam Mushet",
+          "image": "https://www.scottishfacomet.co.uk/file?id=9ba713e8-0a38-48a6-86f3-d360ae1dc843",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 5,
+          "rowEvents": [
+            {
+              "type": "red_card",
+              "minute": "84'",
+              "linkedShirtNumber": null,
+              "alt": "Red card",
+              "icon": "event.redcard.svg"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 6,
+          "name": "Marc McGinty",
+          "image": "https://www.scottishfacomet.co.uk/file?id=a6d32320-91f9-48d7-a1ca-4671b302b9b5",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 6,
+          "rowEvents": []
+        },
+        {
+          "shirtNumber": 7,
+          "name": "Mackenzie Shields",
+          "image": "https://www.scottishfacomet.co.uk/file?id=681bb782-ce33-4629-bd73-fa49c8ad3ffd",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 7,
+          "rowEvents": []
+        },
+        {
+          "shirtNumber": 8,
+          "name": "Jack Docherty",
+          "image": "https://www.scottishfacomet.co.uk/file?id=475430a7-6ec1-47b3-9fb3-11473cc3ab09",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 8,
+          "rowEvents": []
+        },
+        {
+          "shirtNumber": 9,
+          "name": "Kieran McGuire",
+          "image": "https://www.scottishfacomet.co.uk/file?id=6dc45964-3c40-4530-aaa7-86f82d345d1c",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": true,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": "70'",
+          "lineupOrder": 9,
+          "rowEvents": [
+            {
+              "type": "yellow_card",
+              "minute": "65'",
+              "linkedShirtNumber": null,
+              "alt": "Yellow card",
+              "icon": "event.yellowcard.svg"
+            },
+            {
+              "type": "substitution",
+              "minute": "70'",
+              "linkedShirtNumber": 17,
+              "alt": "Substitution",
+              "icon": "event.substitution-out.png"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 10,
+          "name": "Graham Gracie",
+          "image": "https://www.scottishfacomet.co.uk/file?id=19c46719-e01b-4f00-a6ac-56da7195a194",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": true,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": "77'",
+          "lineupOrder": 10,
+          "rowEvents": [
+            {
+              "type": "substitution",
+              "minute": "77'",
+              "linkedShirtNumber": 15,
+              "alt": "Substitution",
+              "icon": "event.substitution-out.png"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 11,
+          "name": "Bradley Gray",
+          "image": "https://www.scottishfacomet.co.uk/file?id=dad3f9f1-d6ae-4655-9cc9-d7388de92149",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": true,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": "61'",
+          "lineupOrder": 11,
+          "rowEvents": [
+            {
+              "type": "substitution",
+              "minute": "61'",
+              "linkedShirtNumber": 20,
+              "alt": "Substitution",
+              "icon": "event.substitution-out.png"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "order": 1,
+          "minute": "90+5'",
+          "type": "goal",
+          "side": "home",
+          "team": "East Kilbride Thistle F.C.",
+          "player": "McAvoy K.",
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 2,
+          "minute": "90+4'",
+          "type": "yellow_card",
+          "side": "away",
+          "team": "Royal Albert F.C.",
+          "player": "Wilson A.",
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 3,
+          "minute": "90'",
+          "type": "yellow_card",
+          "side": "away",
+          "team": "Royal Albert F.C.",
+          "player": "McCallum K.",
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 4,
+          "minute": "85'",
+          "type": "yellow_card",
+          "side": "away",
+          "team": "Royal Albert F.C.",
+          "player": "Collins D.",
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 5,
+          "minute": "84'",
+          "type": "red_card",
+          "side": "away",
+          "team": "Royal Albert F.C.",
+          "player": "Mushet L.",
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 6,
+          "minute": "84'",
+          "type": "yellow_card",
+          "side": "home",
+          "team": "East Kilbride Thistle F.C.",
+          "player": "Conor Boyle",
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 7,
+          "minute": "84'",
+          "type": "substitution",
+          "side": "home",
+          "team": "East Kilbride Thistle F.C.",
+          "player": null,
+          "playerIn": "McAvoy K.",
+          "playerOut": "McKenzie C."
+        },
+        {
+          "order": 8,
+          "minute": "80'",
+          "type": "substitution",
+          "side": "home",
+          "team": "East Kilbride Thistle F.C.",
+          "player": null,
+          "playerIn": "McLaughlin C.",
+          "playerOut": "Kennedy M."
+        },
+        {
+          "order": 9,
+          "minute": "80'",
+          "type": "substitution",
+          "side": "home",
+          "team": "East Kilbride Thistle F.C.",
+          "player": null,
+          "playerIn": "Hughes J.",
+          "playerOut": "McLaren W."
+        },
+        {
+          "order": 10,
+          "minute": "77'",
+          "type": "substitution",
+          "side": "away",
+          "team": "Royal Albert F.C.",
+          "player": null,
+          "playerIn": "McCormack A.",
+          "playerOut": "Gracie G."
+        },
+        {
+          "order": 11,
+          "minute": "73'",
+          "type": "substitution",
+          "side": "home",
+          "team": "East Kilbride Thistle F.C.",
+          "player": null,
+          "playerIn": "Hampson A.",
+          "playerOut": "Stewart G."
+        },
+        {
+          "order": 12,
+          "minute": "70'",
+          "type": "substitution",
+          "side": "away",
+          "team": "Royal Albert F.C.",
+          "player": null,
+          "playerIn": "McCallum K.",
+          "playerOut": "Anderson S."
+        },
+        {
+          "order": 13,
+          "minute": "70'",
+          "type": "substitution",
+          "side": "away",
+          "team": "Royal Albert F.C.",
+          "player": null,
+          "playerIn": "Doherty L.",
+          "playerOut": "McGuire K."
+        },
+        {
+          "order": 14,
+          "minute": "70'",
+          "type": "yellow_card",
+          "side": "home",
+          "team": "East Kilbride Thistle F.C.",
+          "player": "Coleman K.",
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 15,
+          "minute": "65'",
+          "type": "yellow_card",
+          "side": "away",
+          "team": "Royal Albert F.C.",
+          "player": "McGuire K.",
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 16,
+          "minute": "63'",
+          "type": "goal",
+          "side": "home",
+          "team": "East Kilbride Thistle F.C.",
+          "player": "Conor Boyle",
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 17,
+          "minute": "61'",
+          "type": "substitution",
+          "side": "away",
+          "team": "Royal Albert F.C.",
+          "player": null,
+          "playerIn": "Wilson A.",
+          "playerOut": "Gray B."
+        },
+        {
+          "order": 18,
+          "minute": "55'",
+          "type": "yellow_card",
+          "side": "home",
+          "team": "East Kilbride Thistle F.C.",
+          "player": "Kennedy M.",
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 19,
+          "minute": "50'",
+          "type": "yellow_card",
+          "side": "home",
+          "team": "East Kilbride Thistle F.C.",
+          "player": "McLaren W.",
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 20,
+          "minute": "43'",
+          "type": "yellow_card",
+          "side": "home",
+          "team": "East Kilbride Thistle F.C.",
+          "player": "McKenzie C.",
+          "playerIn": null,
+          "playerOut": null
+        }
+      ]
+    },
+    {
+      "matchId": 54097549,
+      "dateTimeUTC": 1786798800000,
+      "competition": "West of Scotland Third Division 26/27",
+      "round": "5",
+      "matchNumber": 38,
+      "homeTeam": "Lugar Boswell Thistle F.C.",
+      "awayTeam": "East Kilbride Thistle F.C.",
+      "score": {
+        "home": 1,
+        "away": 6
+      },
+      "status": "PLAYED",
+      "facility": "Rosebank Park",
+      "description": "Lugar Boswell Thistle F.C. - East Kilbride Thistle F.C. 1:6",
+      "homeLineup": [
+        {
+          "shirtNumber": 1,
+          "name": "Michael MULLEN",
+          "image": "https://www.scottishfacomet.co.uk/file?id=32820880-4c33-414a-92df-ccc03fe796ba",
+          "goalkeeper": true,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 1,
+          "rowEvents": []
+        },
+        {
+          "shirtNumber": 2,
+          "name": "Rhys McLean",
+          "image": "https://www.scottishfacomet.co.uk/file?id=a1651945-58a8-4aba-8cba-ddd248cb9b86",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 2,
+          "rowEvents": []
+        },
+        {
+          "shirtNumber": 3,
+          "name": "Adam John Thomas Lowe",
+          "image": "https://www.scottishfacomet.co.uk/file?id=9c6f7e6a-8aec-4f87-890c-4a19311b4a34",
+          "goalkeeper": false,
+          "captain": true,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": true,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": "33'",
+          "lineupOrder": 3,
+          "rowEvents": [
+            {
+              "type": "substitution",
+              "minute": "33'",
+              "linkedShirtNumber": 12,
+              "alt": "Substitution",
+              "icon": "event.substitution-out.png"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 4,
+          "name": "Jack Taylor",
+          "image": "https://www.scottishfacomet.co.uk/file?id=39968ce7-a159-4a59-824b-3d949da5fd4e",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": true,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": "33'",
+          "lineupOrder": 4,
+          "rowEvents": [
+            {
+              "type": "substitution",
+              "minute": "33'",
+              "linkedShirtNumber": 15,
+              "alt": "Substitution",
+              "icon": "event.substitution-out.png"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 5,
+          "name": "Aidan Berry",
+          "image": "https://www.scottishfacomet.co.uk/file?id=a91d0339-dd29-4902-b087-6537c6623f31",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": true,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": "33'",
+          "lineupOrder": 5,
+          "rowEvents": [
+            {
+              "type": "substitution",
+              "minute": "33'",
+              "linkedShirtNumber": 16,
+              "alt": "Substitution",
+              "icon": "event.substitution-out.png"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 6,
+          "name": "Connor Douglas Green Yair",
+          "image": "https://www.scottishfacomet.co.uk/file?id=bb4b163a-b063-48d3-a8c9-c958814e3082",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 6,
+          "rowEvents": []
+        },
+        {
+          "shirtNumber": 7,
+          "name": "Ben Black",
+          "image": "https://www.scottishfacomet.co.uk/file?id=5f14a39e-a83e-4bd2-b44e-4c433f6aaf3c",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": true,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": "40'",
+          "lineupOrder": 7,
+          "rowEvents": [
+            {
+              "type": "substitution",
+              "minute": "40'",
+              "linkedShirtNumber": 18,
+              "alt": "Substitution",
+              "icon": "event.substitution-out.png"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 8,
+          "name": "Jake Graham",
+          "image": "https://www.scottishfacomet.co.uk/file?id=9cdb131e-5b94-4fdb-9609-5f6670b62d0f",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 8,
+          "rowEvents": []
+        },
+        {
+          "shirtNumber": 9,
+          "name": "Cailean Campbell",
+          "image": "https://www.scottishfacomet.co.uk/file?id=58de310b-9f89-4b0c-a213-78d5cefe0d27",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": true,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": "64'",
+          "lineupOrder": 9,
+          "rowEvents": [
+            {
+              "type": "substitution",
+              "minute": "64'",
+              "linkedShirtNumber": 17,
+              "alt": "Substitution",
+              "icon": "event.substitution-out.png"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 10,
+          "name": "Alex Stanborough",
+          "image": "https://www.scottishfacomet.co.uk/file?id=fd5712c7-c9c9-4a90-93fe-e1d463e60909",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 10,
+          "rowEvents": []
+        },
+        {
+          "shirtNumber": 11,
+          "name": "Rhys Ritchie",
+          "image": "https://www.scottishfacomet.co.uk/file?id=044cdcdb-a260-44ec-ad1e-a18e38a96778",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 11,
+          "rowEvents": []
+        }
+      ],
+      "awayLineup": [
+        {
+          "shirtNumber": 1,
+          "name": "Jordan Brown",
+          "image": "https://www.scottishfacomet.co.uk/file?id=2371ae03-e477-4690-ba7f-d540d878f71d",
+          "goalkeeper": true,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 1,
+          "rowEvents": []
+        },
+        {
+          "shirtNumber": 3,
+          "name": "Patrick McLaughlin",
+          "image": "https://www.scottishfacomet.co.uk/file?id=4e027a51-8001-4bf7-bf90-b515fc5ce349",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 2,
+          "rowEvents": []
+        },
+        {
+          "shirtNumber": 4,
+          "name": "Macauley Kennedy",
+          "image": "https://www.scottishfacomet.co.uk/file?id=597bad3b-93a0-4388-b1d2-edea8b6508f1",
+          "goalkeeper": false,
+          "captain": true,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 3,
+          "rowEvents": []
+        },
+        {
+          "shirtNumber": 5,
+          "name": "Marc Kane",
+          "image": "https://www.scottishfacomet.co.uk/file?id=6530863d-9914-4418-9bcf-c210b474b63c",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": true,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": "78'",
+          "lineupOrder": 4,
+          "rowEvents": [
+            {
+              "type": "substitution",
+              "minute": "78'",
+              "linkedShirtNumber": 14,
+              "alt": "Substitution",
+              "icon": "event.substitution-out.png"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 6,
+          "name": "Marcus Stewart",
+          "image": "https://www.scottishfacomet.co.uk/file?id=c0c2c92a-bd4b-4aa5-8b73-0bc847c61d35",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": true,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": "69'",
+          "lineupOrder": 5,
+          "rowEvents": [
+            {
+              "type": "substitution",
+              "minute": "69'",
+              "linkedShirtNumber": 12,
+              "alt": "Substitution",
+              "icon": "event.substitution-out.png"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 7,
+          "name": "Jamie Scullion",
+          "image": "https://www.scottishfacomet.co.uk/file?id=42d4e664-83fe-4662-9cb3-249c63fa87a7",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": true,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": "54'",
+          "lineupOrder": 6,
+          "rowEvents": [
+            {
+              "type": "goal",
+              "minute": "24'",
+              "linkedShirtNumber": null,
+              "alt": "Goal",
+              "icon": "event.goal.svg"
+            },
+            {
+              "type": "substitution",
+              "minute": "54'",
+              "linkedShirtNumber": 17,
+              "alt": "Substitution",
+              "icon": "event.substitution-out.png"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 8,
+          "name": "Conor Boyle",
+          "image": "https://www.scottishfacomet.co.uk/file?id=91928413-6434-4082-9e54-132089b6cc7f",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 7,
+          "rowEvents": []
+        },
+        {
+          "shirtNumber": 9,
+          "name": "Gary Stewart",
+          "image": "https://www.scottishfacomet.co.uk/file?id=9ad65119-892d-40ed-b634-cf63c7e17fa7",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": true,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": "54'",
+          "lineupOrder": 8,
+          "rowEvents": [
+            {
+              "type": "goal",
+              "minute": "1'",
+              "linkedShirtNumber": null,
+              "alt": "Goal",
+              "icon": "event.goal.svg"
+            },
+            {
+              "type": "unknown",
+              "minute": "5'",
+              "linkedShirtNumber": null,
+              "alt": "Penalty",
+              "icon": "event.penalty.svg"
+            },
+            {
+              "type": "substitution",
+              "minute": "54'",
+              "linkedShirtNumber": 16,
+              "alt": "Substitution",
+              "icon": "event.substitution-out.png"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 10,
+          "name": "Connor McKenzie",
+          "image": "https://www.scottishfacomet.co.uk/file?id=cecbcd83-691f-46ec-838a-5f10aa8fb41c",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 9,
+          "rowEvents": [
+            {
+              "type": "goal",
+              "minute": "30'",
+              "linkedShirtNumber": null,
+              "alt": "Goal",
+              "icon": "event.goal.svg"
+            },
+            {
+              "type": "goal",
+              "minute": "48'",
+              "linkedShirtNumber": null,
+              "alt": "Goal",
+              "icon": "event.goal.svg"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 11,
+          "name": "William McLaren",
+          "image": "https://www.scottishfacomet.co.uk/file?id=91355d59-e380-44e5-8ece-6e2b6a8fe557",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 10,
+          "rowEvents": []
+        },
+        {
+          "shirtNumber": 19,
+          "name": "Jordan Grant",
+          "image": "https://www.scottishfacomet.co.uk/file?id=1e83e03f-eb0f-4364-935a-2647dc5d1c49",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": true,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": "46'",
+          "lineupOrder": 11,
+          "rowEvents": [
+            {
+              "type": "substitution",
+              "minute": "46'",
+              "linkedShirtNumber": 15,
+              "alt": "Substitution",
+              "icon": "event.substitution-out.png"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "order": 1,
+          "minute": "86'",
+          "type": "goal",
+          "side": "away",
+          "team": "East Kilbride Thistle F.C.",
+          "player": "Hampson A.",
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 2,
+          "minute": "78'",
+          "type": "substitution",
+          "side": "away",
+          "team": "East Kilbride Thistle F.C.",
+          "player": null,
+          "playerIn": "Hampson A.",
+          "playerOut": "Kane M."
+        },
+        {
+          "order": 3,
+          "minute": "69'",
+          "type": "substitution",
+          "side": "away",
+          "team": "East Kilbride Thistle F.C.",
+          "player": null,
+          "playerIn": "Blair J.",
+          "playerOut": "Stewart M."
+        },
+        {
+          "order": 4,
+          "minute": "64'",
+          "type": "substitution",
+          "side": "home",
+          "team": "Lugar Boswell Thistle F.C.",
+          "player": null,
+          "playerIn": "McKeown S.",
+          "playerOut": "Campbell C."
+        },
+        {
+          "order": 5,
+          "minute": "57'",
+          "type": "goal",
+          "side": "home",
+          "team": "Lugar Boswell Thistle F.C.",
+          "player": "Murray N.",
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 6,
+          "minute": "54'",
+          "type": "substitution",
+          "side": "away",
+          "team": "East Kilbride Thistle F.C.",
+          "player": null,
+          "playerIn": "Hughes J.",
+          "playerOut": "Scullion J."
+        },
+        {
+          "order": 7,
+          "minute": "54'",
+          "type": "substitution",
+          "side": "away",
+          "team": "East Kilbride Thistle F.C.",
+          "player": null,
+          "playerIn": "McAvoy K.",
+          "playerOut": "Stewart G."
+        },
+        {
+          "order": 8,
+          "minute": "48'",
+          "type": "goal",
+          "side": "away",
+          "team": "East Kilbride Thistle F.C.",
+          "player": "McKenzie C.",
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 9,
+          "minute": "46'",
+          "type": "substitution",
+          "side": "away",
+          "team": "East Kilbride Thistle F.C.",
+          "player": null,
+          "playerIn": "Tough C.",
+          "playerOut": "Grant J."
+        },
+        {
+          "order": 10,
+          "minute": "40'",
+          "type": "substitution",
+          "side": "home",
+          "team": "Lugar Boswell Thistle F.C.",
+          "player": null,
+          "playerIn": "Murray N.",
+          "playerOut": "Black B."
+        },
+        {
+          "order": 11,
+          "minute": "33'",
+          "type": "substitution",
+          "side": "home",
+          "team": "Lugar Boswell Thistle F.C.",
+          "player": null,
+          "playerIn": "McLean C.",
+          "playerOut": "Lowe A."
+        },
+        {
+          "order": 12,
+          "minute": "33'",
+          "type": "substitution",
+          "side": "home",
+          "team": "Lugar Boswell Thistle F.C.",
+          "player": null,
+          "playerIn": "Logan K.",
+          "playerOut": "Taylor J."
+        },
+        {
+          "order": 13,
+          "minute": "33'",
+          "type": "substitution",
+          "side": "home",
+          "team": "Lugar Boswell Thistle F.C.",
+          "player": null,
+          "playerIn": "McMurdo M.",
+          "playerOut": "Berry A."
+        },
+        {
+          "order": 14,
+          "minute": "30'",
+          "type": "goal",
+          "side": "away",
+          "team": "East Kilbride Thistle F.C.",
+          "player": "McKenzie C.",
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 15,
+          "minute": "24'",
+          "type": "goal",
+          "side": "away",
+          "team": "East Kilbride Thistle F.C.",
+          "player": "Scullion J.",
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 16,
+          "minute": "5'",
+          "type": "unknown",
+          "side": "away",
+          "team": "East Kilbride Thistle F.C.",
+          "player": "Stewart G.",
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 17,
+          "minute": "1'",
+          "type": "goal",
+          "side": "away",
+          "team": "East Kilbride Thistle F.C.",
+          "player": "Stewart G.",
+          "playerIn": null,
+          "playerOut": null
+        }
+      ]
+    },
+    {
+      "matchId": 54097536,
+      "dateTimeUTC": 1786194000000,
+      "competition": "West of Scotland Third Division 26/27",
+      "round": "4",
+      "matchNumber": 25,
+      "homeTeam": "East Kilbride Thistle F.C.",
+      "awayTeam": "Glasgow Perthshire F.C.",
+      "score": {
+        "home": 5,
+        "away": 0
+      },
+      "status": "PLAYED",
+      "facility": "Showpark",
+      "description": "East Kilbride Thistle F.C. - Glasgow Perthshire F.C. 5:0",
+      "homeLineup": [
+        {
+          "shirtNumber": 1,
+          "name": "Craig Hart",
+          "image": "https://www.scottishfacomet.co.uk/file?id=8ec37345-ea34-4486-ba19-f00f880d6705",
+          "goalkeeper": true,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 1,
+          "rowEvents": []
+        },
+        {
+          "shirtNumber": 2,
+          "name": "Marcus Stewart",
+          "image": "https://www.scottishfacomet.co.uk/file?id=c0c2c92a-bd4b-4aa5-8b73-0bc847c61d35",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": true,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": "60'",
+          "lineupOrder": 2,
+          "rowEvents": [
+            {
+              "type": "substitution",
+              "minute": "60'",
+              "linkedShirtNumber": 15,
+              "alt": "Substitution",
+              "icon": "event.substitution-out.png"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 3,
+          "name": "Patrick McLaughlin",
+          "image": "https://www.scottishfacomet.co.uk/file?id=4e027a51-8001-4bf7-bf90-b515fc5ce349",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 3,
+          "rowEvents": []
+        },
+        {
+          "shirtNumber": 4,
+          "name": "Keirin Coleman",
+          "image": "https://www.scottishfacomet.co.uk/file?id=98331d5b-4a24-4e0b-862d-5d259ae75965",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 4,
+          "rowEvents": []
+        },
+        {
+          "shirtNumber": 6,
+          "name": "Macauley Kennedy",
+          "image": "https://www.scottishfacomet.co.uk/file?id=597bad3b-93a0-4388-b1d2-edea8b6508f1",
+          "goalkeeper": false,
+          "captain": true,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 5,
+          "rowEvents": []
+        },
+        {
+          "shirtNumber": 7,
+          "name": "Jamie Scullion",
+          "image": "https://www.scottishfacomet.co.uk/file?id=42d4e664-83fe-4662-9cb3-249c63fa87a7",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": true,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": "71'",
+          "lineupOrder": 6,
+          "rowEvents": [
+            {
+              "type": "goal",
+              "minute": "31'",
+              "linkedShirtNumber": null,
+              "alt": "Goal",
+              "icon": "event.goal.svg"
+            },
+            {
+              "type": "substitution",
+              "minute": "71'",
+              "linkedShirtNumber": 16,
+              "alt": "Substitution",
+              "icon": "event.substitution-out.png"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 8,
+          "name": "Conor Boyle",
+          "image": "https://www.scottishfacomet.co.uk/file?id=91928413-6434-4082-9e54-132089b6cc7f",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": true,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": "60'",
+          "lineupOrder": 7,
+          "rowEvents": [
+            {
+              "type": "substitution",
+              "minute": "60'",
+              "linkedShirtNumber": 17,
+              "alt": "Substitution",
+              "icon": "event.substitution-out.png"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 9,
+          "name": "Gary Stewart",
+          "image": "https://www.scottishfacomet.co.uk/file?id=9ad65119-892d-40ed-b634-cf63c7e17fa7",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": true,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": "60'",
+          "lineupOrder": 8,
+          "rowEvents": [
+            {
+              "type": "goal",
+              "minute": "13'",
+              "linkedShirtNumber": null,
+              "alt": "Goal",
+              "icon": "event.goal.svg"
+            },
+            {
+              "type": "substitution",
+              "minute": "60'",
+              "linkedShirtNumber": 12,
+              "alt": "Substitution",
+              "icon": "event.substitution-out.png"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 10,
+          "name": "Connor McKenzie",
+          "image": "https://www.scottishfacomet.co.uk/file?id=cecbcd83-691f-46ec-838a-5f10aa8fb41c",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 9,
+          "rowEvents": [
+            {
+              "type": "goal",
+              "minute": "50'",
+              "linkedShirtNumber": null,
+              "alt": "Goal",
+              "icon": "event.goal.svg"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 11,
+          "name": "William McLaren",
+          "image": "https://www.scottishfacomet.co.uk/file?id=91355d59-e380-44e5-8ece-6e2b6a8fe557",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": true,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": "78'",
+          "lineupOrder": 10,
+          "rowEvents": [
+            {
+              "type": "goal",
+              "minute": "18'",
+              "linkedShirtNumber": null,
+              "alt": "Goal",
+              "icon": "event.goal.svg"
+            },
+            {
+              "type": "goal",
+              "minute": "62'",
+              "linkedShirtNumber": null,
+              "alt": "Goal",
+              "icon": "event.goal.svg"
+            },
+            {
+              "type": "substitution",
+              "minute": "78'",
+              "linkedShirtNumber": 18,
+              "alt": "Substitution",
+              "icon": "event.substitution-out.png"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 19,
+          "name": "Jordan Grant",
+          "image": "https://www.scottishfacomet.co.uk/file?id=1e83e03f-eb0f-4364-935a-2647dc5d1c49",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 11,
+          "rowEvents": []
+        }
+      ],
+      "awayLineup": [
+        {
+          "shirtNumber": 1,
+          "name": "Tyler Flynn",
+          "image": "https://www.scottishfacomet.co.uk/file?id=536d4623-aef3-4ce4-9897-848d2f29f23c",
+          "goalkeeper": true,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 1,
+          "rowEvents": []
+        },
+        {
+          "shirtNumber": 2,
+          "name": "Lewis Noble",
+          "image": "https://www.scottishfacomet.co.uk/file?id=5b1bcd9b-d0f4-4716-8103-427bb7a0733f",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": true,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": "46'",
+          "lineupOrder": 2,
+          "rowEvents": [
+            {
+              "type": "substitution",
+              "minute": "46'",
+              "linkedShirtNumber": 12,
+              "alt": "Substitution",
+              "icon": "event.substitution-out.png"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 3,
+          "name": "Rory Devenney",
+          "image": "https://www.scottishfacomet.co.uk/file?id=978d45f4-6e73-4c86-b959-5f9008d43a8e",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 3,
+          "rowEvents": [
+            {
+              "type": "yellow_card",
+              "minute": "90+1'",
+              "linkedShirtNumber": null,
+              "alt": "Yellow card",
+              "icon": "event.yellowcard.svg"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 4,
+          "name": "Jack Crumlish",
+          "image": "https://www.scottishfacomet.co.uk/file?id=e85209be-43dd-42ad-bee5-75e8a7b8b679",
+          "goalkeeper": false,
+          "captain": true,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 4,
+          "rowEvents": [
+            {
+              "type": "yellow_card",
+              "minute": "70'",
+              "linkedShirtNumber": null,
+              "alt": "Yellow card",
+              "icon": "event.yellowcard.svg"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 5,
+          "name": "William McGowan",
+          "image": "https://www.scottishfacomet.co.uk/file?id=3c2c0cce-6013-47e6-a706-16c3d5463eb3",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 5,
+          "rowEvents": []
+        },
+        {
+          "shirtNumber": 6,
+          "name": "declan morrison",
+          "image": "https://www.scottishfacomet.co.uk/file?id=f8fab430-9be9-4f13-b49e-0b5ee22a6918",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": true,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": "61'",
+          "lineupOrder": 6,
+          "rowEvents": [
+            {
+              "type": "substitution",
+              "minute": "61'",
+              "linkedShirtNumber": 16,
+              "alt": "Substitution",
+              "icon": "event.substitution-out.png"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 7,
+          "name": "Jordan Simpson",
+          "image": "https://www.scottishfacomet.co.uk/file?id=ee416b66-6f1f-49da-8041-10a2adf3a323",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": true,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": "61'",
+          "lineupOrder": 7,
+          "rowEvents": [
+            {
+              "type": "yellow_card",
+              "minute": "52'",
+              "linkedShirtNumber": null,
+              "alt": "Yellow card",
+              "icon": "event.yellowcard.svg"
+            },
+            {
+              "type": "substitution",
+              "minute": "61'",
+              "linkedShirtNumber": 13,
+              "alt": "Substitution",
+              "icon": "event.substitution-out.png"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 8,
+          "name": "Robert Donnelly",
+          "image": "https://www.scottishfacomet.co.uk/file?id=3a2d4396-286a-4298-b66d-4971970bee72",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": true,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": "46'",
+          "lineupOrder": 8,
+          "rowEvents": [
+            {
+              "type": "substitution",
+              "minute": "46'",
+              "linkedShirtNumber": 17,
+              "alt": "Substitution",
+              "icon": "event.substitution-out.png"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 9,
+          "name": "Reegan Shearer",
+          "image": "https://www.scottishfacomet.co.uk/file?id=b533c62c-0362-49b8-8263-51daaa0ac5f4",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 9,
+          "rowEvents": []
+        },
+        {
+          "shirtNumber": 10,
+          "name": "Ryan Gemmell",
+          "image": "https://www.scottishfacomet.co.uk/file?id=5bb86432-dd71-4508-bb3d-79f3fef5b0f7",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 10,
+          "rowEvents": []
+        },
+        {
+          "shirtNumber": 11,
+          "name": "Kevin Fell",
+          "image": "https://www.scottishfacomet.co.uk/file?id=3733d251-9a09-47d3-9f04-5be99c10ab0c",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 11,
+          "rowEvents": [
+            {
+              "type": "yellow_card",
+              "minute": "59'",
+              "linkedShirtNumber": null,
+              "alt": "Yellow card",
+              "icon": "event.yellowcard.svg"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "order": 2,
+          "minute": "90+1'",
+          "type": "yellow_card",
+          "side": "away",
+          "team": "Glasgow Perthshire F.C.",
+          "player": "Rory Devenney",
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 3,
+          "minute": "78'",
+          "type": "substitution",
+          "side": "home",
+          "team": "East Kilbride Thistle F.C.",
+          "player": null,
+          "playerIn": "Friel S.",
+          "playerOut": "McLaren W."
+        },
+        {
+          "order": 4,
+          "minute": "71'",
+          "type": "substitution",
+          "side": "home",
+          "team": "East Kilbride Thistle F.C.",
+          "player": null,
+          "playerIn": "Archer L.",
+          "playerOut": "Scullion J."
+        },
+        {
+          "order": 5,
+          "minute": "70'",
+          "type": "yellow_card",
+          "side": "away",
+          "team": "Glasgow Perthshire F.C.",
+          "player": "Crumlish J.",
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 6,
+          "minute": "65'",
+          "type": "unknown",
+          "side": null,
+          "team": null,
+          "player": null,
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 7,
+          "minute": "63'",
+          "type": "unknown",
+          "side": null,
+          "team": null,
+          "player": null,
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 8,
+          "minute": "62'",
+          "type": "goal",
+          "side": "home",
+          "team": "East Kilbride Thistle F.C.",
+          "player": "McLaren W.",
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 9,
+          "minute": "61'",
+          "type": "substitution",
+          "side": "away",
+          "team": "Glasgow Perthshire F.C.",
+          "player": null,
+          "playerIn": "Reeves L.",
+          "playerOut": "Simpson J."
+        },
+        {
+          "order": 10,
+          "minute": "61'",
+          "type": "substitution",
+          "side": "away",
+          "team": "Glasgow Perthshire F.C.",
+          "player": null,
+          "playerIn": "Tweedie m.",
+          "playerOut": "Balsillie J."
+        },
+        {
+          "order": 11,
+          "minute": "61'",
+          "type": "substitution",
+          "side": "away",
+          "team": "Glasgow Perthshire F.C.",
+          "player": null,
+          "playerIn": "Paterson J.",
+          "playerOut": "morrison d."
+        },
+        {
+          "order": 12,
+          "minute": "60'",
+          "type": "substitution",
+          "side": "home",
+          "team": "East Kilbride Thistle F.C.",
+          "player": null,
+          "playerIn": "Tough C.",
+          "playerOut": "Stewart M."
+        },
+        {
+          "order": 13,
+          "minute": "60'",
+          "type": "substitution",
+          "side": "home",
+          "team": "East Kilbride Thistle F.C.",
+          "player": null,
+          "playerIn": "Scott J.",
+          "playerOut": "Stewart G."
+        },
+        {
+          "order": 14,
+          "minute": "60'",
+          "type": "substitution",
+          "side": "home",
+          "team": "East Kilbride Thistle F.C.",
+          "player": null,
+          "playerIn": "Hughes J.",
+          "playerOut": "Conor Boyle"
+        },
+        {
+          "order": 15,
+          "minute": "59'",
+          "type": "yellow_card",
+          "side": "away",
+          "team": "Glasgow Perthshire F.C.",
+          "player": "Fell K.",
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 16,
+          "minute": "52'",
+          "type": "yellow_card",
+          "side": "away",
+          "team": "Glasgow Perthshire F.C.",
+          "player": "Simpson J.",
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 17,
+          "minute": "50'",
+          "type": "goal",
+          "side": "home",
+          "team": "East Kilbride Thistle F.C.",
+          "player": "McKenzie C.",
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 19,
+          "minute": "46'",
+          "type": "substitution",
+          "side": "away",
+          "team": "Glasgow Perthshire F.C.",
+          "player": null,
+          "playerIn": "Balsillie J.",
+          "playerOut": "Donnelly R."
+        },
+        {
+          "order": 20,
+          "minute": "46'",
+          "type": "substitution",
+          "side": "away",
+          "team": "Glasgow Perthshire F.C.",
+          "player": null,
+          "playerIn": "Kirkwood D.",
+          "playerOut": "Noble L."
+        },
+        {
+          "order": 22,
+          "minute": "45'",
+          "type": "unknown",
+          "side": null,
+          "team": null,
+          "player": null,
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 23,
+          "minute": "31'",
+          "type": "goal",
+          "side": "home",
+          "team": "East Kilbride Thistle F.C.",
+          "player": "Scullion J.",
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 24,
+          "minute": "18'",
+          "type": "goal",
+          "side": "home",
+          "team": "East Kilbride Thistle F.C.",
+          "player": "McLaren W.",
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 25,
+          "minute": "13'",
+          "type": "goal",
+          "side": "home",
+          "team": "East Kilbride Thistle F.C.",
+          "player": "Stewart G.",
+          "playerIn": null,
+          "playerOut": null
+        }
+      ]
+    },
+    {
+      "matchId": 54097530,
+      "dateTimeUTC": 1785589200000,
+      "competition": "West of Scotland Third Division 26/27",
+      "round": "3",
+      "matchNumber": 19,
+      "homeTeam": "Giffnock SC",
+      "awayTeam": "East Kilbride Thistle F.C.",
+      "score": {
+        "home": 2,
+        "away": 4
+      },
+      "status": "PLAYED",
+      "facility": "Gsc Auldhouse",
+      "description": "Giffnock SC - East Kilbride Thistle F.C. 2:4",
+      "homeLineup": [
+        {
+          "shirtNumber": 1,
+          "name": "Jay Bett",
+          "image": "https://www.scottishfacomet.co.uk/file?id=748b32f3-8025-432d-b526-5ec7d550db69",
+          "goalkeeper": true,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 1,
+          "rowEvents": []
+        },
+        {
+          "shirtNumber": 2,
+          "name": "Jack Agnew",
+          "image": "https://www.scottishfacomet.co.uk/file?id=72ec7d16-c137-42f1-a12b-96e8094a9e5c",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 2,
+          "rowEvents": [
+            {
+              "type": "yellow_card",
+              "minute": "21'",
+              "linkedShirtNumber": null,
+              "alt": "Yellow card",
+              "icon": "event.yellowcard.svg"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 3,
+          "name": "Jonathon Brown",
+          "image": "https://www.scottishfacomet.co.uk/file?id=6c833765-f355-4c53-b7d3-b799a1d63288",
+          "goalkeeper": false,
+          "captain": true,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": true,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": "71'",
+          "lineupOrder": 3,
+          "rowEvents": [
+            {
+              "type": "substitution",
+              "minute": "71'",
+              "linkedShirtNumber": 16,
+              "alt": "Substitution",
+              "icon": "event.substitution-out.png"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 4,
+          "name": "Kyle Dalziel",
+          "image": "https://www.scottishfacomet.co.uk/file?id=9a268166-d888-469d-a3d7-9ebc7e2b4d99",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 4,
+          "rowEvents": [
+            {
+              "type": "red_card",
+              "minute": "55'",
+              "linkedShirtNumber": null,
+              "alt": "Red card",
+              "icon": "event.redcard.svg"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 5,
+          "name": "Ryan Whitehorn",
+          "image": "https://www.scottishfacomet.co.uk/file?id=f459b90e-4ddf-4f32-b5d9-fe04c87ff0a4",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 5,
+          "rowEvents": []
+        },
+        {
+          "shirtNumber": 6,
+          "name": "Euan Maclean",
+          "image": "https://www.scottishfacomet.co.uk/file?id=43ea2624-fbfc-47ea-8739-a2d94fdc52af",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 6,
+          "rowEvents": []
+        },
+        {
+          "shirtNumber": 7,
+          "name": "Ryan Milne",
+          "image": "https://www.scottishfacomet.co.uk/file?id=c837f65a-8cd7-4363-8881-84fc96b46b4d",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": true,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": "75'",
+          "lineupOrder": 7,
+          "rowEvents": [
+            {
+              "type": "goal",
+              "minute": "44'",
+              "linkedShirtNumber": null,
+              "alt": "Goal",
+              "icon": "event.goal.svg"
+            },
+            {
+              "type": "substitution",
+              "minute": "75'",
+              "linkedShirtNumber": 12,
+              "alt": "Substitution",
+              "icon": "event.substitution-out.png"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 8,
+          "name": "Owen Adam",
+          "image": "https://www.scottishfacomet.co.uk/file?id=2029eb47-219f-46be-9819-ef49bd09c34b",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 8,
+          "rowEvents": []
+        },
+        {
+          "shirtNumber": 9,
+          "name": "Augustine Nwabuzor",
+          "image": "https://www.scottishfacomet.co.uk/file?id=4df80233-0949-4b6f-a5e8-b2e01ee10869",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": true,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": "63'",
+          "lineupOrder": 9,
+          "rowEvents": [
+            {
+              "type": "substitution",
+              "minute": "63'",
+              "linkedShirtNumber": 14,
+              "alt": "Substitution",
+              "icon": "event.substitution-out.png"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 10,
+          "name": "James Crossan",
+          "image": "https://www.scottishfacomet.co.uk/file?id=37811624-46d2-4dcf-bbfc-96cd5fee5ad6",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": true,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": "71'",
+          "lineupOrder": 10,
+          "rowEvents": [
+            {
+              "type": "yellow_card",
+              "minute": "32'",
+              "linkedShirtNumber": null,
+              "alt": "Yellow card",
+              "icon": "event.yellowcard.svg"
+            },
+            {
+              "type": "substitution",
+              "minute": "71'",
+              "linkedShirtNumber": 15,
+              "alt": "Substitution",
+              "icon": "event.substitution-out.png"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 11,
+          "name": "Chris Bell",
+          "image": "https://www.scottishfacomet.co.uk/file?id=cb8d8049-62ca-4a3d-9a24-2cee76414782",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": true,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": "75'",
+          "lineupOrder": 11,
+          "rowEvents": [
+            {
+              "type": "yellow_card",
+              "minute": "68'",
+              "linkedShirtNumber": null,
+              "alt": "Yellow card",
+              "icon": "event.yellowcard.svg"
+            },
+            {
+              "type": "substitution",
+              "minute": "75'",
+              "linkedShirtNumber": 18,
+              "alt": "Substitution",
+              "icon": "event.substitution-out.png"
+            }
+          ]
+        }
+      ],
+      "awayLineup": [
+        {
+          "shirtNumber": 1,
+          "name": "Jamie McAllister",
+          "image": "https://www.scottishfacomet.co.uk/file?id=83733ec9-8026-47fc-92d3-7f005d6cc31b",
+          "goalkeeper": true,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": true,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": "46'",
+          "lineupOrder": 1,
+          "rowEvents": [
+            {
+              "type": "substitution",
+              "minute": "46'",
+              "linkedShirtNumber": 13,
+              "alt": "Substitution",
+              "icon": "event.substitution-out.png"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 2,
+          "name": "Marcus Stewart",
+          "image": "https://www.scottishfacomet.co.uk/file?id=c0c2c92a-bd4b-4aa5-8b73-0bc847c61d35",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": true,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": "83'",
+          "lineupOrder": 2,
+          "rowEvents": [
+            {
+              "type": "substitution",
+              "minute": "83'",
+              "linkedShirtNumber": 12,
+              "alt": "Substitution",
+              "icon": "event.substitution-out.png"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 3,
+          "name": "Patrick McLaughlin",
+          "image": "https://www.scottishfacomet.co.uk/file?id=4e027a51-8001-4bf7-bf90-b515fc5ce349",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 3,
+          "rowEvents": []
+        },
+        {
+          "shirtNumber": 4,
+          "name": "Macauley Kennedy",
+          "image": "https://www.scottishfacomet.co.uk/file?id=597bad3b-93a0-4388-b1d2-edea8b6508f1",
+          "goalkeeper": false,
+          "captain": true,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 4,
+          "rowEvents": [
+            {
+              "type": "yellow_card",
+              "minute": "50'",
+              "linkedShirtNumber": null,
+              "alt": "Yellow card",
+              "icon": "event.yellowcard.svg"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 5,
+          "name": "mark cuthbertson",
+          "image": "https://www.scottishfacomet.co.uk/file?id=291927dc-d90b-4aa9-81e4-2e9531e9dd01",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": true,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": "70'",
+          "lineupOrder": 5,
+          "rowEvents": [
+            {
+              "type": "substitution",
+              "minute": "70'",
+              "linkedShirtNumber": 16,
+              "alt": "Substitution",
+              "icon": "event.substitution-out.png"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 6,
+          "name": "Munyaradzi Mbanje",
+          "image": "https://www.scottishfacomet.co.uk/file?id=14f8d285-cb42-40ce-aedf-c87ef713adc2",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 6,
+          "rowEvents": []
+        },
+        {
+          "shirtNumber": 7,
+          "name": "Jamie Scullion",
+          "image": "https://www.scottishfacomet.co.uk/file?id=42d4e664-83fe-4662-9cb3-249c63fa87a7",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 7,
+          "rowEvents": []
+        },
+        {
+          "shirtNumber": 8,
+          "name": "Conor Boyle",
+          "image": "https://www.scottishfacomet.co.uk/file?id=91928413-6434-4082-9e54-132089b6cc7f",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 8,
+          "rowEvents": [
+            {
+              "type": "yellow_card",
+              "minute": "75'",
+              "linkedShirtNumber": null,
+              "alt": "Yellow card",
+              "icon": "event.yellowcard.svg"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 9,
+          "name": "Gary Stewart",
+          "image": "https://www.scottishfacomet.co.uk/file?id=9ad65119-892d-40ed-b634-cf63c7e17fa7",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": true,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": "63'",
+          "lineupOrder": 9,
+          "rowEvents": [
+            {
+              "type": "goal",
+              "minute": "30'",
+              "linkedShirtNumber": null,
+              "alt": "Goal",
+              "icon": "event.goal.svg"
+            },
+            {
+              "type": "substitution",
+              "minute": "63'",
+              "linkedShirtNumber": 10,
+              "alt": "Substitution",
+              "icon": "event.substitution-out.png"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 11,
+          "name": "Kieron McAvoy",
+          "image": "https://www.scottishfacomet.co.uk/file?id=d57da290-3fec-4d16-94e2-e6376f10caa6",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": true,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": "46'",
+          "lineupOrder": 10,
+          "rowEvents": [
+            {
+              "type": "goal",
+              "minute": "33'",
+              "linkedShirtNumber": null,
+              "alt": "Goal",
+              "icon": "event.goal.svg"
+            },
+            {
+              "type": "substitution",
+              "minute": "46'",
+              "linkedShirtNumber": 14,
+              "alt": "Substitution",
+              "icon": "event.substitution-out.png"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 19,
+          "name": "Jordan Grant",
+          "image": "https://www.scottishfacomet.co.uk/file?id=1e83e03f-eb0f-4364-935a-2647dc5d1c49",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 11,
+          "rowEvents": []
+        }
+      ],
+      "events": [
+        {
+          "order": 2,
+          "minute": "90+3'",
+          "type": "goal",
+          "side": "away",
+          "team": "East Kilbride Thistle F.C.",
+          "player": "Scott J.",
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 3,
+          "minute": "83'",
+          "type": "substitution",
+          "side": "away",
+          "team": "East Kilbride Thistle F.C.",
+          "player": null,
+          "playerIn": "Scott J.",
+          "playerOut": "Stewart M."
+        },
+        {
+          "order": 4,
+          "minute": "76'",
+          "type": "goal",
+          "side": "home",
+          "team": "Giffnock SC",
+          "player": "Barnsley A.",
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 5,
+          "minute": "75'",
+          "type": "yellow_card",
+          "side": "away",
+          "team": "East Kilbride Thistle F.C.",
+          "player": "Conor Boyle",
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 6,
+          "minute": "75'",
+          "type": "substitution",
+          "side": "home",
+          "team": "Giffnock SC",
+          "player": null,
+          "playerIn": "Darroch L.",
+          "playerOut": "Bell C."
+        },
+        {
+          "order": 7,
+          "minute": "75'",
+          "type": "substitution",
+          "side": "home",
+          "team": "Giffnock SC",
+          "player": null,
+          "playerIn": "Gary Duggan",
+          "playerOut": "Milne R."
+        },
+        {
+          "order": 8,
+          "minute": "71'",
+          "type": "substitution",
+          "side": "home",
+          "team": "Giffnock SC",
+          "player": null,
+          "playerIn": "Barnsley A.",
+          "playerOut": "Jonathon Brown"
+        },
+        {
+          "order": 9,
+          "minute": "71'",
+          "type": "substitution",
+          "side": "home",
+          "team": "Giffnock SC",
+          "player": null,
+          "playerIn": "Maclean N.",
+          "playerOut": "Crossan J."
+        },
+        {
+          "order": 10,
+          "minute": "70'",
+          "type": "substitution",
+          "side": "away",
+          "team": "East Kilbride Thistle F.C.",
+          "player": null,
+          "playerIn": "McKenzie C.",
+          "playerOut": "cuthbertson m."
+        },
+        {
+          "order": 11,
+          "minute": "68'",
+          "type": "goal",
+          "side": "away",
+          "team": "East Kilbride Thistle F.C.",
+          "player": "McLaren W.",
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 12,
+          "minute": "68'",
+          "type": "yellow_card",
+          "side": "home",
+          "team": "Giffnock SC",
+          "player": "Bell C.",
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 13,
+          "minute": "63'",
+          "type": "substitution",
+          "side": "away",
+          "team": "East Kilbride Thistle F.C.",
+          "player": null,
+          "playerIn": "McLaren W.",
+          "playerOut": "Stewart G."
+        },
+        {
+          "order": 14,
+          "minute": "63'",
+          "type": "substitution",
+          "side": "home",
+          "team": "Giffnock SC",
+          "player": null,
+          "playerIn": "MacDonald E.",
+          "playerOut": "Nwabuzor A."
+        },
+        {
+          "order": 15,
+          "minute": "55'",
+          "type": "red_card",
+          "side": "home",
+          "team": "Giffnock SC",
+          "player": "Dalziel K.",
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 16,
+          "minute": "50'",
+          "type": "yellow_card",
+          "side": "away",
+          "team": "East Kilbride Thistle F.C.",
+          "player": "Kennedy M.",
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 18,
+          "minute": "46'",
+          "type": "substitution",
+          "side": "away",
+          "team": "East Kilbride Thistle F.C.",
+          "player": null,
+          "playerIn": "Hampson A.",
+          "playerOut": "McAvoy K."
+        },
+        {
+          "order": 19,
+          "minute": "46'",
+          "type": "substitution",
+          "side": "away",
+          "team": "East Kilbride Thistle F.C.",
+          "player": null,
+          "playerIn": "Borland M.",
+          "playerOut": "McAllister J."
+        },
+        {
+          "order": 21,
+          "minute": "44'",
+          "type": "goal",
+          "side": "home",
+          "team": "Giffnock SC",
+          "player": "Milne R.",
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 22,
+          "minute": "33'",
+          "type": "goal",
+          "side": "away",
+          "team": "East Kilbride Thistle F.C.",
+          "player": "McAvoy K.",
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 23,
+          "minute": "32'",
+          "type": "yellow_card",
+          "side": "home",
+          "team": "Giffnock SC",
+          "player": "Crossan J.",
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 24,
+          "minute": "30'",
+          "type": "goal",
+          "side": "away",
+          "team": "East Kilbride Thistle F.C.",
+          "player": "Stewart G.",
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 25,
+          "minute": "21'",
+          "type": "yellow_card",
+          "side": "home",
+          "team": "Giffnock SC",
+          "player": "Jack Agnew",
+          "playerIn": null,
+          "playerOut": null
+        }
+      ]
+    },
+    {
+      "matchId": 54097522,
+      "dateTimeUTC": 1785263400000,
+      "competition": "West of Scotland Third Division 26/27",
+      "round": "2",
+      "matchNumber": 11,
+      "homeTeam": "East Kilbride Thistle F.C.",
+      "awayTeam": "West Park United FC",
+      "score": {
+        "home": 5,
+        "away": 4
+      },
+      "status": "PLAYED",
+      "facility": "Showpark",
+      "description": "East Kilbride Thistle F.C. - West Park United FC 5:4",
+      "homeLineup": [
+        {
+          "shirtNumber": 1,
+          "name": "Jamie McAllister",
+          "image": "https://www.scottishfacomet.co.uk/file?id=83733ec9-8026-47fc-92d3-7f005d6cc31b",
+          "goalkeeper": true,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 1,
+          "rowEvents": []
+        },
+        {
+          "shirtNumber": 2,
+          "name": "Marcus Stewart",
+          "image": "https://www.scottishfacomet.co.uk/file?id=c0c2c92a-bd4b-4aa5-8b73-0bc847c61d35",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": true,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": "75'",
+          "lineupOrder": 2,
+          "rowEvents": [
+            {
+              "type": "substitution",
+              "minute": "75'",
+              "linkedShirtNumber": 16,
+              "alt": "Substitution",
+              "icon": "event.substitution-out.png"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 3,
+          "name": "Stephen Crossan",
+          "image": "https://www.scottishfacomet.co.uk/file?id=e0ad5f5c-4305-42f5-a72f-7d7e9d8794a6",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": true,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": "46'",
+          "lineupOrder": 3,
+          "rowEvents": [
+            {
+              "type": "substitution",
+              "minute": "46'",
+              "linkedShirtNumber": 6,
+              "alt": "Substitution",
+              "icon": "event.substitution-out.png"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 4,
+          "name": "Macauley Kennedy",
+          "image": "https://www.scottishfacomet.co.uk/file?id=597bad3b-93a0-4388-b1d2-edea8b6508f1",
+          "goalkeeper": false,
+          "captain": true,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": true,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": "75'",
+          "lineupOrder": 4,
+          "rowEvents": [
+            {
+              "type": "substitution",
+              "minute": "75'",
+              "linkedShirtNumber": 14,
+              "alt": "Substitution",
+              "icon": "event.substitution-out.png"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 5,
+          "name": "mark cuthbertson",
+          "image": "https://www.scottishfacomet.co.uk/file?id=291927dc-d90b-4aa9-81e4-2e9531e9dd01",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 5,
+          "rowEvents": [
+            {
+              "type": "own_goal",
+              "minute": "41'",
+              "linkedShirtNumber": null,
+              "alt": "Own goal",
+              "icon": "event.owngoal.svg"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 7,
+          "name": "Jamie Scullion",
+          "image": "https://www.scottishfacomet.co.uk/file?id=42d4e664-83fe-4662-9cb3-249c63fa87a7",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 6,
+          "rowEvents": []
+        },
+        {
+          "shirtNumber": 8,
+          "name": "Conor Boyle",
+          "image": "https://www.scottishfacomet.co.uk/file?id=91928413-6434-4082-9e54-132089b6cc7f",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 7,
+          "rowEvents": []
+        },
+        {
+          "shirtNumber": 9,
+          "name": "Gary Stewart",
+          "image": "https://www.scottishfacomet.co.uk/file?id=9ad65119-892d-40ed-b634-cf63c7e17fa7",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 8,
+          "rowEvents": [
+            {
+              "type": "goal",
+              "minute": "28'",
+              "linkedShirtNumber": null,
+              "alt": "Goal",
+              "icon": "event.goal.svg"
+            },
+            {
+              "type": "goal",
+              "minute": "42'",
+              "linkedShirtNumber": null,
+              "alt": "Goal",
+              "icon": "event.goal.svg"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 10,
+          "name": "Connor McKenzie",
+          "image": "https://www.scottishfacomet.co.uk/file?id=cecbcd83-691f-46ec-838a-5f10aa8fb41c",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": true,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": "65'",
+          "lineupOrder": 9,
+          "rowEvents": [
+            {
+              "type": "yellow_card",
+              "minute": "32'",
+              "linkedShirtNumber": null,
+              "alt": "Yellow card",
+              "icon": "event.yellowcard.svg"
+            },
+            {
+              "type": "substitution",
+              "minute": "65'",
+              "linkedShirtNumber": 15,
+              "alt": "Substitution",
+              "icon": "event.substitution-out.png"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 11,
+          "name": "Anthony Hampson",
+          "image": "https://www.scottishfacomet.co.uk/file?id=670198e4-fc55-4fea-a5fa-63862497c557",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": true,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": "80'",
+          "lineupOrder": 10,
+          "rowEvents": [
+            {
+              "type": "substitution",
+              "minute": "80'",
+              "linkedShirtNumber": 18,
+              "alt": "Substitution",
+              "icon": "event.substitution-out.png"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 19,
+          "name": "Jordan Grant",
+          "image": "https://www.scottishfacomet.co.uk/file?id=1e83e03f-eb0f-4364-935a-2647dc5d1c49",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 11,
+          "rowEvents": []
+        }
+      ],
+      "awayLineup": [
+        {
+          "shirtNumber": 1,
+          "name": "Gregor Binnie",
+          "image": "https://www.scottishfacomet.co.uk/file?id=90bcadc1-2f57-43d4-8691-f177f2cede0a",
+          "goalkeeper": true,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 1,
+          "rowEvents": []
+        },
+        {
+          "shirtNumber": 2,
+          "name": "Jack Anderson",
+          "image": "https://www.scottishfacomet.co.uk/file?id=068d96e0-1bca-4ad7-b3d0-9b3442b878aa",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": true,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": "46'",
+          "lineupOrder": 2,
+          "rowEvents": [
+            {
+              "type": "substitution",
+              "minute": "46'",
+              "linkedShirtNumber": 11,
+              "alt": "Substitution",
+              "icon": "event.substitution-out.png"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 4,
+          "name": "Alex Chatterton",
+          "image": "https://www.scottishfacomet.co.uk/file?id=77116e8a-058d-4f2e-bd1d-63212db0884d",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 3,
+          "rowEvents": [
+            {
+              "type": "yellow_card",
+              "minute": "82'",
+              "linkedShirtNumber": null,
+              "alt": "Yellow card",
+              "icon": "event.yellowcard.svg"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 5,
+          "name": "Dean Bates",
+          "image": "https://www.scottishfacomet.co.uk/file?id=091c7537-d865-4b66-978d-0c08e79ba112",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": true,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": "77'",
+          "lineupOrder": 4,
+          "rowEvents": [
+            {
+              "type": "own_goal",
+              "minute": "20'",
+              "linkedShirtNumber": null,
+              "alt": "Own goal",
+              "icon": "event.owngoal.svg"
+            },
+            {
+              "type": "substitution",
+              "minute": "77'",
+              "linkedShirtNumber": 26,
+              "alt": "Substitution",
+              "icon": "event.substitution-out.png"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 6,
+          "name": "Brad Ross",
+          "image": "https://www.scottishfacomet.co.uk/file?id=7e3c73e1-baa1-4ea4-854d-042c5621d811",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 5,
+          "rowEvents": []
+        },
+        {
+          "shirtNumber": 7,
+          "name": "Sean Findlay",
+          "image": "https://www.scottishfacomet.co.uk/file?id=3e4841cd-e0a4-40df-84be-eb6bca05d676",
+          "goalkeeper": false,
+          "captain": true,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": true,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": "80'",
+          "lineupOrder": 6,
+          "rowEvents": [
+            {
+              "type": "substitution",
+              "minute": "80'",
+              "linkedShirtNumber": 18,
+              "alt": "Substitution",
+              "icon": "event.substitution-out.png"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 8,
+          "name": "Keir Miller",
+          "image": "https://www.scottishfacomet.co.uk/file?id=85f7dabc-e066-45ab-aa4f-2077399f3c0a",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 7,
+          "rowEvents": [
+            {
+              "type": "yellow_card",
+              "minute": "74'",
+              "linkedShirtNumber": null,
+              "alt": "Yellow card",
+              "icon": "event.yellowcard.svg"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 10,
+          "name": "Sean Watson",
+          "image": "https://www.scottishfacomet.co.uk/file?id=32d999a2-cdd3-444a-9947-4de9f69d7865",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 8,
+          "rowEvents": [
+            {
+              "type": "goal",
+              "minute": "86'",
+              "linkedShirtNumber": null,
+              "alt": "Goal",
+              "icon": "event.goal.svg"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 12,
+          "name": "Jamie Young",
+          "image": "https://www.scottishfacomet.co.uk/file?id=7ddcfeae-b434-4ef0-8114-0b1f31a1e833",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 9,
+          "rowEvents": []
+        },
+        {
+          "shirtNumber": 14,
+          "name": "Marcus Taylor",
+          "image": "https://www.scottishfacomet.co.uk/file?id=b42fd178-0fa6-476c-b181-5cba5ead4dd1",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": true,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": "46'",
+          "lineupOrder": 10,
+          "rowEvents": [
+            {
+              "type": "goal",
+              "minute": "2'",
+              "linkedShirtNumber": null,
+              "alt": "Goal",
+              "icon": "event.goal.svg"
+            },
+            {
+              "type": "substitution",
+              "minute": "46'",
+              "linkedShirtNumber": 15,
+              "alt": "Substitution",
+              "icon": "event.substitution-out.png"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 16,
+          "name": "Adam Gribben",
+          "image": "https://www.scottishfacomet.co.uk/file?id=60bee728-be80-4172-be64-5ea64e7dfb97",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 11,
+          "rowEvents": [
+            {
+              "type": "goal",
+              "minute": "44'",
+              "linkedShirtNumber": null,
+              "alt": "Goal",
+              "icon": "event.goal.svg"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "order": 1,
+          "minute": "86'",
+          "type": "goal",
+          "side": "away",
+          "team": "West Park United FC",
+          "player": "Watson S.",
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 2,
+          "minute": "83'",
+          "type": "goal",
+          "side": "home",
+          "team": "East Kilbride Thistle F.C.",
+          "player": "McAvoy K.",
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 3,
+          "minute": "82'",
+          "type": "yellow_card",
+          "side": "away",
+          "team": "West Park United FC",
+          "player": "Chatterton A.",
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 4,
+          "minute": "80'",
+          "type": "substitution",
+          "side": "away",
+          "team": "West Park United FC",
+          "player": null,
+          "playerIn": "Thom K.",
+          "playerOut": "Findlay S."
+        },
+        {
+          "order": 5,
+          "minute": "80'",
+          "type": "substitution",
+          "side": "home",
+          "team": "East Kilbride Thistle F.C.",
+          "player": null,
+          "playerIn": "Kane M.",
+          "playerOut": "Hampson A."
+        },
+        {
+          "order": 6,
+          "minute": "80'",
+          "type": "unknown",
+          "side": null,
+          "team": null,
+          "player": null,
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 7,
+          "minute": "77'",
+          "type": "substitution",
+          "side": "away",
+          "team": "West Park United FC",
+          "player": null,
+          "playerIn": "MCLAUGHLIN N.",
+          "playerOut": "Bates D."
+        },
+        {
+          "order": 8,
+          "minute": "77'",
+          "type": "unknown",
+          "side": null,
+          "team": null,
+          "player": null,
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 9,
+          "minute": "75'",
+          "type": "goal",
+          "side": "home",
+          "team": "East Kilbride Thistle F.C.",
+          "player": "McAvoy K.",
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 10,
+          "minute": "75'",
+          "type": "substitution",
+          "side": "home",
+          "team": "East Kilbride Thistle F.C.",
+          "player": null,
+          "playerIn": "Blair J.",
+          "playerOut": "Stewart M."
+        },
+        {
+          "order": 11,
+          "minute": "75'",
+          "type": "substitution",
+          "side": "home",
+          "team": "East Kilbride Thistle F.C.",
+          "player": null,
+          "playerIn": "Mbanje M.",
+          "playerOut": "Kennedy M."
+        },
+        {
+          "order": 12,
+          "minute": "74'",
+          "type": "yellow_card",
+          "side": "away",
+          "team": "West Park United FC",
+          "player": "Miller K.",
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 13,
+          "minute": "68'",
+          "type": "unknown",
+          "side": null,
+          "team": null,
+          "player": null,
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 14,
+          "minute": "65'",
+          "type": "substitution",
+          "side": "home",
+          "team": "East Kilbride Thistle F.C.",
+          "player": null,
+          "playerIn": "McAvoy K.",
+          "playerOut": "McKenzie C."
+        },
+        {
+          "order": 15,
+          "minute": "62'",
+          "type": "yellow_card",
+          "side": "away",
+          "team": "West Park United FC",
+          "player": "Lee M.",
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 16,
+          "minute": "46'",
+          "type": "substitution",
+          "side": "away",
+          "team": "West Park United FC",
+          "player": null,
+          "playerIn": "McQuarrie R.",
+          "playerOut": "Taylor M."
+        },
+        {
+          "order": 17,
+          "minute": "46'",
+          "type": "substitution",
+          "side": "away",
+          "team": "West Park United FC",
+          "player": null,
+          "playerIn": "Lleshi K.",
+          "playerOut": "Anderson J."
+        },
+        {
+          "order": 18,
+          "minute": "46'",
+          "type": "substitution",
+          "side": "home",
+          "team": "East Kilbride Thistle F.C.",
+          "player": null,
+          "playerIn": "Tough C.",
+          "playerOut": "Crossan S."
+        },
+        {
+          "order": 19,
+          "minute": "44'",
+          "type": "goal",
+          "side": "away",
+          "team": "West Park United FC",
+          "player": "Gribben A.",
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 20,
+          "minute": "44'",
+          "type": "unknown",
+          "side": null,
+          "team": null,
+          "player": null,
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 21,
+          "minute": "43'",
+          "type": "unknown",
+          "side": null,
+          "team": null,
+          "player": null,
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 22,
+          "minute": "42'",
+          "type": "goal",
+          "side": "home",
+          "team": "East Kilbride Thistle F.C.",
+          "player": "Stewart G.",
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 23,
+          "minute": "41'",
+          "type": "own_goal",
+          "side": "home",
+          "team": "East Kilbride Thistle F.C.",
+          "player": "cuthbertson m.",
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 24,
+          "minute": "41'",
+          "type": "unknown",
+          "side": null,
+          "team": null,
+          "player": null,
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 25,
+          "minute": "32'",
+          "type": "yellow_card",
+          "side": "home",
+          "team": "East Kilbride Thistle F.C.",
+          "player": "McKenzie C.",
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 26,
+          "minute": "29'",
+          "type": "unknown",
+          "side": null,
+          "team": null,
+          "player": null,
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 27,
+          "minute": "28'",
+          "type": "goal",
+          "side": "home",
+          "team": "East Kilbride Thistle F.C.",
+          "player": "Stewart G.",
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 28,
+          "minute": "20'",
+          "type": "own_goal",
+          "side": "away",
+          "team": "West Park United FC",
+          "player": "Bates D.",
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 29,
+          "minute": "20'",
+          "type": "unknown",
+          "side": null,
+          "team": null,
+          "player": null,
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 30,
+          "minute": "2'",
+          "type": "goal",
+          "side": "away",
+          "team": "West Park United FC",
+          "player": "Taylor M.",
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 31,
+          "minute": "2'",
+          "type": "unknown",
+          "side": null,
+          "team": null,
+          "player": null,
+          "playerIn": null,
+          "playerOut": null
+        }
+      ]
+    },
+    {
+      "matchId": 54097513,
+      "dateTimeUTC": 1784984400000,
+      "competition": "West of Scotland Third Division 26/27",
+      "round": "1",
+      "matchNumber": 2,
+      "homeTeam": "Eglinton FC",
+      "awayTeam": "East Kilbride Thistle F.C.",
+      "score": {
+        "home": 0,
+        "away": 2
+      },
+      "status": "PLAYED",
+      "facility": "Campbell Park Saltcoats",
+      "description": "Eglinton FC - East Kilbride Thistle F.C. 0:2",
+      "homeLineup": [
+        {
+          "shirtNumber": 1,
+          "name": "Ross Lundy",
+          "image": "https://www.scottishfacomet.co.uk/file?id=fcc0fc5d-91e7-48b1-8a5b-4036cad81af5",
+          "goalkeeper": true,
+          "captain": true,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 1,
+          "rowEvents": []
+        },
+        {
+          "shirtNumber": 2,
+          "name": "Jamie Cochran",
+          "image": "https://www.scottishfacomet.co.uk/file?id=746e21b1-f7fe-4bc0-a888-d2ed26a4f7c9",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": true,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": "64'",
+          "lineupOrder": 2,
+          "rowEvents": [
+            {
+              "type": "substitution",
+              "minute": "64'",
+              "linkedShirtNumber": 12,
+              "alt": "Substitution",
+              "icon": "event.substitution-out.png"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 4,
+          "name": "Logan Ellis",
+          "image": "https://www.scottishfacomet.co.uk/file?id=795a6ade-9ea7-4708-9a5b-9c9b4eb84243",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 3,
+          "rowEvents": []
+        },
+        {
+          "shirtNumber": 5,
+          "name": "Finlay Grier",
+          "image": "https://www.scottishfacomet.co.uk/file?id=eb8da0a6-b670-44d3-a0e0-20172b773380",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 4,
+          "rowEvents": []
+        },
+        {
+          "shirtNumber": 6,
+          "name": "Tyler Burns",
+          "image": "https://www.scottishfacomet.co.uk/file?id=96be6b13-94b7-4ca6-9573-0d079706a111",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 5,
+          "rowEvents": []
+        },
+        {
+          "shirtNumber": 7,
+          "name": "James Maxwell",
+          "image": "https://www.scottishfacomet.co.uk/file?id=302b9f40-c5fa-4dfd-b11f-85c59ff1667d",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 6,
+          "rowEvents": []
+        },
+        {
+          "shirtNumber": 8,
+          "name": "Sam Duncan",
+          "image": "https://www.scottishfacomet.co.uk/file?id=6e914396-75a8-4337-a615-95624b29e76a",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 7,
+          "rowEvents": []
+        },
+        {
+          "shirtNumber": 9,
+          "name": "Michael Young",
+          "image": "https://www.scottishfacomet.co.uk/file?id=cf1134e4-fa88-4445-8d0b-5415356c05f9",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": true,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": "64'",
+          "lineupOrder": 8,
+          "rowEvents": [
+            {
+              "type": "substitution",
+              "minute": "64'",
+              "linkedShirtNumber": 15,
+              "alt": "Substitution",
+              "icon": "event.substitution-out.png"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 10,
+          "name": "Liam Davis",
+          "image": "https://www.scottishfacomet.co.uk/file?id=233b4a1f-487a-437b-85e2-9510a5dabfec",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 9,
+          "rowEvents": []
+        },
+        {
+          "shirtNumber": 11,
+          "name": "Aiden Monaghan",
+          "image": "https://www.scottishfacomet.co.uk/file?id=e748a9d4-7f7f-4c88-b0ed-a235c0070af5",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": true,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": "77'",
+          "lineupOrder": 10,
+          "rowEvents": [
+            {
+              "type": "substitution",
+              "minute": "77'",
+              "linkedShirtNumber": 14,
+              "alt": "Substitution",
+              "icon": "event.substitution-out.png"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 18,
+          "name": "Daniil Kulinich",
+          "image": "https://www.scottishfacomet.co.uk/file?id=59846031-6fe3-4de3-83d5-36e4f1994316",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 11,
+          "rowEvents": []
+        }
+      ],
+      "awayLineup": [
+        {
+          "shirtNumber": 1,
+          "name": "Jamie McAllister",
+          "image": "https://www.scottishfacomet.co.uk/file?id=83733ec9-8026-47fc-92d3-7f005d6cc31b",
+          "goalkeeper": true,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 1,
+          "rowEvents": []
+        },
+        {
+          "shirtNumber": 2,
+          "name": "Marcus Stewart",
+          "image": "https://www.scottishfacomet.co.uk/file?id=c0c2c92a-bd4b-4aa5-8b73-0bc847c61d35",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": true,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": "82'",
+          "lineupOrder": 2,
+          "rowEvents": [
+            {
+              "type": "substitution",
+              "minute": "82'",
+              "linkedShirtNumber": 12,
+              "alt": "Substitution",
+              "icon": "event.substitution-out.png"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 3,
+          "name": "Sharo Abdulla",
+          "image": "https://www.scottishfacomet.co.uk/file?id=edce04e9-61f2-40d6-8062-cd1d89e29ee1",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": true,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": "45'",
+          "lineupOrder": 3,
+          "rowEvents": [
+            {
+              "type": "yellow_card",
+              "minute": "44'",
+              "linkedShirtNumber": null,
+              "alt": "Yellow card",
+              "icon": "event.yellowcard.svg"
+            },
+            {
+              "type": "substitution",
+              "minute": "45'",
+              "linkedShirtNumber": 14,
+              "alt": "Substitution",
+              "icon": "event.substitution-out.png"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 4,
+          "name": "Macauley Kennedy",
+          "image": "https://www.scottishfacomet.co.uk/file?id=597bad3b-93a0-4388-b1d2-edea8b6508f1",
+          "goalkeeper": false,
+          "captain": true,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 4,
+          "rowEvents": [
+            {
+              "type": "yellow_card",
+              "minute": "83'",
+              "linkedShirtNumber": null,
+              "alt": "Yellow card",
+              "icon": "event.yellowcard.svg"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 5,
+          "name": "Aaron Milligan",
+          "image": "https://www.scottishfacomet.co.uk/file?id=d56a9c57-2257-46c1-a5ba-a1f8b488a1de",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 5,
+          "rowEvents": []
+        },
+        {
+          "shirtNumber": 7,
+          "name": "Kieron McAvoy",
+          "image": "https://www.scottishfacomet.co.uk/file?id=d57da290-3fec-4d16-94e2-e6376f10caa6",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": true,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": "82'",
+          "lineupOrder": 6,
+          "rowEvents": [
+            {
+              "type": "substitution",
+              "minute": "82'",
+              "linkedShirtNumber": 18,
+              "alt": "Substitution",
+              "icon": "event.substitution-out.png"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 8,
+          "name": "Conor Boyle",
+          "image": "https://www.scottishfacomet.co.uk/file?id=91928413-6434-4082-9e54-132089b6cc7f",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 7,
+          "rowEvents": []
+        },
+        {
+          "shirtNumber": 9,
+          "name": "Gary Stewart",
+          "image": "https://www.scottishfacomet.co.uk/file?id=9ad65119-892d-40ed-b634-cf63c7e17fa7",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": true,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": "70'",
+          "lineupOrder": 8,
+          "rowEvents": [
+            {
+              "type": "goal",
+              "minute": "32'",
+              "linkedShirtNumber": null,
+              "alt": "Goal",
+              "icon": "event.goal.svg"
+            },
+            {
+              "type": "substitution",
+              "minute": "70'",
+              "linkedShirtNumber": 16,
+              "alt": "Substitution",
+              "icon": "event.substitution-out.png"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 10,
+          "name": "Connor McKenzie",
+          "image": "https://www.scottishfacomet.co.uk/file?id=cecbcd83-691f-46ec-838a-5f10aa8fb41c",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 9,
+          "rowEvents": []
+        },
+        {
+          "shirtNumber": 11,
+          "name": "Jamie Scullion",
+          "image": "https://www.scottishfacomet.co.uk/file?id=42d4e664-83fe-4662-9cb3-249c63fa87a7",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 10,
+          "rowEvents": [
+            {
+              "type": "goal",
+              "minute": "51'",
+              "linkedShirtNumber": null,
+              "alt": "Goal",
+              "icon": "event.goal.svg"
+            }
+          ]
+        },
+        {
+          "shirtNumber": 19,
+          "name": "Jordan Grant",
+          "image": "https://www.scottishfacomet.co.uk/file?id=1e83e03f-eb0f-4364-935a-2647dc5d1c49",
+          "goalkeeper": false,
+          "captain": false,
+          "starter": true,
+          "substitute": false,
+          "substitutedIn": false,
+          "substitutedOut": false,
+          "substitutedInMinute": null,
+          "substitutedOutMinute": null,
+          "lineupOrder": 11,
+          "rowEvents": []
+        }
+      ],
+      "events": [
+        {
+          "order": 1,
+          "minute": "83'",
+          "type": "yellow_card",
+          "side": "away",
+          "team": "East Kilbride Thistle F.C.",
+          "player": "Kennedy M.",
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 2,
+          "minute": "82'",
+          "type": "substitution",
+          "side": "away",
+          "team": "East Kilbride Thistle F.C.",
+          "player": null,
+          "playerIn": "Scott J.",
+          "playerOut": "McAvoy K."
+        },
+        {
+          "order": 3,
+          "minute": "82'",
+          "type": "substitution",
+          "side": "away",
+          "team": "East Kilbride Thistle F.C.",
+          "player": null,
+          "playerIn": "Crossan S.",
+          "playerOut": "Stewart M."
+        },
+        {
+          "order": 4,
+          "minute": "77'",
+          "type": "substitution",
+          "side": "home",
+          "team": "Eglinton FC",
+          "player": null,
+          "playerIn": "Sproul L.",
+          "playerOut": "Monaghan A."
+        },
+        {
+          "order": 5,
+          "minute": "70'",
+          "type": "substitution",
+          "side": "away",
+          "team": "East Kilbride Thistle F.C.",
+          "player": null,
+          "playerIn": "Mbanje M.",
+          "playerOut": "Stewart G."
+        },
+        {
+          "order": 6,
+          "minute": "64'",
+          "type": "substitution",
+          "side": "home",
+          "team": "Eglinton FC",
+          "player": null,
+          "playerIn": "Todd Z.",
+          "playerOut": "Young M."
+        },
+        {
+          "order": 7,
+          "minute": "64'",
+          "type": "substitution",
+          "side": "home",
+          "team": "Eglinton FC",
+          "player": null,
+          "playerIn": "Hamilton B.",
+          "playerOut": "Cochran J."
+        },
+        {
+          "order": 8,
+          "minute": "51'",
+          "type": "goal",
+          "side": "away",
+          "team": "East Kilbride Thistle F.C.",
+          "player": "Scullion J.",
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 9,
+          "minute": "45'",
+          "type": "substitution",
+          "side": "away",
+          "team": "East Kilbride Thistle F.C.",
+          "player": null,
+          "playerIn": "Hampson A.",
+          "playerOut": "Abdulla S."
+        },
+        {
+          "order": 10,
+          "minute": "44'",
+          "type": "yellow_card",
+          "side": "away",
+          "team": "East Kilbride Thistle F.C.",
+          "player": "Abdulla S.",
+          "playerIn": null,
+          "playerOut": null
+        },
+        {
+          "order": 11,
+          "minute": "32'",
+          "type": "goal",
+          "side": "away",
+          "team": "East Kilbride Thistle F.C.",
+          "player": "Stewart G.",
+          "playerIn": null,
+          "playerOut": null
+        }
+      ]
+    }
+  ],
+  "completedAt": "2026-09-24T17:28:51.585Z"
+}

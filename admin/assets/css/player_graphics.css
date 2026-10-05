@@ -1,0 +1,716 @@
+/* Canvas shell */
+#canvas-shell {
+  width: min(100%, 768px);
+  aspect-ratio: 1 / 1;
+  margin: 1rem auto;
+  overflow: hidden;
+}
+
+/*
+ * #canvas-wrap is always a true 768x768 layout box — never resized by
+ * responsive CSS — because .sponsor-graphic__panel uses container-query
+ * (cqw) units for font sizing. If this box were shrunk responsively, cqw
+ * would compute smaller/larger font sizes here than in the fixed 768x768
+ * offscreen box the export path (player_graphics_editor.js) captures,
+ * so what you see on screen could wrap differently than the downloaded
+ * PNG. Instead we scale it visually with `transform`, which doesn't
+ * affect layout/containment, so cqw always resolves against the same
+ * 768px reference the export uses. See updateCanvasScale() in
+ * player_graphics_editor.js, which sets --canvas-scale.
+ */
+#canvas-wrap {
+  width: 768px;
+  height: 768px;
+  transform: scale(var(--canvas-scale, 1));
+  transform-origin: top left;
+  border-radius: var(--radius-05rem, .5rem);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .08);
+  overflow: hidden;
+}
+
+/* Sponsor graphic (HTML/CSS build of the exported PNG) */
+.sponsor-graphic {
+  --graphic-maroon: #58101e;
+  --graphic-gold: #c59b3a;
+  --graphic-cream: #faf4e9;
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: 100%;
+  background: var(--graphic-cream);
+  font-family: "Roboto Condensed", Roboto, Arial, sans-serif;
+  overflow: hidden;
+}
+
+.sponsor-graphic__badge {
+  height: 64px;
+  width: auto;
+  margin-bottom: var(--space-06rem, 0.6rem);
+  /* white badge asset, inverted to black so it reads on the cream panel */
+  filter: invert(1);
+}
+
+.sponsor-graphic__photo {
+  position: relative;
+  flex: 0 0 58%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--graphic-maroon);
+  background-size: cover;
+  background-position: center;
+}
+
+.sponsor-graphic__photo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg,
+      rgba(20, 6, 10, .6) 0%,
+      rgba(20, 6, 10, 0) 28%,
+      rgba(20, 6, 10, 0) 58%,
+      rgba(20, 6, 10, .68) 100%);
+  pointer-events: none;
+}
+
+.sponsor-graphic__initials {
+  position: relative;
+  z-index: 1;
+  font-size: var(--fs-6, 6rem);
+  font-weight: 900;
+  color: var(--graphic-gold);
+  letter-spacing: .04em;
+}
+
+.sponsor-graphic__panel {
+  position: relative;
+  container-type: inline-size;
+  flex: 1 1 auto;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(160deg, #fffbf3 0%, var(--graphic-cream) 45%, #f0e4cd 100%);
+}
+
+.sponsor-graphic__row {
+  position: relative;
+  flex: 1 1 33.3334%;
+  height: 33.3334%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-035rem, .35rem);
+  padding: 0 2rem;
+  box-sizing: border-box;
+  text-align: center;
+  overflow: hidden;
+}
+
+.sponsor-graphic__row-label {
+  position: absolute;
+  top: .9rem;
+  right: 1.15rem;
+  font-size: var(--fs-078, .78rem);
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.sponsor-graphic__row--home .sponsor-graphic__row-label {
+  color: rgba(224, 180, 42);
+}
+
+.sponsor-graphic__row--away .sponsor-graphic__row-label {
+  color: rgba(75, 8, 24);
+}
+
+.sponsor-graphic__row--name {
+  overflow: hidden;
+  padding-inline: var(--space-4, 1rem);
+  border-left: 10px solid rgba(75, 8, 24);
+}
+
+.sponsor-graphic__name {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .05em;
+  width: 100%;
+  min-width: 0;
+  color: var(--graphic-maroon);
+  text-transform: uppercase;
+}
+
+.sponsor-graphic__firstname,
+.sponsor-graphic__surname {
+  max-width: 100%;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+.sponsor-graphic__firstname {
+  font-size: var(--fs-xl, 1.5rem);
+  font-weight: 300;
+  line-height: 1;
+}
+
+.sponsor-graphic__surname {
+  /* Kept a shade under the live-preview-safe size (was 11cqw) — the PNG
+     export (dom-to-image-more, see player_graphics_editor.js) rasterises
+     text slightly wider than the browser's own layout, which was enough
+     for some surnames to wrap their last letter onto a second line in the
+     downloaded PNG despite fitting on one line in the live preview. The
+     extra margin plus a guaranteed single line keeps both in sync. */
+  font-size: clamp(1.8rem, 10cqw, 4rem);
+  font-weight: 700;
+  line-height: .9;
+  letter-spacing: .015em;
+  white-space: nowrap;
+}
+
+.sponsor-graphic__row--home,
+.sponsor-graphic__row--away {
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--space-2, .5rem);
+  color: #000;
+  text-align: center;
+  padding-top: var(--space-22rem, 2.2rem);
+}
+
+.sponsor-graphic__row--home {
+  background: linear-gradient(135deg, rgba(75, 8, 24), rgba(106, 32, 54));
+  color: rgba(224, 180, 42);
+  border-left: 10px solid rgba(224, 180, 42);
+}
+
+.sponsor-graphic__row--away {
+  background: linear-gradient(135deg, rgba(224, 180, 42), rgba(201, 157, 25));
+  color: rgba(75, 8, 24);
+  border-left: 10px solid rgba(75, 8, 24);
+}
+
+.sponsor-graphic__row-logo {
+  flex: 0 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  overflow: hidden;
+}
+
+/* No logo to show (hidden, or none uploaded) — e.g. a sponsor who's an
+   individual rather than a business, or an unsold slot showing "Available
+   for sponsorship". There's nothing to top-align against, so centre the
+   text in the block instead of anchoring it to the top. */
+.sponsor-graphic__row--home.sponsor-graphic__row--no-logo,
+.sponsor-graphic__row--away.sponsor-graphic__row--no-logo,
+.sponsor-graphic__row--merged.sponsor-graphic__row--no-logo {
+  justify-content: center;
+  padding-top: 0;
+}
+
+/* Same sponsor in both the home and away slot: shown once, filling the
+   combined space of the separate home/away rows — see
+   buildPlayerSponsorGraphic() in lib/player_graphic_html.php. The name row
+   above stays the same size. */
+.sponsor-graphic__row--merged {
+  flex: 0 0 66.6668%;
+  height: 66.6668%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2, .5rem);
+  padding-top: var(--space-22rem, 2.2rem);
+  background: linear-gradient(135deg, rgba(75, 8, 24), rgba(106, 32, 54));
+  color: rgba(224, 180, 42);
+  border-left: 10px solid rgba(224, 180, 42);
+}
+
+/* The merged row has roughly twice the height of a normal home/away row,
+   so its logo can safely scale further before it needs to be capped. */
+.sponsor-graphic__row--merged .sponsor-graphic__logo-chip img {
+  height: min(calc(var(--logo-size, 60px) * 1.2), 320px);
+}
+
+.sponsor-graphic__row-details {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1, .25rem);
+  min-width: 0;
+}
+
+/* --name-font-size / --address-font-size / --contact-font-size are set
+   inline per sponsor once a size slider has been moved — see "2. Sponsor
+   image" on player_graphics.php and sponsorRowDetails() in
+   lib/player_graphic_html.php. Unset, each falls back to its original
+   responsive clamp() size. */
+.sponsor-graphic__value {
+  font-size: var(--name-font-size, clamp(1.4rem, 9cqw, 2rem));
+  font-weight: 800;
+  line-height: 1.05;
+  text-transform: uppercase;
+  max-width: 100%;
+  overflow-wrap: break-word;
+}
+
+/* Address + contact number, shown under a business sponsor's name — see
+   sponsor.php's "This sponsor is a business" toggle. */
+.sponsor-graphic__business-line {
+  font-weight: 600;
+  line-height: 1.2;
+  max-width: 100%;
+  overflow-wrap: break-word;
+  opacity: .85;
+}
+
+.sponsor-graphic__business-line--address {
+  font-size: var(--address-font-size, clamp(.7rem, 3.4cqw, .85rem));
+}
+
+.sponsor-graphic__business-line--contact {
+  font-size: var(--contact-font-size, clamp(.7rem, 3.4cqw, .85rem));
+}
+
+.sponsor-graphic__logo-chip {
+  display: inline-flex;
+  align-items: start;
+  justify-content: center;
+  max-width: 100%;
+  min-height: 0;
+}
+
+/* Many sponsor logos are white-on-transparent; without a row background
+   behind them they'd vanish on the cream panel, so light-ink logos get a
+   dark card (chosen server-side per logo, see sponsorLogoNeedsDarkChip()). */
+.sponsor-graphic__logo-chip--dark {}
+
+.sponsor-graphic__logo-chip img {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: min(calc(var(--logo-size, 60px) * 1.2), 150px);
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.sponsor-graphic__available {
+  font-size: var(--fs-xl, 1.5rem);
+  font-weight: 700;
+}
+
+.sponsor-graphic__price {
+  font-size: var(--fs-24, 2.4rem);
+  font-weight: 900;
+}
+
+.editor-panel {
+  border: 1px solid rgba(18, 78, 102, 0.08);
+  border-radius: var(--radius-1rem, 1rem);
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.07);
+}
+
+.editor-panel .form-check-label,
+.editor-panel .form-label {
+  font-weight: 600;
+}
+
+.player-graphics-page {
+  max-width: 1500px;
+  margin-inline: auto;
+}
+
+.graphics-context {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4, 1rem);
+  margin-bottom: var(--space-4, 1rem);
+  padding: .8rem 1rem;
+  border: 1px solid rgba(75, 8, 24, .09);
+  border-radius: var(--radius-1rem, 1rem);
+  background: rgba(255, 255, 255, .94);
+  box-shadow: 0 .35rem 1rem rgba(31, 26, 29, .045);
+}
+
+.graphics-context__identity {
+  display: flex;
+  align-items: center;
+  gap: var(--space-06rem, 0.6rem);
+  min-width: 0;
+}
+
+.graphics-nav-btn {
+  display: grid;
+  flex: 0 0 2.4rem;
+  width: 2.4rem;
+  height: 2.4rem;
+  place-items: center;
+  border-radius: var(--radius-07rem, .7rem);
+  background: rgba(106, 32, 54, .09);
+  color: var(--brand-primary);
+  text-decoration: none;
+  font-size: var(--fs-09, .9rem);
+  transition: background-color .15s ease;
+}
+
+.graphics-nav-btn:hover {
+  background: rgba(106, 32, 54, .16);
+}
+
+.graphics-nav-btn.is-disabled {
+  opacity: .35;
+  pointer-events: none;
+}
+
+.graphics-context__player-picker {
+  min-width: 0;
+  flex: 1 1 auto;
+  max-width: 20rem;
+}
+
+.graphics-context__player-picker .form-select {
+  font-size: var(--fs-base, 1rem);
+  font-weight: 750;
+  color: var(--brand-darkest);
+  border-color: rgba(75, 8, 24, .12);
+}
+
+.graphics-canvas-panel__header p {
+  margin: 0 0 .1rem;
+  color: rgba(31, 26, 29, .5);
+  font-size: var(--fs-066, .66rem);
+  font-weight: 750;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+}
+
+.graphics-canvas-panel__header h2 {
+  margin: 0;
+  color: var(--brand-darkest);
+  font-size: var(--fs-base, 1rem);
+  font-weight: 750;
+}
+
+.graphics-context__slots {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-045rem, .45rem);
+}
+
+.graphics-context__slots span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-035rem, .35rem);
+  padding: .36rem .6rem;
+  border: 1px solid rgba(75, 8, 24, .08);
+  border-radius: var(--radius-pill, 999px);
+  background: rgba(98, 101, 106, .06);
+  color: rgba(31, 26, 29, .48);
+  font-size: var(--fs-068, .68rem);
+  font-weight: 700;
+}
+
+.graphics-context__slots span.is-filled {
+  border-color: rgba(35, 142, 103, .14);
+  background: rgba(35, 142, 103, .08);
+  color: #176c50;
+}
+
+.graphics-workspace {
+  display: grid;
+  gap: var(--space-4, 1rem);
+  align-items: start;
+}
+
+.graphics-sidebar {
+  overflow: hidden;
+  border-color: rgba(75, 8, 24, .09);
+  border-radius: var(--radius-1rem, 1rem);
+  box-shadow: 0 .45rem 1.3rem rgba(31, 26, 29, .055);
+}
+
+.graphics-control {
+  padding: .9rem 1rem;
+  border-bottom: 1px solid rgba(75, 8, 24, .075);
+}
+
+.graphics-control__heading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-065rem, .65rem);
+  margin-bottom: var(--space-3, .75rem);
+}
+
+.graphics-control__step {
+  display: grid;
+  flex: 0 0 1.8rem;
+  width: 1.8rem;
+  height: 1.8rem;
+  place-items: center;
+  border-radius: var(--radius-58rem, .58rem);
+  background: rgba(106, 32, 54, .09);
+  color: var(--brand-primary);
+  font-size: var(--fs-07, .7rem);
+  font-weight: 800;
+}
+
+.graphics-control__heading h3,
+.graphics-output__heading h3 {
+  margin: 0;
+  color: var(--brand-darkest);
+  font-size: var(--fs-082, .82rem);
+  font-weight: 750;
+}
+
+.graphics-control__heading p,
+.graphics-output__heading p {
+  margin: .1rem 0 0;
+  color: rgba(31, 26, 29, .52);
+  font-size: var(--fs-066, .66rem);
+}
+
+.graphics-sidebar .form-label {
+  margin-bottom: var(--space-035rem, .35rem);
+  color: rgba(31, 26, 29, .7);
+  font-size: var(--fs-068, .68rem);
+  font-weight: 700;
+}
+
+.graphics-sidebar .form-select {
+  min-height: 2.45rem;
+  border-color: rgba(75, 8, 24, .12);
+  font-size: var(--fs-078, .78rem);
+  box-shadow: none;
+}
+
+.graphics-sidebar .form-select:focus {
+  border-color: rgba(106, 32, 54, .5);
+  box-shadow: 0 0 0 .16rem rgba(106, 32, 54, .1);
+}
+
+/* Per-sponsor image + text controls — see "2. Sponsor image & text" on
+   player_graphics.php. */
+.sponsor-text-control-group {
+  padding-top: var(--space-3, .75rem);
+  border-top: 1px solid rgba(75, 8, 24, .08);
+}
+
+.sponsor-text-control-group:first-of-type {
+  border-top: none;
+  padding-top: 0;
+}
+
+.sponsor-text-control-group__title {
+  margin: 0 0 .5rem;
+  font-size: var(--fs-068, .68rem);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: rgba(31, 26, 29, .5);
+}
+
+.sponsor-text-control {
+  padding-top: var(--space-2, .5rem);
+  margin-top: var(--space-2, .5rem);
+  border-top: 1px dashed rgba(75, 8, 24, .1);
+}
+
+.form-range-sm {
+  height: 1rem;
+}
+
+.graphics-button-grid {
+  display: grid;
+  gap: var(--space-4rem, .4rem);
+}
+
+.graphics-button-grid--two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.graphics-button-grid .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-03rem, .3rem);
+  min-width: 0;
+  padding-inline: var(--space-035rem, .35rem);
+  font-size: var(--fs-067, .67rem);
+}
+
+.graphics-output {
+  padding: .9rem 1rem 1rem;
+  background: rgba(250, 247, 241, .55);
+}
+
+.graphics-output__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3, .75rem);
+  margin-bottom: var(--space-07rem, .7rem);
+}
+
+.graphics-canvas-panel {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid rgba(75, 8, 24, .09);
+  border-radius: var(--radius-1rem, 1rem);
+  background: rgba(255, 255, 255, .94);
+  box-shadow: 0 .45rem 1.3rem rgba(31, 26, 29, .055);
+}
+
+.graphics-canvas-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4, 1rem);
+  padding: .8rem 1rem;
+  border-bottom: 1px solid rgba(75, 8, 24, .08);
+}
+
+.graphics-canvas-panel__header>span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4rem, .4rem);
+  color: rgba(31, 26, 29, .5);
+  font-size: var(--fs-066, .66rem);
+}
+
+@media (min-width: 1450px) {
+  .graphics-workspace {
+    grid-template-columns: 340px minmax(0, 1fr);
+  }
+
+  .graphics-sidebar {
+    position: sticky;
+    top: .75rem;
+  }
+}
+
+@media (max-width: 767.98px) {
+  #editorControls .text-end {
+    text-align: left !important;
+  }
+
+  #editorControls .btn,
+  #editorControls .form-select {
+    width: 100%;
+  }
+
+  .player-graphics-hero .page-hero-actions,
+  .player-graphics-hero .page-hero-actions .btn {
+    width: 100%;
+  }
+
+  .graphics-context {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .graphics-context__slots {
+    justify-content: flex-start;
+  }
+
+  .graphics-canvas-panel__header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+/* "Add sponsor image" modal — see #sponsorImageModal in player_graphics.php */
+.sponsor-image-dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-035rem, .35rem);
+  padding: 1.75rem 1rem;
+  border: 2px dashed rgba(75, 8, 24, .25);
+  border-radius: var(--radius-075rem, .75rem);
+  text-align: center;
+  cursor: pointer;
+  color: rgba(31, 26, 29, .7);
+  transition: border-color .15s ease, background-color .15s ease;
+}
+
+.sponsor-image-dropzone:hover,
+.sponsor-image-dropzone.is-dragover {
+  border-color: var(--brand-primary, #6a2036);
+  background: rgba(106, 32, 54, .04);
+}
+
+.sponsor-image-dropzone i {
+  font-size: var(--fs-16, 1.6rem);
+  color: var(--brand-primary, #6a2036);
+}
+
+.sponsor-image-dropzone .small {
+  color: rgba(31, 26, 29, .55);
+}
+
+.sponsor-image-picker-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3, .75rem);
+  margin: 1.25rem 0 .6rem;
+  font-weight: 600;
+  font-size: var(--fs-sm, .85rem);
+  color: rgba(31, 26, 29, .7);
+}
+
+.sponsor-image-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: var(--space-06rem, 0.6rem);
+  max-height: 360px;
+  overflow-y: auto;
+  padding-right: var(--space-1, .25rem);
+}
+
+.sponsor-image-picker-item {
+  display: flex;
+  flex-direction: column;
+  border: 2px solid transparent;
+  border-radius: var(--radius-05rem, .5rem);
+  overflow: hidden;
+  background: rgba(0, 0, 0, .03);
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+}
+
+.sponsor-image-picker-item:hover,
+.sponsor-image-picker-item:focus-visible {
+  border-color: var(--brand-primary, #6a2036);
+}
+
+.sponsor-image-picker-item img {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: contain;
+  background: #fff;
+  display: block;
+}
+
+.sponsor-image-picker-item span {
+  display: block;
+  padding: .3rem .4rem;
+  font-size: var(--fs-068, .68rem);
+  line-height: 1.2;
+  color: rgba(31, 26, 29, .65);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

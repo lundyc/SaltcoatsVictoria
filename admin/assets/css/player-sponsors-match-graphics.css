@@ -1,0 +1,356 @@
+.match-event-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+    gap: var(--space-3, 0.75rem);
+  }
+
+  .match-event-grid__button {
+    min-height: 92px;
+    border-radius: var(--radius-8px, 8px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-055rem, 0.55rem);
+    font-weight: 700;
+  }
+
+  .match-event-grid__button svg {
+    font-size: var(--fs-135, 1.35rem);
+  }
+
+  .match-event-timeline {
+    display: grid;
+    gap: var(--space-065rem, 0.65rem);
+  }
+
+  .match-event-timeline__item {
+    border: 1px solid var(--bs-border-color);
+    border-radius: var(--radius-8px, 8px);
+    padding: 0.8rem 0.9rem;
+    background: #fff;
+  }
+
+  .match-event-timeline__item--shareable {
+    cursor: pointer;
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+  }
+
+  .match-event-timeline__item--shareable:hover,
+  .match-event-timeline__item--shareable:focus-visible {
+    border-color: var(--bs-primary);
+    background-color: rgba(var(--bs-primary-rgb), 0.06);
+  }
+
+  .match-event-timeline__item--shareable:focus-visible {
+    outline: 2px solid var(--bs-primary);
+    outline-offset: 2px;
+  }
+
+  .social-event-preview {
+    width: 100%;
+    max-width: 680px;
+    aspect-ratio: 1 / 1;
+    position: relative;
+    margin-inline: auto;
+    border-radius: var(--radius-1rem, 1rem);
+    background: #171419;
+    overflow: hidden;
+    box-shadow: 0 1.5rem 3.5rem rgba(22, 28, 45, 0.22);
+    transition: aspect-ratio 180ms ease, max-width 180ms ease;
+  }
+
+  .social-event-preview.is-portrait {
+    max-width: min(100%, 590px, calc((94vh - 340px) * .8));
+    aspect-ratio: 4 / 5;
+  }
+
+  .social-event-preview img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+
+  .social-event-preview iframe {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    background: transparent;
+  }
+
+  .social-composer-modal .modal-content {
+    border: 0;
+    max-height: 94vh;
+    border-radius: var(--radius-115rem, 1.15rem);
+    overflow: hidden;
+    box-shadow: 0 1.75rem 5rem rgba(25, 15, 21, .28);
+  }
+
+  .social-composer-modal {
+    width: calc(100vw - 2rem);
+    max-width: 1460px;
+  }
+
+  .social-composer-header {
+    padding: .9rem 1.35rem;
+    background: #4d1325;
+    color: #fff;
+    border: 0;
+  }
+
+  .social-composer-header .btn-close {
+    filter: invert(1) grayscale(1) brightness(2);
+  }
+
+  .social-composer-header .modal-title {
+    color: #fff;
+  }
+
+  .social-composer-header__icon {
+    width: 42px;
+    height: 42px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-075rem, 0.75rem);
+    color: #4d1325;
+    background: #f0bf1d;
+    flex: 0 0 auto;
+  }
+
+  .social-composer-preview-panel {
+    display: flex;
+    min-height: 0;
+    background: linear-gradient(145deg, #eceff2, #f7f8f9);
+    border-right: 1px solid var(--bs-border-color);
+  }
+
+  .social-composer-preview-wrap {
+    position: sticky;
+    top: 0;
+    width: 100%;
+    align-self: flex-start;
+  }
+
+  .social-composer-sidebar {
+    background: #fff;
+  }
+
+  .social-composer-template-note {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-08rem, .8rem);
+    margin-bottom: var(--space-4, 1rem);
+    padding: .9rem 1rem;
+    border: 1px solid rgba(77, 19, 37, .14);
+    border-radius: var(--radius-08rem, .8rem);
+    color: #4d1325;
+    background: #faf5f7;
+  }
+
+  .social-composer-template-note__icon {
+    display: inline-grid;
+    width: 34px;
+    height: 34px;
+    flex: 0 0 auto;
+    place-items: center;
+    border-radius: var(--radius-065rem, .65rem);
+    color: #fff;
+    background: #4d1325;
+  }
+
+  .social-composer-caption {
+    min-height: 260px;
+    resize: vertical;
+  }
+
+  .social-composer-section {
+    padding: var(--space-4, 1rem);
+    border: 1px solid var(--bs-border-color);
+    border-radius: var(--radius-08rem, 0.8rem);
+    background: #fff;
+  }
+
+  .social-composer-section + .social-composer-section {
+    margin-top: var(--space-4, 1rem);
+  }
+
+  .social-composer-section__heading {
+    display: flex;
+    align-items: center;
+    gap: var(--space-065rem, 0.65rem);
+    margin-bottom: var(--space-9rem, 0.9rem);
+  }
+
+  .social-composer-section__number {
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: #4d1325;
+    color: #fff;
+    font-size: var(--fs-08, 0.8rem);
+    font-weight: 700;
+  }
+
+  .social-composer-footer {
+    padding: .8rem 1.25rem;
+    background: #f8f9fa;
+  }
+
+  .social-publish-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-055rem, 0.55rem);
+    min-width: 150px;
+    min-height: 46px;
+    font-weight: 700;
+  }
+
+  @media (max-width: 991.98px) {
+    .social-composer-modal {
+      width: auto;
+      max-width: none;
+    }
+
+    .social-composer-modal .modal-content {
+      max-height: none;
+      border-radius: 0;
+    }
+
+    .social-composer-preview-panel {
+      border-right: 0;
+      border-bottom: 1px solid var(--bs-border-color);
+    }
+
+    .social-composer-preview-wrap {
+      position: static;
+    }
+
+    .social-event-preview.is-portrait {
+      max-width: 520px;
+    }
+
+    .social-composer-footer {
+      padding: var(--space-3, 0.75rem);
+      flex-direction: column-reverse;
+    }
+
+    .social-composer-footer > div:first-child {
+      display: grid !important;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      width: 100%;
+    }
+
+    .social-composer-footer > div:first-child .btn {
+      width: 100%;
+    }
+
+    .social-composer-footer__actions {
+      display: grid !important;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      width: 100%;
+    }
+
+    .social-publish-button {
+      width: 100%;
+      min-width: 0;
+      min-height: 42px;
+      padding-inline: var(--space-045rem, 0.45rem);
+      font-size: var(--fs-sm, 0.85rem);
+    }
+
+  }
+
+  .match-event-choice-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2, 0.5rem);
+  }
+
+  .match-event-choice-grid .btn {
+    flex: 1 1 150px;
+  }
+
+  .match-event-player-team .match-event-choice-grid {
+    display: flex;
+    width: 100%;
+  }
+
+  .match-event-player-team .match-event-choice-grid .btn {
+    width: calc((100% - 1rem) / 3);
+    min-width: 0;
+    flex: 0 0 calc((100% - 1rem) / 3);
+  }
+
+  @media (max-width: 575.98px) {
+    .match-event-player-team .match-event-choice-grid .btn {
+      width: 100%;
+      flex-basis: 100%;
+    }
+  }
+
+  #matchEventBoardTeam .btn-primary.active,
+  #matchEventBoardTeam .btn-primary.active:focus,
+  #matchEventTeamWrap .btn-check:checked + .btn-outline-primary,
+  #matchEventTeamWrap .btn-check:checked + .btn-outline-primary:focus {
+    color: #fff;
+    background-color: var(--brand-primary, #6a2036);
+    border-color: var(--brand-primary, #6a2036);
+  }
+
+  #matchEventBoardTeam .btn-primary.active:hover,
+  #matchEventBoardTeam .btn-outline-primary:hover,
+  #matchEventTeamWrap .btn-check:checked + .btn-outline-primary:hover,
+  #matchEventTeamWrap .btn-outline-primary:hover {
+    color: #fff;
+    background-color: var(--brand-dark, #4b0818);
+    border-color: var(--brand-dark, #4b0818);
+  }
+
+  .match-event-pitch-grid,
+  .match-event-goal-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-4px, 4px);
+    padding: var(--space-10px, 10px);
+    border: 2px solid rgba(255, 255, 255, 0.8);
+    outline: 2px solid #198754;
+    border-radius: var(--radius-065rem, 0.65rem);
+    background: linear-gradient(90deg, #31935a 0 33%, #2b8751 33% 66%, #31935a 66%);
+  }
+
+  .match-event-goal-grid {
+    background: #eef2f6;
+    outline-color: #6c757d;
+  }
+
+  .match-event-pitch-zone,
+  .match-event-goal-zone {
+    min-height: 56px;
+    border: 1px solid rgba(255, 255, 255, 0.65);
+    border-radius: var(--radius-035rem, 0.35rem);
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+    font-size: var(--fs-072, 0.72rem);
+    font-weight: 700;
+  }
+
+  .match-event-goal-zone {
+    border-color: #adb5bd;
+    background: #fff;
+    color: #343a40;
+  }
+
+  .match-event-pitch-zone.is-selected,
+  .match-event-goal-zone.is-selected {
+    box-shadow: inset 0 0 0 3px #ffc107;
+    background: #0d6efd;
+    color: #fff;
+  }

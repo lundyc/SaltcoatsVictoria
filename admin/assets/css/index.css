@@ -1,0 +1,540 @@
+/*
+ * The whole overview page is one tile grid, not a stack of independent
+ * sections — rows snap to a shared rhythm so the eye has a fixed grid to
+ * track while scrolling, instead of re-orienting at every section boundary.
+ */
+.hub-index-page {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-6, 1.5rem);
+    }
+
+    .hub-index-page > .hub-section-commandbar {
+        margin-bottom: 0;
+        padding: 0.7rem 1rem;
+    }
+
+    .hub-index-section__header {
+        margin-bottom: var(--space-085rem, 0.85rem);
+    }
+
+    .hub-index-section__header h2 {
+        margin: 0;
+        color: var(--hub-ink, #1f1a1d);
+        font-weight: 800;
+    }
+
+    /* Dense KPI strip: one continuous row of tiles, not two stacked grids. */
+    .hub-index-page .hub-metric-card {
+        min-height: 5.4rem;
+        padding: 0.8rem 0.9rem;
+    }
+
+    .hub-index-page .hub-metric-card__icon {
+        width: 2.3rem;
+        height: 2.3rem;
+        font-size: var(--fs-088, 0.88rem);
+    }
+
+    .hub-index-page .hub-metric-card__value {
+        font-size: var(--fs-128, 1.28rem);
+    }
+
+    @media (min-width: 768px) {
+        .hub-index-page .hub-metric-grid {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+    }
+
+    /* League position and recent results share the available width. */
+    .hub-index-matchday {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--space-11rem, 1.1rem);
+    }
+
+    @media (max-width: 767.98px) {
+        .hub-index-matchday {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    /*
+     * Money section: Stripe activity list beside the season charts, so
+     * finance content shares one row instead of each taking a full-width
+     * section on its own. flex (not a fixed grid) so either panel alone —
+     * e.g. charts with no Stripe capability, or Stripe with no chart data —
+     * still fills the row cleanly instead of leaving half of it empty.
+     */
+    .hub-index-money {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-11rem, 1.1rem);
+        align-items: stretch;
+    }
+
+    .hub-index-money__stripe,
+    .hub-index-money__charts {
+        flex: 2 1 340px;
+        min-width: 0;
+    }
+
+    /* Recent-activity feed is capped to 3 rows at source (see index.php) so
+       it naturally matches the other columns' height — no scrolling. */
+
+    /* Money metric cards ride along the right of the same row, stacked in a
+       single column instead of the usual multi-column metric grid. */
+    .hub-index-money__metrics {
+        flex: 1 1 240px;
+        min-width: 0;
+    }
+
+    .hub-index-money__metrics .hub-metric-grid {
+        display: flex;
+        flex-direction: column;
+        grid-template-columns: none;
+        gap: var(--space-065rem, 0.65rem);
+        height: 100%;
+        margin-bottom: 0;
+    }
+
+    .hub-index-money__metrics .hub-metric-card {
+        flex: 1 1 auto;
+    }
+
+    .dashboard-season-charts {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-11rem, 1.1rem);
+    }
+
+    .dashboard-season-charts--row {
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+
+    .dashboard-season-charts--row .dashboard-season-charts__block {
+        flex: 1 1 9rem;
+        min-width: 9rem;
+    }
+
+    .dashboard-season-charts__block + .dashboard-season-charts__block {
+        padding-top: var(--space-11rem, 1.1rem);
+        border-top: 1px solid var(--hub-line, rgba(75, 8, 24, 0.13));
+    }
+
+    .dashboard-season-charts--row .dashboard-season-charts__block + .dashboard-season-charts__block {
+        padding-top: 0;
+        border-top: 0;
+    }
+
+    .dashboard-season-charts__label {
+        margin: 0 0 0.6rem;
+        color: var(--hub-muted, #675f62);
+        font-size: var(--fs-078, 0.78rem);
+        font-weight: 700;
+    }
+
+    .dashboard-chart-wrap--rail {
+        height: 14.4rem;
+    }
+
+    .dashboard-command-centre {
+        display: grid;
+        grid-template-columns: minmax(0, 1.45fr) minmax(19rem, 0.9fr);
+        gap: var(--space-9rem, 0.9rem);
+    }
+
+    .dashboard-command-centre__main,
+    .dashboard-command-centre__side {
+        border: 1px solid var(--hub-line, rgba(75, 8, 24, 0.13));
+        border-radius: var(--hub-radius, 0.72rem);
+        background: rgba(255, 253, 249, 0.98);
+        box-shadow: var(--hub-shadow-sm, 0 0.25rem 0.8rem rgba(31, 26, 29, 0.045));
+    }
+
+    .dashboard-command-centre__main {
+        padding: clamp(1rem, 2vw, 1.35rem);
+    }
+
+    .dashboard-command-centre__side {
+        display: grid;
+        gap: var(--space-3, 0.75rem);
+        padding: var(--space-085rem, 0.85rem);
+    }
+
+    .dashboard-command-centre h2 {
+        margin: 0;
+        color: var(--hub-ink, #1f1a1d);
+        font-size: clamp(1.25rem, 2vw, 1.65rem);
+        font-weight: 800;
+    }
+
+    .dashboard-command-centre__summary {
+        max-width: 58ch;
+        margin: 0.55rem 0 1rem;
+        color: var(--hub-muted, #675f62);
+    }
+
+    .dashboard-command-centre__actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-2, 0.5rem);
+        margin-top: var(--space-9rem, 0.9rem);
+    }
+
+    .dashboard-next-fixture {
+        display: grid;
+        grid-template-columns: minmax(6rem, auto) minmax(0, 1fr) auto;
+        gap: var(--space-085rem, 0.85rem);
+        align-items: center;
+        margin-top: var(--space-9rem, 0.9rem);
+        padding: var(--space-085rem, 0.85rem);
+        border: 1px solid rgba(75, 8, 24, 0.12);
+        border-radius: var(--radius-072rem, 0.72rem);
+        background: linear-gradient(135deg, rgba(246, 236, 222, 0.78), rgba(255, 255, 255, 0.92));
+        color: var(--hub-ink, #1f1a1d);
+        text-decoration: none;
+    }
+
+    .dashboard-next-fixture:hover,
+    .dashboard-next-fixture:focus-visible {
+        border-color: rgba(106, 32, 54, 0.32);
+        color: var(--brand-primary);
+        background: #fff;
+    }
+
+    .dashboard-next-fixture__date,
+    .dashboard-next-fixture__body {
+        display: grid;
+        min-width: 0;
+    }
+
+    .dashboard-next-fixture__date {
+        padding-right: var(--space-085rem, 0.85rem);
+        border-right: 1px solid rgba(75, 8, 24, 0.12);
+    }
+
+    .dashboard-next-fixture__date strong {
+        font-size: var(--fs-base, 1rem);
+        font-weight: 800;
+    }
+
+    .dashboard-next-fixture__date small,
+    .dashboard-next-fixture__body small {
+        color: var(--hub-muted, #675f62);
+        font-size: var(--fs-078, 0.78rem);
+    }
+
+    .dashboard-next-fixture__body strong {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: var(--fs-105, 1.05rem);
+    }
+
+    /* Competition names ("West of Scotland Football League Third Division")
+       are long enough to blow out this compact row — clip with an ellipsis
+       and let the title attribute carry the full name on hover. */
+    .dashboard-next-fixture__competition {
+        display: inline-block;
+        max-width: 14rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        vertical-align: bottom;
+    }
+
+    .dashboard-attention-score {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-3, 0.75rem);
+        padding: 0.15rem 0.1rem 0;
+    }
+
+    .dashboard-attention-score span {
+        color: var(--hub-muted, #675f62);
+        font-size: var(--fs-072, 0.72rem);
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+
+    .dashboard-attention-score strong {
+        display: inline-grid;
+        min-width: 2.25rem;
+        height: 2.25rem;
+        place-items: center;
+        border-radius: var(--radius-pill, 999px);
+        background: var(--brand-primary);
+        color: #fff;
+        font-size: var(--fs-base, 1rem);
+    }
+
+    .dashboard-attention__list--compact {
+        gap: var(--space-2, 0.5rem);
+    }
+
+.hub-index__league-card {
+        display: flex;
+        align-items: center;
+        gap: var(--space-4, 1rem);
+        padding: 1rem 1.05rem;
+        border-radius: var(--radius-1rem, 1rem);
+        background: linear-gradient(135deg, rgba(75, 8, 24, 0.07), rgba(224, 180, 42, 0.12));
+        border: 1px solid rgba(75, 8, 24, 0.08);
+    }
+
+    .hub-index__league-pos {
+        width: 3.2rem;
+        height: 3.2rem;
+        border-radius: var(--radius-pill, 999px);
+        background: linear-gradient(135deg, var(--brand-primary), var(--brand-dark));
+        color: var(--brand-light);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        flex: 0 0 auto;
+        box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.18);
+    }
+
+    .hub-index__fact-list {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: var(--space-3, 0.75rem);
+    }
+
+    .hub-index__fact {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: var(--space-015rem, 0.15rem);
+        padding: 0.85rem 0.25rem;
+        text-align: center;
+        border-radius: var(--radius-09rem, 0.9rem);
+        background: rgba(246, 236, 222, 0.78);
+        border: 1px solid rgba(75, 8, 24, 0.07);
+    }
+
+    .hub-index__fact-label {
+        font-size: var(--fs-072, 0.72rem);
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: rgba(31, 26, 29, 0.62);
+    }
+
+    .hub-index__fact-value {
+        font-weight: 600;
+        color: var(--brand-darkest);
+    }
+
+    .hub-index__result {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-4rem, 0.4rem);
+        font-size: var(--fs-078, 0.78rem);
+        font-weight: 700;
+    }
+
+    .hub-index__result-light {
+        width: 0.65rem;
+        height: 0.65rem;
+        border-radius: 50%;
+        background: currentColor;
+        box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 18%, transparent);
+    }
+
+    .hub-index__result--win {
+        color: #198754;
+    }
+
+    .hub-index__result--draw {
+        color: #b58105;
+    }
+
+    .hub-index__result--loss {
+        color: #dc3545;
+    }
+
+    /* Competition icon — its own leading column on a result row, same
+       treatment as the Needs-attention icons, rather than sitting inline
+       with the date/time text. */
+    .hub-index-result__icon {
+        display: grid;
+        flex: 0 0 auto;
+        width: 2.35rem;
+        height: 2.35rem;
+        place-items: center;
+        border-radius: var(--radius-07rem, 0.7rem);
+        background: rgba(106, 32, 54, 0.1);
+        color: var(--brand-primary);
+        font-size: var(--fs-095, 0.95rem);
+    }
+
+    .min-w-0 {
+        min-width: 0;
+    }
+
+    .dashboard-attention__list {
+        display: grid;
+        gap: var(--space-065rem, 0.65rem);
+    }
+
+    .dashboard-attention__item {
+        display: grid;
+        grid-template-columns: 2.35rem minmax(0, 1fr) auto;
+        gap: var(--space-3, 0.75rem);
+        align-items: center;
+        padding: var(--space-08rem, 0.8rem);
+        border: 1px solid rgba(75, 8, 24, 0.08);
+        border-radius: var(--radius-085rem, 0.85rem);
+        color: var(--brand-darkest);
+        text-decoration: none;
+        background: rgba(246, 236, 222, 0.45);
+    }
+
+    .dashboard-attention__item:hover,
+    .dashboard-attention__item:focus-visible {
+        border-color: rgba(106, 32, 54, 0.28);
+        color: var(--brand-primary);
+        background: #fff;
+    }
+
+    .dashboard-attention__icon {
+        display: grid;
+        width: 2.35rem;
+        height: 2.35rem;
+        place-items: center;
+        border-radius: var(--radius-07rem, 0.7rem);
+        background: rgba(106, 32, 54, 0.1);
+        color: var(--brand-primary);
+    }
+
+    .dashboard-attention__item strong,
+    .dashboard-attention__item small {
+        display: block;
+    }
+
+    .dashboard-attention__item small {
+        margin-top: var(--space-01rem, 0.1rem);
+        color: rgba(31, 26, 29, 0.65);
+    }
+
+    .dashboard-birthdays__list {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: var(--space-065rem, 0.65rem);
+    }
+
+    .dashboard-birthdays__item {
+        display: grid;
+        grid-template-columns: 4.2rem minmax(0, 1fr);
+        align-items: center;
+        gap: var(--space-9rem, 0.9rem);
+        padding: var(--space-065rem, 0.65rem);
+        border: 1px solid rgba(75, 8, 24, 0.08);
+        border-radius: var(--radius-09rem, 0.9rem);
+        background: rgba(246, 236, 222, 0.45);
+        color: var(--brand-darkest);
+        text-decoration: none;
+    }
+
+    .dashboard-birthdays__item:hover,
+    .dashboard-birthdays__item:focus-visible {
+        border-color: rgba(106, 32, 54, 0.28);
+        background: #fff;
+    }
+
+    .dashboard-birthdays__days {
+        display: grid;
+        justify-items: center;
+        align-content: center;
+        width: 4.2rem;
+        height: 4.2rem;
+        border-radius: var(--radius-1rem, 1rem);
+        background: linear-gradient(135deg, var(--brand-primary), var(--brand-dark));
+        color: var(--brand-light);
+        box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.18);
+        flex: 0 0 auto;
+    }
+
+    .dashboard-birthdays__days strong {
+        font-size: var(--fs-185, 1.85rem);
+        font-weight: 800;
+        line-height: 1;
+    }
+
+    .dashboard-birthdays__days small {
+        margin-top: var(--space-015rem, 0.15rem);
+        font-size: var(--fs-062, 0.62rem);
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        opacity: 0.85;
+    }
+
+    .dashboard-birthdays__days--today {
+        background: linear-gradient(135deg, var(--brand-warning), var(--brand-warning-hover, #c99d19));
+        color: var(--brand-warning-text, #1f1a1d);
+    }
+
+    .dashboard-birthdays__days--today strong {
+        font-size: var(--fs-16, 1.6rem);
+    }
+
+    .dashboard-birthdays__info {
+        display: grid;
+        min-width: 0;
+        gap: var(--space-015rem, 0.15rem);
+    }
+
+    .dashboard-birthdays__name {
+        font-weight: 700;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .dashboard-birthdays__info small {
+        color: var(--hub-muted, #675f62);
+    }
+
+    /* Chart.js sizes the canvas to its positioned wrapper. */
+    .dashboard-chart-wrap {
+        position: relative;
+    }
+
+    @media (max-width: 991.98px) {
+        .dashboard-command-centre {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media (max-width: 575.98px) {
+        .dashboard-command-centre__actions,
+        .dashboard-command-centre__actions .btn {
+            width: 100%;
+        }
+
+        .dashboard-next-fixture {
+            grid-template-columns: 1fr;
+        }
+
+        .dashboard-next-fixture__date {
+            padding-right: 0;
+            padding-bottom: var(--space-065rem, 0.65rem);
+            border-right: 0;
+            border-bottom: 1px solid rgba(75, 8, 24, 0.12);
+        }
+
+        .dashboard-next-fixture__body strong {
+            white-space: normal;
+        }
+
+        .dashboard-next-fixture .badge {
+            justify-self: start;
+        }
+    }

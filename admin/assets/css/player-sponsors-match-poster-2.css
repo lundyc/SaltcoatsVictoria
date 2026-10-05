@@ -1,0 +1,3 @@
+@page { size: A4 portrait; margin: 0; }
+              html, body { width: 210mm; height: 297mm; margin: 0; padding: 0; overflow: hidden; background: #fff; }
+              img { display: block; width: 210mm; height: 297mm; object-fit: fill; }

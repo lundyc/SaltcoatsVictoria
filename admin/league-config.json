@@ -1,0 +1,26 @@
+{
+    "league_title": "WOSFL Third Division",
+    "wosfl_table_url": "https://www.wosfl.co.uk/fg/1_184170169.html",
+    "league_banner_image": "uploads/league/league-banner-20260617114549-58fdaa87.png",
+    "total_games_per_team": 28,
+    "promotion_spots": 3,
+    "relegation_spots": 3,
+    "show_table_lines": true,
+    "max_possible_points": {
+        "East Kilbride YM": 65,
+        "Royal Albert": 62,
+        "East Kilbride Thistle": 62,
+        "Carluke Rovers": 61,
+        "West Park United": 55,
+        "Vale of Leven": 53,
+        "Eglinton": 52,
+        "Irvine Victoria": 51,
+        "Giffnock SC": 45,
+        "Newmains United": 43,
+        "St Peters": 42,
+        "Wishaw": 32,
+        "Saltcoats Victoria": 29,
+        "Campbeltown Pupils": 25,
+        "Rossvale": 18
+    }
+}

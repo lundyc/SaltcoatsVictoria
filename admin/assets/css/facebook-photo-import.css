@@ -1,0 +1,376 @@
+.facebook-import {
+    display: grid;
+    gap: var(--space-4, 1rem);
+}
+
+.facebook-import-toolbar,
+.facebook-import-actions {
+    background: #fff;
+    border: 1px solid rgba(15, 23, 42, .08);
+    border-radius: var(--radius-8px, 8px);
+    box-shadow: 0 8px 24px rgba(15, 23, 42, .06);
+    padding: var(--space-4, 1rem);
+}
+
+.facebook-import-toolbar {
+    display: grid;
+    gap: var(--space-4, 1rem);
+}
+
+.facebook-import-toolbar__header,
+.facebook-import-actions {
+    align-items: center;
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-4, 1rem);
+}
+
+.facebook-import-actions__buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-06rem, 0.6rem);
+    justify-content: flex-end;
+}
+
+.facebook-import-toolbar h2 {
+    font-size: var(--fs-base, 1rem);
+    margin: 0 0 .2rem;
+}
+
+.facebook-import-toolbar p {
+    color: #64748b;
+    margin: 0;
+}
+
+.facebook-import-toolbar__actions {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-06rem, 0.6rem);
+    width: 100%;
+}
+
+.facebook-import-toolbar__actions .form-select {
+    width: 6rem;
+}
+
+.facebook-import-toolbar__actions .facebook-import-album-select {
+    width: min(22rem, 100%);
+}
+
+.facebook-import-status:empty {
+    display: none;
+}
+
+.facebook-import-status {
+    border: 1px solid rgba(15, 23, 42, .08);
+    border-radius: var(--radius-pill, 999px);
+    color: #475569;
+    flex: 0 0 auto;
+    font-size: var(--fs-086, .86rem);
+    font-weight: 700;
+    padding: .45rem .7rem;
+    white-space: nowrap;
+}
+
+.facebook-import-status.is-success {
+    background: #f0fdf4;
+    border-color: rgba(22, 163, 74, .25);
+    color: #166534;
+}
+
+.facebook-import-status.is-warning {
+    background: #fffbeb;
+    border-color: rgba(217, 119, 6, .28);
+    color: #92400e;
+}
+
+.facebook-import-status.is-error {
+    background: #fef2f2;
+    border-color: rgba(220, 38, 38, .28);
+    color: #991b1b;
+}
+
+.facebook-import-actions {
+    bottom: 1rem;
+    left: calc(300px + 1.5rem);
+    position: fixed;
+    right: 1.5rem;
+    z-index: 30;
+}
+
+html.hub-nav-collapsed .facebook-import-actions {
+    left: 1.5rem;
+}
+
+.facebook-import-grid {
+    display: grid;
+    gap: var(--space-4, 1rem);
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+}
+
+.facebook-import-loadmore {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-06rem, 0.6rem);
+    justify-content: center;
+}
+
+.facebook-import-card {
+    background: #fff;
+    border: 1px solid rgba(15, 23, 42, .1);
+    border-radius: var(--radius-8px, 8px);
+    overflow: hidden;
+    position: relative;
+}
+
+.facebook-import-card.is-selected {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, .16);
+}
+
+.facebook-import-card.is-imported {
+    opacity: .58;
+}
+
+.facebook-import-card__check {
+    align-items: center;
+    background: rgba(255, 255, 255, .94);
+    border-radius: var(--radius-pill, 999px);
+    display: flex;
+    gap: var(--space-4rem, .4rem);
+    left: .65rem;
+    padding: .35rem .7rem;
+    position: absolute;
+    top: .65rem;
+    z-index: 2;
+}
+
+.facebook-import-card__image {
+    aspect-ratio: 4 / 3;
+    background: #111827;
+    cursor: pointer;
+}
+
+.facebook-import-card__image img {
+    display: block;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0;
+    transition: opacity .18s ease;
+    width: 100%;
+}
+
+.facebook-import-card__image img.is-loaded,
+.facebook-import-card__image img[src] {
+    opacity: 1;
+}
+
+.facebook-import-card__body {
+    display: grid;
+    gap: var(--space-3, .75rem);
+    padding: var(--space-9rem, .9rem);
+}
+
+.facebook-import-card__meta {
+    color: #64748b;
+    display: flex;
+    font-size: var(--fs-082, .82rem);
+    justify-content: space-between;
+    gap: var(--space-3, .75rem);
+}
+
+.facebook-import-card__reject {
+    align-items: center;
+    background: #fff;
+    border: 1px solid rgba(220, 38, 38, .22);
+    border-radius: var(--radius-md, 6px);
+    color: #991b1b;
+    display: inline-flex;
+    font-size: var(--fs-082, .82rem);
+    font-weight: 700;
+    gap: var(--space-035rem, .35rem);
+    justify-self: start;
+    padding: .35rem .55rem;
+}
+
+.facebook-import-card__reject:hover,
+.facebook-import-card__reject:focus {
+    background: #fef2f2;
+    border-color: rgba(220, 38, 38, .45);
+}
+
+.facebook-import-card__text {
+    color: #334155;
+    display: -webkit-box;
+    font-size: var(--fs-09, .9rem);
+    line-height: 1.35;
+    margin: 0;
+    min-height: 2.4rem;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+}
+
+.facebook-import-suggestion {
+    border-radius: var(--radius-md, 6px);
+    font-size: var(--fs-082, .82rem);
+    font-weight: 700;
+    padding: .45rem .55rem;
+}
+
+.facebook-import-suggestion.is-strong {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.facebook-import-suggestion.is-medium {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.facebook-import-suggestion.is-weak {
+    background: #f1f5f9;
+    color: #475569;
+}
+
+.facebook-import-fields {
+    display: grid;
+    gap: var(--space-06rem, 0.6rem);
+}
+
+.facebook-import-fields label {
+    color: #475569;
+    display: grid;
+    font-size: var(--fs-078, .78rem);
+    font-weight: 700;
+    gap: var(--space-1, .25rem);
+    text-transform: uppercase;
+}
+
+.facebook-import-group-reference {
+    display: grid;
+    gap: var(--space-065rem, .65rem);
+}
+
+.facebook-import-group-reference .btn {
+    justify-self: start;
+}
+
+.facebook-import-faces {
+    display: grid;
+    gap: var(--space-06rem, 0.6rem);
+}
+
+.facebook-import-face {
+    align-items: center;
+    background: #f8fafc;
+    border: 1px solid rgba(15, 23, 42, .08);
+    border-radius: var(--radius-md, 6px);
+    display: grid;
+    gap: var(--space-065rem, .65rem);
+    grid-template-columns: 4.25rem minmax(0, 1fr);
+    padding: var(--space-055rem, .55rem);
+}
+
+.facebook-import-face img,
+.facebook-import-face__empty {
+    aspect-ratio: 1;
+    background: #e2e8f0;
+    border-radius: var(--radius-md, 6px);
+    display: block;
+    object-fit: cover;
+    width: 100%;
+}
+
+.facebook-import-face-help {
+    color: #64748b;
+    font-size: var(--fs-082, .82rem);
+    margin: 0;
+}
+
+.facebook-import-new-person {
+    display: grid;
+    gap: var(--space-045rem, .45rem);
+    grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.facebook-import-new-person-name {
+    grid-column: 1 / -1;
+}
+
+.facebook-import-face .facebook-import-new-person {
+    grid-column: 1 / -1;
+}
+
+.facebook-import-face-match {
+    color: #166534;
+    font-size: var(--fs-078, .78rem);
+    font-weight: 700;
+    grid-column: 1 / -1;
+}
+
+.facebook-import-face-match.is-possible {
+    color: #92400e;
+}
+
+.facebook-import-new-person .btn {
+    white-space: nowrap;
+}
+
+.facebook-import-new-fixture {
+    background: #f8fafc;
+    border: 1px solid rgba(15, 23, 42, .08);
+    border-radius: var(--radius-md, 6px);
+    display: grid;
+    gap: var(--space-055rem, .55rem);
+    grid-template-columns: minmax(0, 1fr) minmax(7rem, .45fr);
+    padding: var(--space-065rem, .65rem);
+}
+
+.facebook-import-new-fixture label {
+    text-transform: uppercase;
+}
+
+.facebook-import-new-fixture-opponent,
+.facebook-import-new-fixture-competition {
+    min-width: 0;
+}
+
+.facebook-import-new-fixture label:nth-child(2),
+.facebook-import-new-fixture label:nth-child(4) {
+    grid-column: 1 / -1;
+}
+
+.facebook-import-new-fixture .btn {
+    grid-column: 1 / -1;
+    justify-self: start;
+}
+
+@media (max-width: 720px) {
+    .facebook-import-toolbar__header,
+    .facebook-import-actions {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .facebook-import-toolbar__actions,
+    .facebook-import-actions__buttons,
+    .facebook-import-new-person,
+    .facebook-import-new-fixture {
+        align-items: stretch;
+        flex-direction: column;
+        grid-template-columns: 1fr;
+    }
+
+    .facebook-import-new-fixture .btn {
+        justify-self: stretch;
+    }
+}
+
+@media (max-width: 1199.98px) {
+    .facebook-import-actions {
+        left: 1rem;
+        right: 1rem;
+    }
+}

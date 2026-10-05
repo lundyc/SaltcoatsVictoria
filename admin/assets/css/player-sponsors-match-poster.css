@@ -1,0 +1,166 @@
+.match-poster-workspace { --poster-yellow: #f2b900; }
+  .match-poster-controls {
+    position: sticky;
+    top: 1rem;
+  }
+  .match-poster-stage {
+    position: relative;
+    width: 100%;
+    overflow: hidden;
+    border-radius: var(--radius-075rem, .75rem);
+    background: #dfe3e8;
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .08);
+  }
+  .match-poster {
+    --poster-yellow: #f2b900;
+    position: relative;
+    width: 794px;
+    height: 1123px;
+    padding: var(--space-34px, 34px);
+    color: #050505;
+    background: #fff;
+    font-family: Arial, Helvetica, sans-serif;
+    transform-origin: top left;
+  }
+  .match-poster__border {
+    display: flex;
+    height: 100%;
+    padding: 38px 42px 40px;
+    flex-direction: column;
+    border: 8px solid var(--poster-yellow);
+  }
+  .match-poster__teams {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 100px minmax(0, 1fr);
+    gap: var(--space-16px, 16px);
+    align-items: center;
+  }
+  .match-poster__team {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+  .match-poster__badge-wrap {
+    display: grid;
+    width: 140px;
+    height: 140px;
+    place-items: center;
+  }
+  .match-poster__badge {
+    /* Square box (not a rectangle) so a non-square source image can never be
+       stretched — html2canvas doesn't reliably honour object-fit on cloned,
+       off-screen nodes, so contain alone isn't enough for the exported PNG/PDF. */
+    display: block;
+    width: 130px;
+    height: 130px;
+    object-fit: contain;
+  }
+  .match-poster__badge-placeholder {
+    display: grid;
+    width: 112px;
+    height: 112px;
+    place-items: center;
+    border: 4px solid #111;
+    border-radius: 50%;
+    font-size: 28px;
+    font-weight: 900;
+  }
+  .match-poster__team-name {
+    min-height: 66px;
+    margin-top: var(--space-8px, 8px);
+    font-size: 28px;
+    font-weight: 800;
+    line-height: 1.08;
+    text-transform: uppercase;
+  }
+  .match-poster__versus {
+    padding-top: var(--space-8px, 8px);
+    font-size: 34px;
+    font-weight: 900;
+    white-space: nowrap;
+  }
+  .match-poster__competition {
+    margin-top: var(--space-14px, 14px);
+    padding: 16px 8px 0;
+    border-top: 6px solid var(--poster-yellow);
+    font-size: 26px;
+    font-weight: 900;
+    line-height: 1.1;
+    text-align: center;
+  }
+  .match-poster__fixture {
+    margin-top: var(--space-96px, 96px);
+    text-align: center;
+  }
+  .match-poster__date {
+    font-size: 34px;
+    font-weight: 900;
+    line-height: 1.05;
+    white-space: nowrap;
+  }
+  .match-poster__date-ordinal {
+    font-size: .55em;
+    font-weight: 900;
+    vertical-align: text-top;
+  }
+  .match-poster__kickoff {
+    margin-top: var(--space-22px, 22px);
+    font-size: 39px;
+    line-height: 1.05;
+  }
+  .match-poster__kickoff strong { font-weight: 900; }
+  .match-poster__venue {
+    margin-top: var(--space-78px, 78px);
+    text-align: center;
+  }
+  .match-poster__venue-name {
+    font-size: 48px;
+    font-weight: 900;
+    line-height: 1;
+    text-transform: uppercase;
+  }
+  .match-poster__venue-address {
+    margin-top: var(--space-22px, 22px);
+    padding: 0 20px;
+    font-size: 30px;
+    line-height: 1.2;
+    text-transform: uppercase;
+  }
+  .match-poster__admission {
+    margin-top: auto;
+    padding-bottom: var(--space-32px, 32px);
+    font-size: 33px;
+    line-height: 1.35;
+    text-align: center;
+  }
+  .match-poster__admission strong { font-weight: 900; }
+  .match-poster__note {
+    margin-top: var(--space-5px, 5px);
+    font-size: 21px;
+    font-weight: 800;
+  }
+  @media (max-width: 1199.98px) {
+    .match-poster-controls { position: static; }
+  }
+  @media print {
+    @page { size: A4 portrait; margin: 0; }
+    body { margin: 0 !important; background: #fff !important; }
+    body > :not(.hub-shell), .hub-sidebar, .hub-topbar, .page-hero, .match-poster-controls, .match-poster-page-heading, footer { display: none !important; }
+    .hub-shell, .hub-main, .hub-content, .container, .container-fluid, .match-poster-workspace, .row, .col-xl-8, .card, .card-body, .match-poster-stage {
+      width: 100% !important;
+      max-width: none !important;
+      height: auto !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      border: 0 !important;
+      box-shadow: none !important;
+      background: #fff !important;
+    }
+    .match-poster {
+      width: 210mm !important;
+      height: 297mm !important;
+      transform: none !important;
+    }
+  }

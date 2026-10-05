@@ -1,0 +1,31 @@
+body > nav,
+  body > footer,
+  .hub-desktop-nav-toggle {
+    display: none !important;
+  }
+
+  body {
+    min-height: 0;
+  }
+
+  body > main > .container-fluid {
+    width: 100% !important;
+    max-width: none !important;
+    margin-left: 0 !important;
+    padding: 0 !important;
+  }
+
+  .starting11-shell {
+    max-width: none;
+    padding: 0 !important;
+  }
+
+  @media (min-width: 768px) {
+    .starting11-shell form > .row > .col-xl-8 {
+      width: 66.66666667%;
+    }
+
+    .starting11-shell form > .row > .col-xl-4 {
+      width: 33.33333333%;
+    }
+  }

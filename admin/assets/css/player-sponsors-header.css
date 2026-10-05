@@ -1,0 +1,12 @@
+.navbar-brand {
+                              display: flex;
+                              align-items: center;
+                              gap: var(--space-07rem, 0.7rem);
+                    }
+
+                    .navbar-brand__logo {
+                              width: 34px;
+                              height: 34px;
+                              object-fit: contain;
+                              flex: 0 0 auto;
+                    }

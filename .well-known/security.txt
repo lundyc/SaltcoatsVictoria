@@ -1,0 +1,4 @@
+Contact: https://saltcoatsvictoria.co.uk/contact
+Expires: 2027-10-05T00:00:00.000Z
+Preferred-Languages: en
+Canonical: https://saltcoatsvictoria.co.uk/.well-known/security.txt

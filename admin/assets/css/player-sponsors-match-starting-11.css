@@ -1,0 +1,230 @@
+.starting11-shell {
+    --s11-ink: #132238;
+    --s11-accent: #b11f2e;
+    --s11-panel: linear-gradient(180deg, #fffdf9 0%, #f4efe5 100%);
+    --s11-border: rgba(19, 34, 56, 0.12);
+  }
+
+  .starting11-shell .starting11-panel {
+    background: var(--s11-panel);
+    border: 1px solid var(--s11-border);
+    border-radius: var(--radius-1rem, 1rem);
+    box-shadow: 0 16px 40px rgba(19, 34, 56, 0.08);
+  }
+
+  .starting11-shell .starting11-title {
+    color: var(--s11-ink);
+    font-family: "Cinzel", Georgia, serif;
+    letter-spacing: 0.03em;
+  }
+
+  .starting11-shell .starting11-kicker {
+    color: var(--s11-accent);
+    font-size: var(--fs-08, 0.8rem);
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+
+  .starting11-shell .starting11-preview {
+    min-height: 280px;
+    border-radius: var(--radius-1rem, 1rem);
+    border: 1px dashed rgba(19, 34, 56, 0.18);
+    background:
+      radial-gradient(circle at top left, rgba(177, 31, 46, 0.18), transparent 35%),
+      linear-gradient(160deg, #1a2d45 0%, #101d2f 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  .starting11-shell .starting11-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .starting11-shell .starting11-preview iframe {
+    width: 100%;
+    aspect-ratio: 1080 / 1350;
+    display: block;
+    border: 0;
+    background: #111;
+  }
+
+  .starting11-shell .starting11-preview-empty {
+    color: #f8f4ed;
+    font-weight: 600;
+    text-align: center;
+    max-width: 14rem;
+  }
+
+  .starting11-shell .starting11-upload-zone {
+    border: 2px dashed rgba(19, 34, 56, 0.28);
+    border-radius: var(--radius-085rem, 0.85rem);
+    padding: var(--space-4, 1rem);
+    background: rgba(255, 255, 255, 0.55);
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+  }
+
+  .starting11-shell .starting11-upload-zone:hover,
+  .starting11-shell .starting11-upload-zone.is-dragging {
+    border-color: var(--s11-accent);
+    background: rgba(177, 31, 46, 0.07);
+    transform: translateY(-1px);
+  }
+
+  .starting11-shell .starting11-upload-zone input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+
+  .starting11-shell .starting11-upload-zone__status {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-4rem, 0.4rem);
+    margin-top: var(--space-065rem, 0.65rem);
+    padding: 0.3rem 0.7rem;
+    border-radius: var(--radius-pill, 999px);
+    font-size: var(--fs-078, 0.78rem);
+    font-weight: 700;
+    line-height: 1.3;
+  }
+
+  .starting11-shell .starting11-upload-zone__status.is-visible {
+    display: inline-flex;
+  }
+
+  .starting11-shell .starting11-upload-zone__status.state-busy {
+    background: rgba(19, 34, 56, 0.1);
+    color: var(--s11-ink);
+  }
+
+  .starting11-shell .starting11-upload-zone__status.state-busy::before {
+    content: "";
+    width: 0.6rem;
+    height: 0.6rem;
+    border-radius: var(--radius-pill, 999px);
+    background: var(--s11-ink);
+    animation: starting11UploadPulse 1s ease-in-out infinite;
+  }
+
+  .starting11-shell .starting11-upload-zone__status.state-success {
+    background: rgba(25, 135, 84, 0.14);
+    color: #146c43;
+  }
+
+  .starting11-shell .starting11-upload-zone__status.state-error {
+    background: rgba(177, 31, 46, 0.12);
+    color: var(--s11-accent);
+  }
+
+  @keyframes starting11UploadPulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.7); }
+  }
+
+  .starting11-shell .starting11-save-status {
+    min-height: 1.5rem;
+    font-size: var(--fs-875, 0.875rem);
+  }
+
+  .starting11-shell .starting11-table td,
+  .starting11-shell .starting11-table th {
+    vertical-align: middle;
+  }
+
+  .starting11-shell .starting11-number {
+    width: 2.1rem;
+    height: 2.1rem;
+    border-radius: var(--radius-pill, 999px);
+    background: var(--s11-ink);
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+  }
+
+  .starting11-shell .starting11-captain {
+    transform: scale(1.3);
+    accent-color: var(--s11-accent);
+    border: 2px solid var(--s11-ink);
+    box-shadow: none;
+  }
+
+  .starting11-shell .starting11-captain:checked {
+    border-color: var(--s11-accent);
+  }
+
+  .starting11-shell .starting11-captain:focus {
+    border-color: var(--s11-accent);
+    box-shadow: 0 0 0 0.2rem rgba(177, 31, 46, 0.25);
+  }
+
+  .starting11-shell .starting11-subs {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: var(--space-3, 0.75rem);
+  }
+
+  .starting11-shell .starting11-sub-pill {
+    border: 1px solid var(--s11-border);
+    border-radius: var(--radius-pill, 999px);
+    padding: 0.65rem 0.9rem;
+    background: linear-gradient(180deg, #24364f 0%, #152338 100%);
+    color: #f7f0e4;
+    display: flex;
+    align-items: center;
+    gap: var(--space-055rem, 0.55rem);
+    cursor: pointer;
+    transition: border-width 0.15s ease, border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+    box-shadow: 0 10px 18px rgba(19, 34, 56, 0.16);
+  }
+
+  .starting11-shell .starting11-sub-pill.is-selected {
+    border-width: 4px;
+    border-color: var(--s11-accent);
+    box-shadow: 0 10px 20px rgba(177, 31, 46, 0.14);
+    transform: translateY(-1px);
+  }
+
+  .starting11-shell .starting11-sub-pill span {
+    color: inherit;
+    font-weight: 600;
+  }
+
+  .starting11-shell .starting11-sub-pill-number {
+    width: 1.8rem;
+    height: 1.8rem;
+    flex: 0 0 1.8rem;
+    border-radius: var(--radius-pill, 999px);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.16);
+    font-size: var(--fs-082, 0.82rem);
+  }
+
+  .starting11-shell .starting11-sub-pill-number[hidden] {
+    display: none;
+  }
+
+  .starting11-shell .starting11-sub-pill.is-disabled {
+    display: none;
+  }
+
+  @media (max-width: 991.98px) {
+    .starting11-shell .starting11-preview {
+      min-height: 220px;
+    }
+  }

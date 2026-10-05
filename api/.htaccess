@@ -1,0 +1,7 @@
+Options -Indexes -MultiViews
+RewriteEngine On
+RewriteBase /api/
+
+# Preserve bearer authorization when forwarding through Apache/FastCGI.
+RewriteRule ^ - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+RewriteRule ^ index.php [END]

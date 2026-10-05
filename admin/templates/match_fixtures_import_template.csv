@@ -1,0 +1,3 @@
+fixture_id,match_date,kickoff_time,opponent,opponent_abbreviation,is_home,status,competition,competition_season_id,competition_stage,venue,notes
+,2026-07-04,15:00,Example FC,EXF,1,scheduled,League Cup,,Second Round,Home Park,Optional notes
+,2026-07-11,19:45,Another FC,ANF,0,scheduled,League Cup,,Quarter-final,Another Stadium,

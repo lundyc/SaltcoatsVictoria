@@ -1,0 +1,180 @@
+.potm-shell {
+        max-width: 1180px;
+        margin: 0 auto;
+    }
+
+    .potm-intro {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: var(--space-24px, 24px);
+        padding: var(--space-26px, 26px);
+        border: 1px solid rgba(92, 20, 40, .12);
+        border-radius: var(--radius-8px, 8px);
+        background: #fff;
+        box-shadow: 0 .75rem 1.6rem rgba(15, 23, 42, .06);
+    }
+
+    .potm-intro h2 {
+        margin: 4px 0 8px;
+        color: #29151b;
+        font-size: clamp(1.45rem, 2.5vw, 2rem);
+        font-weight: 800;
+    }
+
+    .potm-intro p {
+        max-width: 650px;
+        margin: 0;
+        color: #6d6265;
+    }
+
+    .potm-status {
+        flex: 0 0 auto;
+        padding: 7px 12px;
+        border-radius: var(--radius-pill, 999px);
+        background: #fff3cd;
+        color: #805b00;
+        font-size: var(--fs-078, .78rem);
+        font-weight: 800;
+        letter-spacing: .05em;
+        text-transform: uppercase;
+    }
+
+    .potm-status.is-recorded {
+        background: #e8f7ee;
+        color: #167347;
+    }
+
+    .potm-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(175px, 1fr));
+        gap: var(--space-15px, 15px);
+        margin-top: var(--space-22px, 22px);
+    }
+
+    .potm-player {
+        position: relative;
+        min-height: 235px;
+        cursor: pointer;
+    }
+
+    .potm-player input {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    .potm-player__card {
+        display: flex;
+        height: 100%;
+        min-height: 235px;
+        flex-direction: column;
+        overflow: hidden;
+        border: 2px solid transparent;
+        border-radius: var(--radius-8px, 8px);
+        background: #fff;
+        box-shadow: 0 .75rem 1.6rem rgba(15, 23, 42, .06);
+        transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease;
+    }
+
+    .potm-player:hover .potm-player__card {
+        transform: translateY(-3px);
+        box-shadow: 0 16px 34px rgba(30, 20, 23, .13);
+    }
+
+    .potm-player input:focus-visible + .potm-player__card {
+        outline: 3px solid rgba(240, 191, 29, .5);
+        outline-offset: 3px;
+    }
+
+    .potm-player input:checked + .potm-player__card {
+        border-color: #f0bf1d;
+        box-shadow: 0 0 0 4px rgba(240, 191, 29, .2), 0 16px 34px rgba(30, 20, 23, .14);
+    }
+
+    .potm-player__image {
+        display: flex;
+        height: 172px;
+        align-items: flex-end;
+        justify-content: center;
+        overflow: hidden;
+        background: linear-gradient(145deg, #241218, #5c1428);
+    }
+
+    .potm-player__image img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        object-position: center bottom;
+    }
+
+    .potm-player__initials {
+        display: grid;
+        width: 88px;
+        height: 88px;
+        margin: auto;
+        place-items: center;
+        border: 2px solid rgba(255, 255, 255, .28);
+        border-radius: 50%;
+        color: #fff;
+        font-size: var(--fs-16, 1.6rem);
+        font-weight: 800;
+    }
+
+    .potm-player__name {
+        display: flex;
+        min-height: 62px;
+        align-items: center;
+        justify-content: center;
+        padding: var(--space-13px, 13px);
+        color: #29151b;
+        font-weight: 800;
+        line-height: 1.15;
+        text-align: center;
+    }
+
+    .potm-actions {
+        position: sticky;
+        z-index: 10;
+        bottom: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-16px, 16px);
+        margin-top: var(--space-24px, 24px);
+        padding: 16px 18px;
+        border: 1px solid rgba(92, 20, 40, .12);
+        border-radius: var(--radius-8px, 8px);
+        background: rgba(255, 255, 255, .94);
+        box-shadow: 0 14px 38px rgba(30, 20, 23, .14);
+        backdrop-filter: blur(10px);
+    }
+
+    .potm-actions__selection {
+        color: #6d6265;
+        font-size: var(--fs-092, .92rem);
+    }
+
+    .potm-actions__selection strong {
+        display: block;
+        color: #29151b;
+        font-size: var(--fs-base, 1rem);
+    }
+
+    @media (max-width: 640px) {
+        .potm-intro,
+        .potm-actions {
+            align-items: stretch;
+            flex-direction: column;
+        }
+
+        .potm-status {
+            align-self: flex-start;
+        }
+
+        .potm-actions .btn {
+            width: 100%;
+        }
+    }

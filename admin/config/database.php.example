@@ -1,0 +1,9 @@
+<?php
+// Copy to database.php and fill in. database.php is git-ignored.
+return [
+    'host' => '127.0.0.1',
+    'database' => '',
+    'username' => '',
+    'password' => '',
+    'charset' => 'utf8mb4',
+];

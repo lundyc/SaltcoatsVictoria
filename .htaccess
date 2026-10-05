@@ -1,0 +1,55 @@
+DirectoryIndex index.php
+Options -Indexes
+
+RewriteEngine On
+RewriteBase /
+
+<IfModule mod_alias.c>
+RedirectMatch 403 (?i)(^|/)\.git(/|$)
+RedirectMatch 403 (?i)(^|/)\.env$
+</IfModule>
+RewriteRule (^|/)\.git - [F,L]
+RewriteRule (^|/)\.env$ - [F,L]
+RewriteRule ^(bootstrap|router|helpers|config)\.php$ - [F,L]
+RewriteRule ^admin/(lib|database|config|migrations|tests|tools|app|vendor|node_modules)(/|$) - [F,L]
+RewriteRule ^uploads/secretary_documents(/|$) - [F,L]
+RewriteRule ^PDF_imports(/|$) - [F,L,NC]
+# internal docs, dependency manifests, dumps and old backups are not public
+RewriteRule \.(md|lock|sql|bak)$ - [F,L,NC]
+RewriteRule (^|/)(composer\.json|package(-lock)?\.json|league-config\.json|htaccess-hub-original\.txt|render\.js)$ - [F,L,NC]
+RewriteRule ^admin/(backup|docs)(/|$) - [F,L]
+
+# standalone customer flows still served by the Hub (now under admin/)
+RewriteRule ^season-tickets/?$ admin/season_tickets_signup.php [L,QSA]
+RewriteRule ^season-tickets/checkout/?$ admin/season_tickets_checkout.php [L,QSA]
+RewriteRule ^playersponsors/?$ admin/playersponsors.php [L,QSA]
+RewriteRule ^playersponsors/checkout/?$ admin/playersponsors_checkout.php [L,QSA]
+RewriteRule ^p/([A-Za-z0-9]{6,24})/?$ admin/pay.php?c=$1 [L,QSA]
+
+# back-compat: old flat Hub URLs -> /admin/ (only when nothing matches at root)
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^([A-Za-z0-9_-]+\.php)$ /admin/$1 [R=301,L,QSA]
+
+# public site front controller
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+RewriteRule . index.php [L]
+
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/css text/javascript application/javascript application/json image/svg+xml
+</IfModule>
+<IfModule mod_headers.c>
+    <FilesMatch "\.(css|js)$">
+        Header set Cache-Control "public, max-age=604800"
+    </FilesMatch>
+    # public.css / public.js are always requested with a ?v=<mtime> query
+    # (see asset() in helpers.php), so they can be cached for a year.
+    <If "%{REQUEST_URI} =~ m#^/assets/(css|js)/[^?]+\.(css|js)$#">
+        Header set Cache-Control "public, max-age=31536000, immutable"
+    </If>
+    <FilesMatch "\.(png|jpe?g|gif|webp|svg|ico|woff2?)$">
+        Header set Cache-Control "public, max-age=2592000"
+    </FilesMatch>
+</IfModule>

@@ -1,0 +1,1193 @@
+/* reports.css — dynamic reporting workspace
+   Built on the Hub's existing brand tokens (see style.css :root) so this page
+   stays in step with the rest of the site if the palette ever changes. */
+
+.rpt-page {
+    --rpt-primary: var(--brand-primary, #6a2036);
+    --rpt-primary-tint: rgba(106, 32, 54, .1);
+    --rpt-success: #187e5b;
+    --rpt-success-tint: rgba(24, 126, 91, .12);
+    --rpt-warning: #8a6100;
+    --rpt-warning-tint: rgba(224, 180, 42, .22);
+    --rpt-danger: #a3313c;
+    --rpt-danger-tint: rgba(176, 48, 62, .12);
+    --rpt-info: #276884;
+    --rpt-info-tint: rgba(39, 104, 132, .12);
+    --rpt-neutral: #625956;
+    --rpt-neutral-tint: rgba(84, 75, 72, .1);
+
+    --rpt-club: #9c6b1f;
+    --rpt-club-tint: rgba(156, 107, 31, .13);
+    --rpt-digital: #0f8a93;
+    --rpt-digital-tint: rgba(15, 138, 147, .13);
+    --rpt-team: #6b4fa0;
+    --rpt-team-tint: rgba(107, 79, 160, .13);
+    --rpt-match: #a83a72;
+    --rpt-match-tint: rgba(168, 58, 114, .13);
+    --rpt-player: #3f6b3f;
+    --rpt-player-tint: rgba(63, 107, 63, .13);
+
+    color: var(--hub-ink);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5, 1.25rem);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Hero                                                                    */
+/* ---------------------------------------------------------------------- */
+
+.rpt-hero {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-4, 1rem);
+    padding: 1.5rem var(--hub-space);
+    border-radius: var(--hub-radius);
+    background: linear-gradient(135deg, var(--brand-dark, #4b0818), var(--brand-primary, #6a2036));
+    box-shadow: var(--hub-shadow);
+    color: #fdf6ec;
+}
+
+.rpt-hero__eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-4rem, .4rem);
+    font-size: var(--fs-072, .72rem);
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: rgba(253, 246, 236, .78);
+    margin-bottom: var(--space-035rem, .35rem);
+}
+
+.rpt-hero h1 {
+    font-size: clamp(1.35rem, 2.4vw, 1.85rem);
+    font-weight: 800;
+    margin: 0 0 .3rem;
+    color: #fff;
+}
+
+.rpt-hero p {
+    margin: 0;
+    max-width: 46rem;
+    color: rgba(253, 246, 236, .88);
+    font-size: var(--fs-092, .92rem);
+}
+
+.rpt-hero__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2, .5rem);
+}
+
+.rpt-export-orientation {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-045rem, .45rem);
+    margin: 0;
+    color: inherit;
+}
+
+.rpt-export-orientation span {
+    font-size: var(--fs-068, .68rem);
+    font-weight: 800;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.rpt-export-orientation .form-select {
+    width: auto;
+    min-width: 8.4rem;
+    border-radius: var(--radius-55rem, .55rem);
+    font-weight: 700;
+}
+
+.rpt-hero__actions .rpt-export-orientation .form-select {
+    background-color: rgba(255, 255, 255, .14);
+    border-color: rgba(255, 255, 255, .35);
+    color: #fff;
+}
+
+.rpt-hero__actions .rpt-export-orientation .form-select option {
+    color: var(--hub-ink);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Buttons                                                                 */
+/* ---------------------------------------------------------------------- */
+
+.rpt-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-4rem, .4rem);
+    border-radius: var(--radius-06rem, .6rem);
+    font-weight: 700;
+    font-size: var(--fs-082, .82rem);
+    white-space: nowrap;
+}
+
+.rpt-btn--ghost {
+    background: rgba(255, 255, 255, .12);
+    border: 1px solid rgba(255, 255, 255, .35);
+    color: #fff;
+}
+
+.rpt-btn--ghost:hover {
+    background: rgba(255, 255, 255, .2);
+    color: #fff;
+}
+
+.rpt-table-card .rpt-btn--ghost,
+.rpt-filter-actions .rpt-btn--ghost {
+    background: var(--hub-surface-muted, #faf5ed);
+    border: 1px solid var(--hub-line);
+    color: var(--hub-ink);
+}
+
+.rpt-table-card .rpt-btn--ghost:hover,
+.rpt-filter-actions .rpt-btn--ghost:hover {
+    background: #fff;
+    border-color: var(--rpt-primary);
+    color: var(--rpt-primary);
+}
+
+.rpt-btn--primary {
+    background: var(--rpt-primary);
+    border: 1px solid var(--rpt-primary);
+    color: #fff;
+}
+
+.rpt-btn--primary:hover {
+    background: var(--brand-dark, #4b0818);
+    color: #fff;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Layout: report picker + main column                                    */
+/* ---------------------------------------------------------------------- */
+
+.rpt-layout {
+    display: grid;
+    grid-template-columns: minmax(220px, 17rem) minmax(0, 1fr);
+    gap: var(--space-5, 1.25rem);
+    align-items: start;
+}
+
+.rpt-picker {
+    position: sticky;
+    top: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-11rem, 1.1rem);
+    padding: var(--space-4, 1rem);
+    border: 1px solid var(--hub-line);
+    border-radius: var(--hub-radius);
+    background: var(--hub-surface);
+    box-shadow: var(--hub-shadow-sm);
+    /* max-height: calc(100vh - 2rem);*/
+    overflow-y: auto;
+}
+
+.rpt-picker__group-label {
+    font-size: var(--fs-068, .68rem);
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--hub-muted);
+    margin: 0 0 .4rem .3rem;
+}
+
+.rpt-picker__item {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-065rem, .65rem);
+    padding: .55rem .6rem;
+    border-radius: var(--radius-07rem, .7rem);
+    text-decoration: none;
+    color: var(--hub-ink);
+    transition: background .12s ease, transform .12s ease;
+}
+
+.rpt-picker__item:hover {
+    background: var(--hub-surface-muted, #faf5ed);
+}
+
+.rpt-picker__item.is-active {
+    background: var(--rpt-primary-tint);
+}
+
+.rpt-picker__item.is-active .rpt-picker__icon {
+    background: var(--rpt-primary);
+    color: #fff;
+}
+
+.rpt-picker__icon {
+    flex: 0 0 2.1rem;
+    width: 2.1rem;
+    height: 2.1rem;
+    border-radius: var(--radius-06rem, .6rem);
+    display: grid;
+    place-items: center;
+    background: var(--hub-surface-muted, #faf5ed);
+    color: var(--rpt-primary);
+    font-size: var(--fs-sm, .85rem);
+}
+
+.rpt-picker__text {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-01rem, .1rem);
+    min-width: 0;
+}
+
+.rpt-picker__text strong {
+    font-size: var(--fs-084, .84rem);
+    line-height: 1.2;
+}
+
+.rpt-picker__text small {
+    font-size: var(--fs-072, .72rem);
+    color: var(--hub-muted);
+    line-height: 1.3;
+}
+
+.rpt-main {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-11rem, 1.1rem);
+    min-width: 0;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Filter card                                                            */
+/* ---------------------------------------------------------------------- */
+
+.rpt-filter-card {
+    padding: 1rem 1.1rem;
+    border: 1px solid var(--hub-line);
+    border-radius: var(--hub-radius);
+    background: var(--hub-surface);
+    box-shadow: var(--hub-shadow-sm);
+}
+
+.rpt-filter-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+    gap: var(--space-3, .75rem);
+}
+
+.rpt-field--search {
+    grid-column: span 2;
+}
+
+.rpt-field label {
+    font-size: var(--fs-068, .68rem);
+    font-weight: 800;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    color: var(--hub-muted);
+    margin-bottom: var(--space-1, .25rem);
+}
+
+.rpt-search-input {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.rpt-search-input i {
+    position: absolute;
+    left: .65rem;
+    color: var(--hub-muted);
+    font-size: var(--fs-08, .8rem);
+    pointer-events: none;
+}
+
+.rpt-search-input input {
+    padding-left: var(--space-8, 2rem);
+}
+
+.rpt-filter-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-06rem, 0.6rem);
+    margin-top: var(--space-9rem, .9rem);
+    padding-top: var(--space-9rem, .9rem);
+    border-top: 1px dashed var(--hub-line);
+}
+
+.rpt-filter-actions__count {
+    margin-left: auto;
+    font-size: var(--fs-078, .78rem);
+    font-weight: 700;
+    color: var(--hub-muted);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Checkbox dropdown (e.g. "Compare against" multi-season picker)         */
+/* ---------------------------------------------------------------------- */
+
+.rpt-checkbox-dropdown {
+    width: 100%;
+}
+
+.rpt-checkbox-dropdown__toggle {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    text-align: left;
+    background: #fff;
+}
+
+.rpt-checkbox-dropdown__toggle::after {
+    margin-left: auto;
+}
+
+.rpt-checkbox-dropdown__menu {
+    padding: var(--space-2, .5rem);
+    min-width: 14rem;
+    max-height: 16rem;
+    overflow-y: auto;
+    border-radius: var(--radius-07rem, .7rem);
+    border-color: var(--hub-line);
+    box-shadow: var(--hub-shadow);
+}
+
+.rpt-checkbox-dropdown__item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-055rem, .55rem);
+    padding: .4rem .5rem;
+    border-radius: var(--radius-05rem, .5rem);
+    font-size: var(--fs-084, .84rem);
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.rpt-checkbox-dropdown__item:hover {
+    background: var(--hub-surface-muted, #faf5ed);
+}
+
+.rpt-checkbox-dropdown__item input {
+    flex: 0 0 auto;
+}
+
+.rpt-checkbox-dropdown__empty {
+    display: block;
+    padding: .4rem .5rem;
+    font-size: var(--fs-08, .8rem);
+    color: var(--hub-muted);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Insight panels (portfolio overview)                                    */
+/* ---------------------------------------------------------------------- */
+
+.rpt-insight-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+    gap: var(--space-4, 1rem);
+}
+
+.rpt-insight-card {
+    padding: 1.1rem 1.2rem;
+    border: 1px solid var(--hub-line);
+    border-radius: var(--hub-radius);
+    background: var(--hub-surface);
+    box-shadow: var(--hub-shadow-sm);
+}
+
+.rpt-insight-card h3 {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2, .5rem);
+    font-size: var(--fs-088, .88rem);
+    font-weight: 800;
+    margin: 0 0 .85rem;
+    color: var(--hub-ink);
+}
+
+.rpt-insight-card h3 i {
+    color: var(--rpt-primary);
+}
+
+.rpt-bar-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-065rem, .65rem);
+}
+
+.rpt-bar-list__label {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2, .5rem);
+    font-size: var(--fs-08, .8rem);
+    margin-bottom: var(--space-03rem, .3rem);
+}
+
+.rpt-bar-list__label span:nth-child(2) {
+    color: var(--hub-muted);
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.rpt-bar-list__label strong {
+    font-weight: 800;
+}
+
+.rpt-bar-list__track {
+    height: .45rem;
+    border-radius: var(--radius-pill, 999px);
+    background: var(--hub-surface-muted, #faf5ed);
+    overflow: hidden;
+}
+
+.rpt-bar-list__fill {
+    height: 100%;
+    border-radius: var(--radius-pill, 999px);
+    background: var(--rpt-primary);
+}
+
+.rpt-bar-list__fill--club {
+    background: var(--rpt-club);
+}
+
+.rpt-bar-list__fill--digital {
+    background: var(--rpt-digital);
+}
+
+.rpt-bar-list__fill--team {
+    background: var(--rpt-team);
+}
+
+.rpt-bar-list__fill--match {
+    background: var(--rpt-match);
+}
+
+.rpt-bar-list__fill--player {
+    background: var(--rpt-player);
+}
+
+.rpt-empty-inline {
+    font-size: var(--fs-082, .82rem);
+    color: var(--hub-muted);
+}
+
+.rpt-health-bar {
+    display: flex;
+    height: .85rem;
+    border-radius: var(--radius-pill, 999px);
+    overflow: hidden;
+    background: var(--hub-surface-muted, #faf5ed);
+    margin-bottom: var(--space-4, 1rem);
+}
+
+.rpt-health-bar__segment--success {
+    background: var(--rpt-success);
+}
+
+.rpt-health-bar__segment--danger {
+    background: var(--rpt-danger);
+}
+
+.rpt-legend-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2, .5rem);
+}
+
+.rpt-legend-list li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3, .75rem);
+    font-size: var(--fs-084, .84rem);
+}
+
+.rpt-legend-list strong {
+    font-weight: 800;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Season ticket comparison: charts, pivot table, renewal breakdown       */
+/* ---------------------------------------------------------------------- */
+
+.rpt-chart-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-4, 1rem);
+}
+
+.rpt-chart-card h3 {
+    margin-bottom: var(--space-06rem, 0.6rem);
+}
+
+.rpt-chart-wrap {
+    position: relative;
+    height: 13.5rem;
+}
+
+.rpt-compare-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.6fr) minmax(17rem, 1fr);
+    gap: var(--space-4, 1rem);
+    align-items: start;
+}
+
+.rpt-compare-side {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4, 1rem);
+}
+
+/* Top-aligned (not middle) so the metric label sits level with the top "value" line
+   in every column, rather than centering against the taller two-line value+delta cells.
+   !important is required here: style.css's ".hub-main .table>tbody>tr>*" rule (two
+   classes) outranks a plain ".rpt-compare-table td" selector and was winning instead. */
+.rpt-page .rpt-compare-table tbody td {
+    vertical-align: top !important;
+}
+
+.rpt-compare-table__metric {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-015rem, .15rem);
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.rpt-compare-table__metric-label {
+    display: flex;
+    align-items: center;
+    gap: var(--space-055rem, .55rem);
+}
+
+.rpt-compare-table__metric i {
+    color: var(--rpt-primary);
+    width: 1rem;
+    text-align: center;
+}
+
+.rpt-compare-table__cell {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-015rem, .15rem);
+}
+
+/* Every data cell (metric label included) reserves the same two lines — value/label
+   plus delta, note, or an invisible spacer — so row heights stay uniform whether or
+   not that particular cell has a delta to show. */
+.rpt-compare-table__cell> :nth-child(2),
+.rpt-compare-table__metric .rpt-compare-table__spacer {
+    font-size: var(--fs-072, .72rem);
+    line-height: 1.3;
+}
+
+.rpt-compare-table__spacer {
+    visibility: hidden;
+}
+
+.rpt-delta {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-03rem, .3rem);
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.rpt-delta--up {
+    color: var(--rpt-success);
+}
+
+.rpt-delta--down {
+    color: var(--rpt-danger);
+}
+
+.rpt-bar-list--compact {
+    margin-top: var(--space-4, 1rem);
+    padding-top: var(--space-085rem, .85rem);
+    border-top: 1px dashed var(--hub-line);
+}
+
+.rpt-donut-wrap {
+    position: relative;
+    height: 11rem;
+    margin: 0 auto 1rem;
+    max-width: 11rem;
+}
+
+.rpt-donut-center {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    pointer-events: none;
+}
+
+.rpt-donut-center strong {
+    font-size: var(--fs-13, 1.3rem);
+    font-weight: 800;
+    color: var(--hub-ink);
+    line-height: 1.1;
+}
+
+.rpt-donut-center span {
+    font-size: var(--fs-068, .68rem);
+    color: var(--hub-muted);
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    font-weight: 700;
+}
+
+.rpt-compare-stat {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3, .75rem);
+    margin-top: var(--space-3, .75rem);
+    padding-top: var(--space-3, .75rem);
+    border-top: 1px dashed var(--hub-line);
+    font-size: var(--fs-084, .84rem);
+    color: var(--hub-muted);
+}
+
+.rpt-compare-stat strong {
+    color: var(--hub-ink);
+    font-weight: 800;
+}
+
+.rpt-types-compare {
+    margin: 0;
+}
+
+.rpt-types-compare th {
+    font-size: var(--fs-066, .66rem);
+    font-weight: 800;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: var(--hub-muted);
+    border-bottom: 1px solid var(--hub-line);
+    padding: 0 0 .5rem;
+}
+
+.rpt-types-compare td {
+    font-size: var(--fs-082, .82rem);
+    padding: .45rem 0;
+    border-bottom: 1px solid var(--hub-line);
+}
+
+.rpt-types-compare tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.rpt-types-compare td:first-child i {
+    color: var(--hub-muted);
+    margin-right: var(--space-03rem, .3rem);
+}
+
+.rpt-compare-note {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-2, .5rem);
+    margin: 0;
+    padding: .75rem 1rem;
+    border-radius: var(--radius-07rem, .7rem);
+    background: var(--hub-surface-muted, #faf5ed);
+    border: 1px solid var(--hub-line);
+    color: var(--hub-muted);
+    font-size: var(--fs-08, .8rem);
+}
+
+.rpt-compare-note i {
+    color: var(--rpt-primary);
+    margin-top: var(--space-015rem, .15rem);
+}
+
+@media (max-width: 1199.98px) {
+    .rpt-chart-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .rpt-compare-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+@media (max-width: 767.98px) {
+    .rpt-chart-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+/* ---------------------------------------------------------------------- */
+/* Table card                                                             */
+/* ---------------------------------------------------------------------- */
+
+.rpt-table-card {
+    border: 1px solid var(--hub-line);
+    border-radius: var(--hub-radius);
+    background: var(--hub-surface);
+    box-shadow: var(--hub-shadow-sm);
+    overflow: hidden;
+}
+
+/* The legacy player-sponsors-base.css (imported by style.css) forces
+   table-layout: fixed + equal-width columns and disables the responsive
+   scroller between 768px-991px. Our pills/tags rely on nowrap, so under
+   that fixed layout they overflow into neighbouring columns. Reassert
+   natural column sizing + a real horizontal scroller for this table only. */
+.rpt-table-card .table-responsive {
+    overflow-x: auto;
+}
+
+.rpt-table-card table.rpt-table {
+    table-layout: auto;
+    width: 100%;
+}
+
+.rpt-table-card__header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-3, .75rem);
+    padding: 1.1rem 1.2rem;
+    border-bottom: 1px solid var(--hub-line);
+}
+
+.rpt-table-card__eyebrow {
+    font-size: var(--fs-068, .68rem);
+    font-weight: 800;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--rpt-primary);
+}
+
+.rpt-table-card__header h2 {
+    font-size: var(--fs-105, 1.05rem);
+    font-weight: 800;
+    margin: .15rem 0 .2rem;
+}
+
+.rpt-table-card__header p {
+    margin: 0;
+    font-size: var(--fs-082, .82rem);
+    color: var(--hub-muted);
+    max-width: 40rem;
+}
+
+.rpt-table-card__actions {
+    display: flex;
+    gap: var(--space-2, .5rem);
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.rpt-table-card__actions .rpt-export-orientation {
+    color: var(--hub-muted);
+}
+
+.rpt-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--hub-surface-muted, #faf5ed);
+    color: var(--hub-ink);
+    font-size: var(--fs-068, .68rem);
+    font-weight: 800;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+}
+
+.rpt-table thead th:hover {
+    color: var(--rpt-primary);
+}
+
+.rpt-sort-icon {
+    margin-left: var(--space-035rem, .35rem);
+    font-size: var(--fs-065, .65rem);
+    opacity: .35;
+}
+
+.rpt-table thead th[data-order] .rpt-sort-icon {
+    opacity: 1;
+    color: var(--rpt-primary);
+}
+
+.rpt-table tbody td {
+    font-size: var(--fs-sm, .85rem);
+    vertical-align: middle;
+}
+
+.rpt-table tbody tr:hover {
+    background: var(--rpt-primary-tint);
+}
+
+.rpt-num {
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+}
+
+.rpt-muted {
+    color: var(--hub-muted);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Colour system: pills (status/urgency/etc.) + tags (scope)              */
+/* ---------------------------------------------------------------------- */
+
+.rpt-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-03rem, .3rem);
+    padding: .24rem .6rem;
+    border-radius: var(--radius-pill, 999px);
+    font-size: var(--fs-072, .72rem);
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.rpt-pill--primary {
+    background: var(--rpt-primary-tint);
+    color: var(--rpt-primary);
+}
+
+.rpt-pill--success {
+    background: var(--rpt-success-tint);
+    color: var(--rpt-success);
+}
+
+.rpt-pill--warning {
+    background: var(--rpt-warning-tint);
+    color: var(--rpt-warning);
+}
+
+.rpt-pill--danger {
+    background: var(--rpt-danger-tint);
+    color: var(--rpt-danger);
+}
+
+.rpt-pill--info {
+    background: var(--rpt-info-tint);
+    color: var(--rpt-info);
+}
+
+.rpt-pill--neutral {
+    background: var(--rpt-neutral-tint);
+    color: var(--rpt-neutral);
+}
+
+.rpt-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-035rem, .35rem);
+    padding: .24rem .6rem;
+    border-radius: var(--radius-05rem, .5rem);
+    font-size: var(--fs-072, .72rem);
+    font-weight: 800;
+    white-space: nowrap;
+    border: 1px solid transparent;
+}
+
+.rpt-tag--club {
+    background: var(--rpt-club-tint);
+    color: var(--rpt-club);
+}
+
+.rpt-tag--digital {
+    background: var(--rpt-digital-tint);
+    color: var(--rpt-digital);
+}
+
+.rpt-tag--team {
+    background: var(--rpt-team-tint);
+    color: var(--rpt-team);
+}
+
+.rpt-tag--match {
+    background: var(--rpt-match-tint);
+    color: var(--rpt-match);
+}
+
+.rpt-tag--player {
+    background: var(--rpt-player-tint);
+    color: var(--rpt-player);
+}
+
+.rpt-tag--neutral {
+    background: var(--rpt-neutral-tint);
+    color: var(--rpt-neutral);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Empty state                                                            */
+/* ---------------------------------------------------------------------- */
+
+.rpt-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-2, .5rem);
+    padding: 3rem 1rem;
+    color: var(--hub-muted);
+    text-align: center;
+}
+
+.rpt-empty i {
+    font-size: var(--fs-16, 1.6rem);
+    opacity: .5;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Responsive                                                             */
+/* ---------------------------------------------------------------------- */
+
+@media (max-width: 1199.98px) {
+    .rpt-layout {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .rpt-picker {
+        position: static;
+        max-height: none;
+        flex-direction: row;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        gap: var(--space-6, 1.5rem);
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .rpt-picker__group {
+        flex: 0 0 auto;
+        min-width: 15rem;
+    }
+}
+
+@media (max-width: 767.98px) {
+    .rpt-hero {
+        flex-direction: column;
+        align-items: stretch;
+        text-align: left;
+    }
+
+    .rpt-hero__actions {
+        justify-content: stretch;
+    }
+
+    .rpt-hero__actions .rpt-btn,
+    .rpt-hero__actions .rpt-export-orientation,
+    .rpt-hero__actions .rpt-export-orientation .form-select {
+        flex: 1;
+    }
+
+    .rpt-hero__actions .rpt-btn {
+        justify-content: center;
+    }
+
+    .rpt-filter-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .rpt-field--search {
+        grid-column: span 2;
+    }
+
+    .rpt-filter-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .rpt-filter-actions .rpt-btn {
+        justify-content: center;
+    }
+
+    .rpt-filter-actions__count {
+        margin-left: 0;
+        text-align: center;
+        order: -1;
+        margin-bottom: var(--space-2rem, .2rem);
+    }
+
+    .rpt-table-card__header {
+        flex-direction: column;
+    }
+
+    .rpt-table-card__actions {
+        width: 100%;
+    }
+
+    .rpt-table-card__actions .rpt-btn,
+    .rpt-table-card__actions .rpt-export-orientation,
+    .rpt-table-card__actions .rpt-export-orientation .form-select {
+        flex: 1;
+    }
+
+    .rpt-table-card__actions .rpt-btn {
+        justify-content: center;
+    }
+
+    .rpt-sort-icon {
+        display: none;
+    }
+}
+
+@media (max-width: 479.98px) {
+    .rpt-filter-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .rpt-field--search {
+        grid-column: span 1;
+    }
+}
+
+/* ---------------------------------------------------------------------- */
+/* Sponsor showcase — one card per sponsorship type, grouped like a       */
+/* printed sponsor board. Reuses the scope colour tokens defined above.   */
+/* ---------------------------------------------------------------------- */
+
+.rpt-showcase-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4, 1rem);
+}
+
+.rpt-showcase-card {
+    border: 1px solid var(--hub-line);
+    border-radius: var(--hub-radius);
+    background: var(--hub-surface);
+    box-shadow: var(--hub-shadow-sm);
+    overflow: hidden;
+}
+
+.rpt-showcase-card__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2, .5rem);
+    padding: .7rem .9rem;
+    font-weight: 800;
+    font-size: var(--fs-base, 1rem);
+    background: var(--rpt-club-tint);
+    color: var(--rpt-club);
+}
+
+.rpt-showcase-card__header--digital { background: var(--rpt-digital-tint); color: var(--rpt-digital); }
+.rpt-showcase-card__header--team { background: var(--rpt-team-tint); color: var(--rpt-team); }
+.rpt-showcase-card__header--match { background: var(--rpt-match-tint); color: var(--rpt-match); }
+.rpt-showcase-card__header--player { background: var(--rpt-player-tint); color: var(--rpt-player); }
+.rpt-showcase-card__header--neutral { background: var(--rpt-neutral-tint); color: var(--rpt-neutral); }
+
+.rpt-showcase-card__count {
+    background: rgba(255, 255, 255, .55);
+    border-radius: var(--radius-pill, 999px);
+    padding: .1rem .6rem;
+    font-size: var(--fs-08, .8rem);
+}
+
+.rpt-showcase-card__body {
+    padding: .9rem 1.1rem 1.1rem;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-11rem, 1.1rem);
+}
+
+.rpt-showcase-row {
+    display: grid;
+    /* grid-template-columns is set inline per row — one equal-width column per
+       package placed on that row, so 4 packages means 25% each, 3 means 33%, etc. */
+    gap: 1.1rem 1.5rem;
+}
+
+.rpt-showcase-package__title {
+    margin: 0 0 .5rem;
+    font-size: var(--fs-082, .82rem);
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+    color: var(--rpt-primary);
+    padding-bottom: var(--space-035rem, .35rem);
+    border-bottom: 1px solid var(--hub-line);
+}
+
+.rpt-showcase-package__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2, .5rem);
+}
+
+.rpt-showcase-package__list li {
+    display: flex;
+    flex-direction: column;
+}
+
+.rpt-showcase-package__name {
+    font-weight: 700;
+    color: var(--hub-ink);
+}
+
+.rpt-showcase-package__empty {
+    font-size: var(--fs-sm, .85rem);
+    font-style: italic;
+    color: var(--hub-muted, #6b6461);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Dark colour-scheme safety net (the Hub currently ships light-only, but  */
+/* this keeps the report readable if a user forces dark mode in-browser). */
+/* ---------------------------------------------------------------------- */
+
+@media (prefers-color-scheme: dark) {
+    .rpt-page {
+        color-scheme: light;
+    }
+}
+
+/* ---------------------------------------------------------------------- */
+/* Print (viewing the live page itself, not the dedicated PDF export)     */
+/* ---------------------------------------------------------------------- */
+
+@media print {
+
+    .rpt-picker,
+    .rpt-hero__actions,
+    .rpt-filter-card,
+    .rpt-table-card__actions,
+    .hub-mobile-nav,
+    #hubSideNavigation {
+        display: none !important;
+    }
+
+    .rpt-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .rpt-table thead th {
+        position: static;
+    }
+}

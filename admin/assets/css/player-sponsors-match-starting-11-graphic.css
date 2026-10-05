@@ -1,0 +1,25 @@
+html, body {
+    width: 100%;
+    min-height: 0;
+    margin: 0;
+    overflow: hidden;
+    background: #111;
+  }
+
+  .starting11-graphic-page--preview {
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  .starting11-graphic-preview-wrap {
+    display: block;
+    max-width: 100%;
+    margin: 0 auto;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  #starting11GraphicCapture {
+    transform-origin: top left;
+  }
