@@ -48,6 +48,8 @@ pub_jsonld(['@type' => 'StadiumOrArena', 'name' => $name, 'address' => $address,
     </aside>
   </div>
 
+  <?php partial('boards_cta'); ?>
+
   <div class="container">
     <div class="mapembed">
       <iframe src="<?= e($mapEmbed) ?>" loading="lazy" referrerpolicy="no-referrer-when-downgrade" title="Map of <?= e($name) ?>"></iframe>

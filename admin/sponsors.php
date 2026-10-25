@@ -444,7 +444,7 @@ $visibleOutstanding = array_sum(array_map(
     </div>
   <?php endif; ?>
 
-  <div class="card sponsors-section-card border-0 shadow-sm mb-3 hub-form-card">
+  <div class="card sponsors-section-card border-0 shadow-sm mb-3 hub-form-card" data-filter-collapse>
     <div class="card-body">
       <form method="get" class="row g-2 g-lg-3 align-items-end">
         <div class="col-12 col-lg-3">
@@ -885,6 +885,9 @@ $visibleOutstanding = array_sum(array_map(
   });
 </script>
 
+<?php
+?>
+<script src="/admin/assets/js/hub_list_tools.js?v=<?= (int) @filemtime(__DIR__ . '/assets/js/hub_list_tools.js') ?>" defer></script>
 <?php
 require_once __DIR__ . '/footer.php';
 ?>

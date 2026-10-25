@@ -7,7 +7,7 @@ $hasAny = array_sum(array_map('count', $groups)) > 0;
 $labels = ['GK' => 'Goalkeepers', 'DEF' => 'Defenders', 'MID' => 'Midfielders', 'FWD' => 'Forwards'];
 
 set_meta([
-    'title' => club('club_short_name', club('club_name')) . ' Squad' . (seo_season_label() !== '' ? ' ' . seo_season_label() : '') . ' | Players & Management | ' . club('club_name'),
+    'title' => club('club_short_name', club('club_name')) . ' Squad' . (seo_season_label() !== '' ? ' ' . seo_season_label() : '') . ' | Players & Management',
     'title_full' => '1',
     'description' => 'Meet the ' . club('club_name') . ' first-team squad' . (seo_season_label() !== '' ? ' for ' . seo_season_label() : '')
         . ' — goalkeepers, defenders, midfielders and forwards, with player profiles.',
@@ -31,7 +31,7 @@ seo_breadcrumbs([['First team', url('team')]]);
         <h2 class="squad-heading"><?= e($label) ?></h2>
         <div class="squad-grid">
           <?php foreach ($groups[$key] as $player): ?>
-            <?php partial('player_card', ['player' => $player]); ?>
+            <?php partial('player_card', ['player' => $player, 'priority' => (($pcardN = ($pcardN ?? 0) + 1) <= 4)]); ?>
           <?php endforeach; ?>
         </div>
       <?php endforeach; ?>

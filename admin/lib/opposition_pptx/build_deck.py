@@ -180,6 +180,79 @@ def load_league(path):
         return None
 
 
+BADGE_DIR = os.path.join(HERE, '..', '..', '..', 'badges')
+BADGE_OVERRIDES = os.path.join(HERE, '..', '..', 'data', 'wosfl_badge_overrides.json')
+
+
+def _norm(text):
+    return re.sub(r'[^a-z0-9]+', '', (text or '').lower())
+
+
+def find_badge(team):
+    """Path of the opponent's badge in /badges (WOSFL overrides first, then a name match), or None."""
+    name = stats.clean_team(team)
+    try:
+        with open(BADGE_OVERRIDES, encoding='utf-8') as fh:
+            for k, v in json.load(fh).items():
+                if _norm(k) == _norm(name) and os.path.isfile(os.path.join(BADGE_DIR, v)):
+                    return os.path.join(BADGE_DIR, v)
+    except (OSError, ValueError):
+        pass
+    want = _norm(name)
+    best = None
+    for f in sorted(os.listdir(BADGE_DIR)) if os.path.isdir(BADGE_DIR) else []:
+        stem, ext = os.path.splitext(f)
+        if ext.lower() not in ('.png', '.jpg', '.jpeg', '.webp'):
+            continue
+        n = _norm(re.sub(r'\s*(-\d+|\(\d+\))$', '', stem))
+        for tail in ('fc', 'afc', 'sc', 'jfc'):
+            if n.endswith(tail) and n[:-len(tail)] == want:
+                n = want
+        rank = 0 if n == want else 2 if n.startswith(want) and want else None
+        if rank is None:
+            continue
+        if re.search(r'\sb$', stem, re.I):  # "... B" files are alternative (dark/white) versions
+            rank += 1
+        if best is None or rank < best[0]:
+            best = (rank, os.path.join(BADGE_DIR, f))
+    return best[1] if best else None
+
+
+def swap_opponent_badge(prs, team):
+    """Every slide carries the template's old opponent badge top-right (the Saltcoats badge sits
+    beside it and stays). Replace it with this team's badge, padded to the same frame; drop it
+    if we have no badge for the team rather than show the wrong club."""
+    import io
+    from PIL import Image
+    first = next((sh for sh in prs.slides[1].shapes if sh.shape_type == 13 and sh.shape_id == 6), None)
+    if first is None:
+        return
+    old_sha = first.image.sha1
+    ratio = first.width / first.height
+    path = find_badge(team)
+    new_blob = None
+    if path:
+        try:
+            im = Image.open(path).convert('RGBA')
+            w, h = im.size
+            cw, ch = (w, int(round(w / ratio))) if w / h > ratio else (int(round(h * ratio)), h)
+            canvas = Image.new('RGBA', (cw, ch), (0, 0, 0, 0))
+            canvas.paste(im, ((cw - w) // 2, (ch - h) // 2))
+            buf = io.BytesIO()
+            canvas.save(buf, 'PNG')
+            new_blob = buf.getvalue()
+        except Exception:
+            new_blob = None
+    for slide in prs.slides:
+        for sh in list(slide.shapes):
+            if sh.shape_type == 13 and sh.image.sha1 == old_sha:
+                if new_blob is None:
+                    drop_shape(sh)
+                else:
+                    _, rid = slide.part.get_or_add_image_part(io.BytesIO(new_blob))
+                    sh._element.blipFill.blip.rEmbed = rid
+
+
 def build_deck(data, template, league, out):
     r = stats.build(data)
     prs = Presentation(template)
@@ -187,6 +260,7 @@ def build_deck(data, template, league, out):
     n, sm, team = r['n'], r['summary'], stats.clean_team(r['team'])
     if n == 0:
         raise SystemExit('No played matches in that file.')
+    swap_opponent_badge(prs, r['team'])
     team_up = team.upper() + ('' if team.upper().endswith(' FC') else ' FC')
     has_lineups = bool(r['starters'])
 

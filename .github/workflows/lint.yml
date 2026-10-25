@@ -1,0 +1,25 @@
+name: Lint and static analysis
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  php:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          tools: phpstan:2
+      - name: Syntax check (php -l)
+        run: |
+          find . -name '*.php' -not -path './admin/vendor/*' -not -path './admin/node_modules/*' -not -path './cache/*' -print0 \
+            | xargs -0 -n1 -P4 php -l | grep -v '^No syntax errors' || true
+          ! find . -name '*.php' -not -path './admin/vendor/*' -not -path './admin/node_modules/*' -not -path './cache/*' -print0 \
+            | xargs -0 -n1 -P4 php -l 2>&1 | grep -q '^PHP Parse error\|^Parse error'
+      - name: PHPStan (level 0, public layer)
+        run: phpstan analyse -c phpstan.neon --no-progress --memory-limit=1G
+      # admin/tests/run.php needs the live database, so it is run on the server
+      # (cd admin && php tests/run.php), not here.

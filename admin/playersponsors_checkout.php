@@ -62,6 +62,9 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                     'is_business' => $isBusiness,
                     'address' => $buyerAddress,
                     'website_url' => $buyerWebsite,
+                    'consent_email' => isset($_POST['consent_email']),
+                    'consent_sms' => isset($_POST['consent_sms']),
+                    'consent_whatsapp' => isset($_POST['consent_whatsapp']),
                 ], $seasonId, player_sponsorship_basket_items());
 
                 $orderId = $order['order_id'];
@@ -99,7 +102,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Checkout - <?= h(APP_NAME) ?></title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/admin/assets/vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
     <link href="/admin/assets/css/style.css" rel="stylesheet">
     <style>
         :root { --ps-maroon: #4b0818; --ps-gold: #e0b42a; --ps-cream: #f6ecde; }

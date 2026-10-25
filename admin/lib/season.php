@@ -106,6 +106,18 @@ function ensureSeasonSchema(PDO $pdo): void
                     $pdo->exec("ALTER TABLE seasons ADD COLUMN sponsorship_deadline DATE NULL DEFAULT NULL AFTER is_locked");
           }
 
+          if (!isset($seasonColumns['is_archived'])) {
+                    // Archived seasons stay in the database as read-only history but are
+                    // left out of the everyday season pickers. See seasonArchive().
+                    $pdo->exec("ALTER TABLE seasons ADD COLUMN is_archived TINYINT(1) NOT NULL DEFAULT 0 AFTER is_locked");
+                    $pdo->exec("ALTER TABLE seasons ADD COLUMN archived_at DATETIME NULL DEFAULT NULL AFTER is_archived");
+                    $pdo->exec("ALTER TABLE seasons ADD COLUMN archive_prompt_dismissed TINYINT(1) NOT NULL DEFAULT 0 AFTER archived_at");
+                    // One-off: keep 2023 / 2024 onwards active, archive everything older, and do
+                    // not nag about seasons that already exist.
+                    $pdo->exec("UPDATE seasons SET is_archived = 1, is_locked = 1, archived_at = NOW() WHERE is_current = 0 AND start_date IS NOT NULL AND start_date < '2023-07-01'");
+                    $pdo->exec("UPDATE seasons SET archive_prompt_dismissed = 1");
+          }
+
           $paymentColumns = [];
           $stmt = $pdo->query("SHOW COLUMNS FROM sponsorship_payments");
           foreach ($stmt as $row) {
@@ -156,12 +168,17 @@ function ensureSeasonSchema(PDO $pdo): void
                     $historicSeasonId = $currentSeasonId;
           }
 
-          $pdo->prepare("UPDATE seasons SET is_current = 0")->execute();
-          if ($historicSeasonId > 0) {
-                    $pdo->prepare("UPDATE seasons SET is_locked = 1 WHERE id = :id")->execute([':id' => $historicSeasonId]);
-          }
-          if ($currentSeasonId > 0) {
-                    $pdo->prepare("UPDATE seasons SET is_current = 1, is_locked = 0 WHERE id = :id")->execute([':id' => $currentSeasonId]);
+          // One-off seed for a fresh install only. It used to run on every request, which reset the
+          // current season to "2026 / 2027" and unlocked it each time, so choosing a different current
+          // season, or locking this one, never stuck.
+          $hasCurrentSeason = (int)$pdo->query("SELECT COUNT(*) FROM seasons WHERE is_current = 1")->fetchColumn() > 0;
+          if (!$hasCurrentSeason) {
+                    if ($historicSeasonId > 0) {
+                              $pdo->prepare("UPDATE seasons SET is_locked = 1 WHERE id = :id")->execute([':id' => $historicSeasonId]);
+                    }
+                    if ($currentSeasonId > 0) {
+                              $pdo->prepare("UPDATE seasons SET is_current = 1, is_locked = 0 WHERE id = :id")->execute([':id' => $currentSeasonId]);
+                    }
           }
 
           $pdo->exec("
@@ -369,9 +386,10 @@ function getActiveSponsorsForSeason(PDO $pdo, int $seasonId): array
           return getSeasonSponsors($pdo, $seasonId, true);
 }
 
-function getSeasons(PDO $pdo): array
+function getSeasons(PDO $pdo, bool $includeArchived = true): array
 {
           ensureSeasonSchema($pdo);
+          $where = $includeArchived ? '' : 'WHERE s.is_archived = 0';
           return $pdo->query("
                     SELECT
                               s.id,
@@ -380,6 +398,9 @@ function getSeasons(PDO $pdo): array
                               s.end_date,
                               s.is_current,
                               s.is_locked,
+                              s.is_archived,
+                              s.archived_at,
+                              s.archive_prompt_dismissed,
                               s.sponsorship_deadline,
                               s.competition_id,
                               s.season_ticket_terms,
@@ -390,6 +411,7 @@ function getSeasons(PDO $pdo): array
                               mc.is_league AS competition_is_league
                     FROM seasons s
                     LEFT JOIN match_competitions mc ON mc.id = s.competition_id
+                    {$where}
                     ORDER BY s.start_date ASC, s.id ASC
           ")->fetchAll(PDO::FETCH_ASSOC);
 }
@@ -405,6 +427,8 @@ function getSeasonById(PDO $pdo, int $seasonId): ?array
                               s.end_date,
                               s.is_current,
                               s.is_locked,
+                              s.is_archived,
+                              s.archived_at,
                               s.sponsorship_deadline,
                               s.competition_id,
                               s.season_ticket_terms,
@@ -551,8 +575,13 @@ function getSelectedSeasonId(PDO $pdo): int
 
 function getSeasonContext(PDO $pdo): array
 {
-          $seasons = getSeasons($pdo);
           $seasonId = getSelectedSeasonId($pdo);
+          // The everyday season picker leaves out archived seasons, unless one is the
+          // season being viewed right now (so the picker never shows a blank).
+          $seasons = array_values(array_filter(
+                    getSeasons($pdo),
+                    static fn (array $r): bool => (int)($r['is_archived'] ?? 0) !== 1 || (int)$r['id'] === $seasonId
+          ));
           if ($seasonId <= 0 && $seasons) {
                     $seasonId = (int)$seasons[0]['id'];
           }
@@ -615,4 +644,49 @@ function seasonScopeSql(string $alias = 's', ?int $seasonId = null): string
                     return '';
           }
           return " AND {$alias}.season_id = :season_id";
+}
+
+
+/**
+ * Seasons that have finished and are waiting for someone to decide whether to
+ * commit them to the archive. Existing seasons are marked as already decided.
+ *
+ * @return list<array<string,mixed>>
+ */
+function getSeasonsAwaitingArchive(PDO $pdo): array
+{
+          ensureSeasonSchema($pdo);
+          return $pdo->query("
+                    SELECT id, name, start_date, end_date
+                    FROM seasons
+                    WHERE is_archived = 0
+                      AND is_current = 0
+                      AND archive_prompt_dismissed = 0
+                      AND end_date IS NOT NULL
+                      AND end_date < CURDATE()
+                    ORDER BY start_date DESC
+          ")->fetchAll(PDO::FETCH_ASSOC);
+}
+
+/** Commit a finished season to the archive: it is locked and tucked away as history. */
+function seasonArchive(PDO $pdo, int $seasonId): bool
+{
+          ensureSeasonSchema($pdo);
+          $stmt = $pdo->prepare("
+                    UPDATE seasons
+                    SET is_archived = 1, is_locked = 1, archived_at = NOW(), archive_prompt_dismissed = 1
+                    WHERE id = :id AND is_current = 0
+                    LIMIT 1
+          ");
+          $stmt->execute([':id' => $seasonId]);
+          return $stmt->rowCount() > 0;
+}
+
+/** Bring an archived season back into the everyday lists (it stays locked). */
+function seasonRestoreFromArchive(PDO $pdo, int $seasonId): bool
+{
+          ensureSeasonSchema($pdo);
+          $stmt = $pdo->prepare("UPDATE seasons SET is_archived = 0, archived_at = NULL, archive_prompt_dismissed = 1 WHERE id = :id LIMIT 1");
+          $stmt->execute([':id' => $seasonId]);
+          return $stmt->rowCount() > 0;
 }

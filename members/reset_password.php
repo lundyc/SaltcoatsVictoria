@@ -37,12 +37,12 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 <input type="hidden" name="token" value="<?= h($token) ?>">
                 <div class="mb-3">
                     <label class="form-label" for="newPassword">New password</label>
-                    <input type="password" class="form-control" id="newPassword" name="password" minlength="8" required autofocus>
+                    <input type="password" class="form-control" id="newPassword" name="password" minlength="12" maxlength="200" required autofocus>
                     <div class="form-text">At least 8 characters.</div>
                 </div>
                 <div class="mb-3">
                     <label class="form-label" for="confirmPassword">Confirm password</label>
-                    <input type="password" class="form-control" id="confirmPassword" name="password_confirm" minlength="8" required>
+                    <input type="password" class="form-control" id="confirmPassword" name="password_confirm" minlength="12" maxlength="200" required>
                 </div>
                 <button type="submit" class="btn btn-brand w-100">Set password</button>
             </form>

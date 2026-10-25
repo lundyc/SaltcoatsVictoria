@@ -153,8 +153,6 @@ function players_all_birthdays(PDO $pdo, int $limit = 0, bool $missing = false):
     if (
         players_birthdays_table_exists($pdo, 'people')
         && players_birthdays_table_exists($pdo, 'accounts')
-        && players_birthdays_table_exists($pdo, 'roles')
-        && players_birthdays_table_exists($pdo, 'account_roles')
         && players_birthdays_table_exists($pdo, 'person_club_roles')
         && players_birthdays_table_exists($pdo, 'club_roles')
     ) {
@@ -165,16 +163,15 @@ function players_all_birthdays(PDO $pdo, int $limit = 0, bool $missing = false):
             $accessRoleJoins = 'LEFT JOIN person_access_templates par ON par.person_id = p.id
                 LEFT JOIN access_templates access_role ON access_role.id = par.template_id';
         }
+        $roleCodesSql = accountRoleCodesSql();
         $peopleStmt = $pdo->query("
             SELECT p.id, p.display_name, p.date_of_birth,
                    {$accessRoleSelect} AS access_role_codes,
-                   GROUP_CONCAT(DISTINCT r.code ORDER BY r.code SEPARATOR ',') AS role_codes,
+                   {$roleCodesSql} AS role_codes,
                    GROUP_CONCAT(DISTINCT hp.name ORDER BY hp.sort_order, hp.name SEPARATOR ', ') AS position_names
             FROM people p
             {$accessRoleJoins}
             LEFT JOIN accounts a ON a.person_id = p.id AND a.is_active = 1
-            LEFT JOIN account_roles ar ON ar.account_id = a.id
-            LEFT JOIN roles r ON r.id = ar.role_id
             LEFT JOIN person_club_roles pp ON pp.person_id = p.id
                 AND COALESCE(pp.start_date, DATE(pp.assigned_at)) <= CURDATE()
                 AND (pp.end_date IS NULL OR pp.end_date >= CURDATE())

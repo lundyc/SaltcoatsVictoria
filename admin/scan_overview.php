@@ -159,6 +159,8 @@ require_once __DIR__ . '/header.php';
     @media (max-width:991.98px) { .scan-overview-layout { grid-template-columns:1fr; } }
 </style>
 
+<div class="text-end mb-2"><a class="small" href="/admin/scan_problems.php"><i class="fa-solid fa-triangle-exclamation me-1"></i>Scanner problems</a></div>
+
 <?php if ($notice !== ''): ?><div class="alert alert-success"><?= h($notice) ?></div><?php endif; ?>
 <?php if ($error !== ''): ?><div class="alert alert-danger"><?= h($error) ?></div><?php endif; ?>
 

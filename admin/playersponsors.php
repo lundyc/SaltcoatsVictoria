@@ -131,9 +131,26 @@ function player_sponsorship_render_basket(array $basket, string $csrfFieldHtml):
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Player Sponsorship - <?= h(APP_NAME) ?></title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css" rel="stylesheet">
+<?php
+    // Fan-facing page that Google can index, so it needs a real title, description
+    // and canonical (APP_NAME is the generic back-office label "Hub").
+    require_once __DIR__ . '/lib/site_settings.php';
+    try {
+        $seoClub = site_setting($pdo, 'club_name', 'Saltcoats Victoria FC');
+    } catch (Throwable) {
+        $seoClub = 'Saltcoats Victoria FC';
+    }
+    $seoSeason = $currentSeason ? trim((string) $currentSeason['name']) : '';
+    if (preg_match('#^(\d{4})\s*[/-]\s*(?:\d{2})?(\d{2})$#', $seoSeason, $seoM)) {
+        $seoSeason = $seoM[1] . '/' . $seoM[2]; // "2026 / 2027" -> "2026/27"
+    }
+    $seoHost = preg_replace('~^www\.~i', '', strtolower((string) ($_SERVER['HTTP_HOST'] ?? '')));
+?>
+    <title><?= h('Sponsor a Player' . ($seoSeason !== '' ? ' ' . $seoSeason : '') . ' | ' . $seoClub) ?></title>
+    <meta name="description" content="<?= h('Sponsor a ' . $seoClub . ' player\'s home or away kit' . ($seoSeason !== '' ? ' for ' . $seoSeason : '') . ' and support the club.') ?>">
+    <?php if ($seoHost !== ''): ?><link rel="canonical" href="<?= h('https://' . $seoHost . '/playersponsors') ?>"><?php endif; ?>
+    <link href="/admin/assets/vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
+    <link href="/admin/assets/vendor/fontawesome/css/all.min.css" rel="stylesheet">
     <link href="/admin/assets/css/style.css" rel="stylesheet">
     <style>
         :root { --ps-maroon: #4b0818; --ps-gold: #e0b42a; --ps-cream: #f6ecde; }
@@ -171,7 +188,7 @@ function player_sponsorship_render_basket(array $basket, string $csrfFieldHtml):
     <img src="/admin/Saltcoats Victoria FC -White_Transparent.png" alt="Saltcoats Victoria FC" class="ps-badge">
     <h1>Sponsor a Player<?= $currentSeason ? ' — ' . h((string) $currentSeason['name']) : '' ?></h1>
     <p class="mb-0">Choose a player's Home or Away kit to sponsor, add as many as you like, then check out.</p>
-    <p class="mt-2 mb-0"><a href="/members/matches.php" style="color:inherit;font-weight:700;">Fixtures &amp; results &rarr;</a></p>
+    <p class="mt-2 mb-0"><a href="/fixtures" style="color:inherit;font-weight:700;">Fixtures &amp; results &rarr;</a></p>
 </div>
 
 <div class="ps-wrap">

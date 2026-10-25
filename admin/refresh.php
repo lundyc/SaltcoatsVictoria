@@ -73,6 +73,11 @@ function resolvePhpCliBinary(): ?string
         $candidates[] = $whichPhp;
     }
 
+    // php-fpm has a minimal PATH, so `command -v php` can come back empty.
+    foreach (['/usr/bin/php', '/usr/local/bin/php', '/opt/plesk/php/8.4/bin/php', '/opt/plesk/php/8.3/bin/php'] as $fallbackPhp) {
+        $candidates[] = $fallbackPhp;
+    }
+
     $seen = [];
     foreach ($candidates as $candidate) {
         if ($candidate === '' || isset($seen[$candidate])) {

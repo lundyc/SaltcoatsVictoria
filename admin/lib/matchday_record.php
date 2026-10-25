@@ -201,6 +201,7 @@ function matchday_record_event_type_defaults(): array
         'goal'           => ['label' => 'Goal',                 'category' => 'goal',  'projects_to' => 'goal'],
         'own_goal'       => ['label' => 'Own goal',             'category' => 'goal',  'projects_to' => 'goal'],
         'penalty_scored' => ['label' => 'Penalty scored',       'category' => 'goal',  'projects_to' => 'goal'],
+        'shootout_penalty' => ['label' => 'Shootout penalty',    'category' => 'other', 'projects_to' => ''],
         'penalty_missed' => ['label' => 'Penalty missed',       'category' => 'other', 'projects_to' => 'penalty'],
         'yellow_card'    => ['label' => 'Yellow card',          'category' => 'card',  'projects_to' => 'yellow_card'],
         'second_yellow'  => ['label' => 'Second yellow (→ red)', 'category' => 'card', 'projects_to' => 'red_card'],
@@ -941,6 +942,26 @@ function matchday_record_sync_derived(PDO $pdo, int $fixtureId): void
     }
 
     $types = matchday_record_event_types($pdo);
+
+    // Shootout kicks (type 'shootout_penalty', outcome scored|missed) set the fixture's shootout score.
+    // They are never goals, so the full-time score and goal counts are untouched.
+    $kickGoals = ['svfc' => 0, 'opponent' => 0];
+    $haveKicks = false;
+    foreach ($events as $ev) {
+        if ((string) $ev['type'] === 'shootout_penalty') {
+            $haveKicks = true;
+            if ((string) ($ev['outcome'] ?? '') === 'scored' && isset($kickGoals[(string) $ev['side']])) {
+                $kickGoals[(string) $ev['side']]++;
+            }
+        }
+    }
+    if ($haveKicks) {
+        $pdo->prepare('UPDATE match_fixtures SET home_penalties = :hp, away_penalties = :ap WHERE id = :id LIMIT 1')->execute([
+            ':hp' => $isHome ? $kickGoals['svfc'] : $kickGoals['opponent'],
+            ':ap' => $isHome ? $kickGoals['opponent'] : $kickGoals['svfc'],
+            ':id' => $fixtureId,
+        ]);
+    }
 
     $svfcLineup = array_values(array_filter($lineups, static fn($r) => (string) $r['side'] === 'svfc'));
     $haveSvfcLineup = $svfcLineup !== [];

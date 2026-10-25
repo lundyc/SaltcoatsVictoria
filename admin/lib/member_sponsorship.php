@@ -18,27 +18,26 @@ function ensureMemberSponsorshipPackages(PDO $pdo): void
     }
     ensureSponsorshipCatalogSchema($pdo);
     $packages = [
-        ['Small Pitchside Board', 'pitchside_board_small', 300.00, 'Small 4x4 pitchside advertising board at Campbell Park.', 330],
-        ['Medium Pitchside Board', 'pitchside_board_medium', 400.00, 'Medium 7x3.5 pitchside advertising board at Campbell Park.', 340],
-        ['Large Pitchside Board', 'pitchside_board_large', 500.00, 'Large 8x4 pitchside advertising board at Campbell Park.', 350],
+        ['Small Pitchside Board', 'pitchside_board_small', 250.00, 'Small pitchside advertising board (2ft 9 x 3ft) at Campbell Park.', 330, 80.00],
+        ['Medium Pitchside Board', 'pitchside_board_medium', 350.00, 'Medium pitchside advertising board (7ft x 3ft 6) at Campbell Park.', 340, 150.00],
+        ['Large Pitchside Board', 'pitchside_board_large', 420.00, 'Large pitchside advertising board (8ft x 4ft) at Campbell Park.', 350, 200.00],
     ];
+    // Prices, descriptions and renewal prices are only the starting values: once a package exists they
+    // are edited in Admin → Sponsorship → Packages and are never overwritten here.
     $stmt = $pdo->prepare("INSERT INTO packages
-        (name, code, scope, category, amount, duration_type, max_slots, graphic_enabled, graphic_placement, default_logo_variant, is_active, sort_order, description)
-        VALUES (:name, :code, 'club', 'Ground Advertising', :amount, 'season', NULL, 0, :placement, 'colour', 1, :sort_order, :description)
+        (name, code, scope, category, amount, renewal_amount, duration_type, max_slots, graphic_enabled, graphic_placement, default_logo_variant, is_active, sort_order, description)
+        VALUES (:name, :code, 'club', 'Ground Advertising', :amount, :renewal, 'season', NULL, 0, :placement, 'colour', 1, :sort_order, :description)
         ON DUPLICATE KEY UPDATE
-            name = VALUES(name),
             scope = VALUES(scope),
             category = VALUES(category),
-            amount = VALUES(amount),
             duration_type = VALUES(duration_type),
-            is_active = 1,
-            sort_order = VALUES(sort_order),
-            description = VALUES(description)");
+            is_active = 1");
     foreach ($packages as $package) {
         $stmt->execute([
             ':name' => $package[0],
             ':code' => $package[1],
             ':amount' => $package[2],
+            ':renewal' => $package[5],
             ':placement' => $package[1],
             ':sort_order' => $package[4],
             ':description' => $package[3],
@@ -88,7 +87,7 @@ function member_sponsorship_player_options(PDO $pdo, int $seasonId): array
 function member_sponsorship_match_options(PDO $pdo, int $seasonId): array
 {
     ensureMemberSponsorshipPackages($pdo);
-    $fixtures = $pdo->prepare("SELECT id, opponent, match_date FROM match_fixtures WHERE season_id = :season AND match_date >= CURDATE() ORDER BY match_date");
+    $fixtures = $pdo->prepare("SELECT f.id, f.opponent, f.match_date, f.kickoff_time, f.competition, f.is_home, o.logo_path AS opponent_logo FROM match_fixtures f LEFT JOIN match_opponents o ON o.id = f.opponent_id WHERE f.season_id = :season AND f.match_date >= CURDATE() ORDER BY f.match_date");
     $fixtures->execute([':season' => $seasonId]);
     $fixtures = $fixtures->fetchAll(PDO::FETCH_ASSOC);
 
@@ -160,6 +159,25 @@ function member_sponsorship_ensure_sponsor(PDO $pdo, array $holder): int
  * lock — see member_sponsorship_purchase() for why the real, authoritative
  * check happens again at the point the slot is actually claimed.
  */
+/**
+ * What this package costs for this fixture. Match-based packages can carry a lower price
+ * for away games (packages.away_amount, e.g. Matchday: £50 home / £20 away); a NULL
+ * away_amount means "same price home and away".
+ */
+function member_sponsorship_package_price(PDO $pdo, array $package, ?int $fixtureId): float
+{
+    $amount = (float) $package['amount'];
+    if ($fixtureId && isset($package['away_amount']) && $package['away_amount'] !== null && $package['away_amount'] !== '') {
+        $stmt = $pdo->prepare('SELECT is_home FROM match_fixtures WHERE id = :id LIMIT 1');
+        $stmt->execute([':id' => $fixtureId]);
+        $isHome = $stmt->fetchColumn();
+        if ($isHome !== false && (int) $isHome === 0) {
+            return (float) $package['away_amount'];
+        }
+    }
+    return $amount;
+}
+
 function member_sponsorship_assert_slot_open(PDO $pdo, array $package, ?int $playerId, ?int $fixtureId, int $seasonId): void
 {
     if ($playerId) {
@@ -193,7 +211,7 @@ function member_sponsorship_create_agreement(PDO $pdo, int $sponsorId, array $pa
         ':season' => $seasonId,
         ':fixture' => $fixtureId,
         ':player' => $playerId,
-        ':amount' => (float) $package['amount'],
+        ':amount' => member_sponsorship_package_price($pdo, $package, $fixtureId),
         ':status' => 'active',
         ':notes' => $source, // e.g. 'self_serve:cash' or 'self_serve:stripe' — admin-visible provenance, not used for any automated cleanup.
     ]);
@@ -252,7 +270,8 @@ function member_sponsorship_purchase(PDO $pdo, array $holder, string $packageCod
 
     $sponsorId = member_sponsorship_ensure_sponsor($pdo, $holder);
 
-    if ($paymentMethod === 'online' && (float) $package['amount'] > 0) {
+    $price = member_sponsorship_package_price($pdo, $package, $fixtureId);
+    if ($paymentMethod === 'online' && $price > 0) {
         $currency = stripe_default_currency();
         $session = stripe_request('POST', '/checkout/sessions', [
             'mode' => 'payment',
@@ -262,7 +281,7 @@ function member_sponsorship_purchase(PDO $pdo, array $holder, string $packageCod
                 'quantity' => 1,
                 'price_data' => [
                     'currency' => $currency,
-                    'unit_amount' => stripe_amount_to_minor_units((float) $package['amount'], $currency),
+                    'unit_amount' => stripe_amount_to_minor_units($price, $currency),
                     'product_data' => [
                         'name' => (string) $package['name'],
                         'description' => 'Sponsorship — Saltcoats Victoria FC',
@@ -304,6 +323,181 @@ function member_sponsorship_purchase(PDO $pdo, array $holder, string $packageCod
 }
 
 /**
+ * Pay for a whole basket in ONE Stripe Checkout Session (card only). Like the single-item
+ * flow, nothing is created until Stripe confirms payment: the basket items travel in the
+ * session metadata and member_sponsorship_stripe_handle_checkout_completed() creates one
+ * agreement + payment record per item. Free baskets (all items £0) are claimed immediately.
+ *
+ * @param list<array{package_code:string,player_id:?int,fixture_id:?int,label?:string}> $cartItems
+ * @return array{url: string}
+ */
+function member_sponsorship_purchase_cart(PDO $pdo, array $holder, array $cartItems, int $seasonId, string $successUrl, string $cancelUrl): array
+{
+    ensureMemberSponsorshipPackages($pdo);
+    if (!$cartItems) {
+        throw new RuntimeException('Add at least one sponsorship to your basket first.');
+    }
+    if (count($cartItems) > 40) {
+        throw new RuntimeException('Please check out in smaller batches (up to 40 items at a time).');
+    }
+
+    $prepared = [];
+    $seen = [];
+    foreach ($cartItems as $item) {
+        $code = (string) ($item['package_code'] ?? '');
+        $package = getSponsorshipPackageByCode($pdo, $code);
+        if (!$package || (int) $package['is_active'] !== 1) {
+            throw new RuntimeException('One of the sponsorships in your basket is no longer available.');
+        }
+        $isPlayer = in_array($code, MEMBER_SPONSORSHIP_PLAYER_CODES, true);
+        $isMatch = in_array($code, MEMBER_SPONSORSHIP_MATCH_CODES, true);
+        $isBoard = in_array($code, MEMBER_SPONSORSHIP_BOARD_CODES, true);
+        if (!$isPlayer && !$isMatch && !$isBoard) {
+            throw new RuntimeException('One of the sponsorships in your basket is not available for self sign-up.');
+        }
+        $playerId = $isPlayer && !empty($item['player_id']) ? (int) $item['player_id'] : null;
+        $fixtureId = $isMatch && !empty($item['fixture_id']) ? (int) $item['fixture_id'] : null;
+        if (($isPlayer && !$playerId) || ($isMatch && !$fixtureId)) {
+            throw new RuntimeException('One of the sponsorships in your basket is incomplete.');
+        }
+        $key = $code . ':' . (int) $playerId . ':' . (int) $fixtureId;
+        if (isset($seen[$key])) {
+            continue; // duplicate line — only ever charge once
+        }
+        $seen[$key] = true;
+        member_sponsorship_assert_slot_open($pdo, $package, $playerId, $fixtureId, $seasonId);
+        $prepared[] = [
+            'package' => $package,
+            'player_id' => $playerId,
+            'fixture_id' => $fixtureId,
+            'price' => member_sponsorship_package_price($pdo, $package, $fixtureId),
+            'label' => trim((string) ($item['label'] ?? '')) ?: (string) $package['name'],
+        ];
+    }
+
+    $sponsorId = member_sponsorship_ensure_sponsor($pdo, $holder);
+    $total = array_sum(array_column($prepared, 'price'));
+
+    if ($total <= 0) {
+        $pdo->beginTransaction();
+        try {
+            foreach ($prepared as $row) {
+                member_sponsorship_assert_slot_open($pdo, $row['package'], $row['player_id'], $row['fixture_id'], $seasonId);
+                member_sponsorship_create_agreement($pdo, $sponsorId, $row['package'], $row['player_id'], $row['fixture_id'], $seasonId, 'self_serve:free');
+            }
+            $pdo->commit();
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
+        return ['url' => $successUrl];
+    }
+
+    $currency = stripe_default_currency();
+    $lineItems = [];
+    $metadata = [
+        'kind' => 'member_sponsorship',
+        'sponsor_id' => (string) $sponsorId,
+        'season_id' => (string) $seasonId,
+        'item_count' => (string) count($prepared),
+    ];
+    foreach ($prepared as $i => $row) {
+        if ($row['price'] > 0) {
+            $lineItems[] = [
+                'quantity' => 1,
+                'price_data' => [
+                    'currency' => $currency,
+                    'unit_amount' => stripe_amount_to_minor_units($row['price'], $currency),
+                    'product_data' => [
+                        'name' => mb_substr($row['label'], 0, 120),
+                        'description' => 'Sponsorship — Saltcoats Victoria FC',
+                    ],
+                ],
+            ];
+        }
+        $metadata['item_' . ($i + 1)] = (int) $row['package']['id'] . '|' . (int) $row['player_id'] . '|' . (int) $row['fixture_id'];
+    }
+    $session = stripe_request('POST', '/checkout/sessions', [
+        'mode' => 'payment',
+        'success_url' => $successUrl,
+        'cancel_url' => $cancelUrl,
+        'line_items' => $lineItems,
+        'metadata' => $metadata,
+        'payment_intent_data' => ['metadata' => ['kind' => 'member_sponsorship', 'sponsor_id' => (string) $sponsorId]],
+    ]);
+
+    return ['url' => (string) $session['url']];
+}
+
+/**
+ * Basket checkout completed: one agreement + one payment record per item, all-or-nothing.
+ */
+function member_sponsorship_stripe_handle_cart_completed(PDO $pdo, array $session): void
+{
+    $sessionId = (string) ($session['id'] ?? '');
+    $metadata = is_array($session['metadata'] ?? null) ? $session['metadata'] : [];
+    $sponsorId = (int) ($metadata['sponsor_id'] ?? 0);
+    $seasonId = (int) ($metadata['season_id'] ?? 0);
+    $count = (int) ($metadata['item_count'] ?? 0);
+    if ($sessionId === '' || $sponsorId <= 0 || $count <= 0) {
+        error_log('[member_sponsorship] Paid cart session ' . $sessionId . ' is missing metadata.');
+        return;
+    }
+    $existing = $pdo->prepare('SELECT COUNT(*) FROM stripe_transactions WHERE stripe_checkout_session_id = :s');
+    $existing->execute([':s' => $sessionId]);
+    if ((int) $existing->fetchColumn() > 0) {
+        return; // webhook retry
+    }
+
+    ensureSponsorshipCatalogSchema($pdo);
+    $currency = (string) ($session['currency'] ?? 'gbp');
+    $paymentIntentId = (string) ($session['payment_intent'] ?? '') ?: ('unknown_' . $sessionId);
+
+    $pdo->beginTransaction();
+    try {
+        for ($i = 1; $i <= $count; $i++) {
+            $parts = explode('|', (string) ($metadata['item_' . $i] ?? ''));
+            if (count($parts) !== 3) {
+                throw new RuntimeException('Malformed basket item ' . $i);
+            }
+            $package = getSponsorshipPackage($pdo, (int) $parts[0]);
+            if (!$package) {
+                throw new RuntimeException('Missing package ' . (int) $parts[0]);
+            }
+            $playerId = (int) $parts[1] ?: null;
+            $fixtureId = (int) $parts[2] ?: null;
+            $agreementId = member_sponsorship_create_agreement($pdo, $sponsorId, $package, $playerId, $fixtureId, $seasonId, 'self_serve:stripe (session ' . $sessionId . ')');
+            $agreement = getSponsorshipAgreement($pdo, $agreementId);
+            $amount = (float) ($agreement['agreed_amount'] ?? 0);
+
+            $pdo->prepare('INSERT INTO stripe_transactions
+                (agreement_id, payment_link_id, stripe_payment_intent_id, stripe_checkout_session_id, amount, currency, status, raw_payload)
+                VALUES (:agreement_id, NULL, :payment_intent_id, :session_id, :amount, :currency, :status, :raw_payload)')
+                ->execute([
+                    ':agreement_id' => $agreementId,
+                    ':payment_intent_id' => $paymentIntentId,
+                    ':session_id' => $sessionId,
+                    ':amount' => $amount,
+                    ':currency' => $currency,
+                    ':status' => 'succeeded',
+                    ':raw_payload' => $i === 1 ? json_encode($session) : null,
+                ]);
+            if ($agreement && $amount > 0) {
+                stripe_record_agreement_payment($pdo, $agreement, $amount, 'Stripe payment (member basket, session ' . $sessionId . ')');
+            }
+        }
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        error_log('[member_sponsorship] Failed to finalize paid cart session ' . $sessionId . ': ' . $e->getMessage());
+    }
+}
+
+/**
  * Only now — payment actually confirmed by Stripe — does the sponsorship
  * get created. Re-checks the slot one last time: if someone else's payment
  * for the same slot landed first (a genuine race between two people paying
@@ -332,6 +526,10 @@ function member_sponsorship_stripe_handle_checkout_completed(PDO $pdo, array $se
     }
 
     $metadata = is_array($session['metadata'] ?? null) ? $session['metadata'] : [];
+    if (isset($metadata['item_count'])) {
+        member_sponsorship_stripe_handle_cart_completed($pdo, $session);
+        return;
+    }
     $sponsorId = (int) ($metadata['sponsor_id'] ?? 0);
     $packageId = (int) ($metadata['package_id'] ?? 0);
     $seasonId = (int) ($metadata['season_id'] ?? 0);

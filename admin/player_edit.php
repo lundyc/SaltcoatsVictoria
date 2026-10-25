@@ -8,6 +8,7 @@ require_once __DIR__ . '/lib/functions.php';
 require_once __DIR__ . '/lib/player_birthdays.php';
 require_once __DIR__ . '/lib/season.php';
 require_once __DIR__ . '/players_lib.php';
+require_once __DIR__ . '/lib/squad_public.php';
 
 $id = (int)($_GET['id'] ?? 0);
 
@@ -31,6 +32,8 @@ if (!$positionColumn) {
     $pdo->exec("ALTER TABLE players ADD COLUMN position VARCHAR(80) NULL AFTER name");
 }
 
+squad_public_ensure_schema($pdo);
+
 $stmt = $pdo->prepare('SELECT * FROM players WHERE id = :id');
 $stmt->execute([':id' => $id]);
 $player = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -47,6 +50,19 @@ if (!$player) {
     require_once __DIR__ . '/footer.php';
     exit;
 }
+
+$pdo->exec('CREATE TABLE IF NOT EXISTS player_website_photos (
+  player_id INT UNSIGNED NOT NULL,
+  uploaded_to_website TINYINT(1) NOT NULL DEFAULT 0,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (player_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
+$onWebsiteStmt = $pdo->prepare('SELECT uploaded_to_website FROM player_website_photos WHERE player_id = :id');
+$onWebsiteStmt->execute([':id' => $id]);
+$onWebsiteRaw = $onWebsiteStmt->fetchColumn();
+// No row = shown by default (every current player appears unless switched off).
+$onWebsite = $onWebsiteRaw === false ? 1 : (int) $onWebsiteRaw;
+$websiteSlug = (string) ($player['website_slug'] ?? '') ?: squad_public_slug((string) $player['name'], $id);
 
 $seasonId = getSelectedSeasonId($pdo);
 $season = getSeasonById($pdo, $seasonId);
@@ -88,6 +104,14 @@ $avatarFilename = basename((string)($player['avatar'] ?? ''));
 $avatarAvailable = $avatarFilename !== ''
     && is_file(__DIR__ . '/uploads/players/' . $avatarFilename);
 
+try {
+    $pdo->query('SELECT celebration_image FROM players LIMIT 1');
+} catch (Throwable $e) {
+    $pdo->exec('ALTER TABLE players ADD COLUMN celebration_image VARCHAR(255) NULL DEFAULT NULL');
+    $player['celebration_image'] = null;
+}
+$celebrationFile = basename((string)($pdo->query('SELECT celebration_image FROM players WHERE id = ' . (int)$id)->fetchColumn() ?: ''));
+$celebrationAvailable = $celebrationFile !== '' && is_file(__DIR__ . '/uploads/players/' . $celebrationFile);
 $actionShotsStmt = $pdo->prepare('SELECT id, filename FROM player_action_shots WHERE player_id = :pid ORDER BY sort_order ASC, id ASC');
 $actionShotsStmt->execute([':pid' => $id]);
 $actionShots = array_values(array_filter(
@@ -135,6 +159,12 @@ echo '<script src="/admin/assets/js/player_status_cards.js?v=' . h($playerStatus
     <?php endif; ?>
     <?php if (isset($_GET['action_shot_error'])): ?>
         <div class="alert alert-danger">Action shot upload failed: <?= htmlspecialchars((string) $_GET['action_shot_error']) ?></div>
+    <?php endif; ?>
+    <?php if (isset($_GET['website_saved'])): ?>
+        <div class="alert alert-success">Website profile saved.</div>
+    <?php endif; ?>
+    <?php if (isset($_GET['website_error'])): ?>
+        <div class="alert alert-danger">Your session expired. Please try again.</div>
     <?php endif; ?>
     <?php if (isset($_GET['action_shot_deleted'])): ?>
         <div class="alert alert-success">Action shot removed.</div>
@@ -245,6 +275,84 @@ echo '<script src="/admin/assets/js/player_status_cards.js?v=' . h($playerStatus
             </div>
             </div>
           </section>
+        </div>
+    </div>
+
+    <div class="card player-edit-website hub-section" id="website-profile">
+        <form method="post" action="/admin/player_website_save.php" class="card-body">
+            <?= csrf_field() ?>
+            <input type="hidden" name="player_id" value="<?= (int) $player['id'] ?>">
+            <div class="player-edit-kicker">Public website</div>
+            <h2 class="player-edit-title mb-1">Website profile</h2>
+            <p class="player-edit-help mb-3">Controls how this player appears in the Team section of the club website. Clear the squad number to show no number.</p>
+
+            <div class="form-check form-switch mb-3">
+                <input class="form-check-input" type="checkbox" role="switch" id="on_website" name="on_website" value="1" <?= $onWebsite === 1 ? 'checked' : '' ?>>
+                <label class="form-check-label" for="on_website"><strong>Show this player on the club website</strong></label>
+                <div class="form-text">Only current players with this switch on appear in the Team section.</div>
+            </div>
+
+            <div class="row g-3">
+                <div class="col-sm-4">
+                    <label class="form-label" for="squad_number">Squad number</label>
+                    <input class="form-control" type="number" min="1" max="999" id="squad_number" name="squad_number" value="<?= h((string) ($player['squad_number'] ?? '')) ?>">
+                </div>
+                <div class="col-sm-8">
+                    <label class="form-label" for="nationality">Nationality</label>
+                    <input class="form-control" id="nationality" name="nationality" value="<?= h((string) ($player['nationality'] ?? '')) ?>" placeholder="e.g. Scotland">
+                </div>
+            </div>
+
+            <div class="mt-3">
+                <label class="form-label" for="website_slug">URL slug</label>
+                <div class="input-group">
+                    <span class="input-group-text">/team/</span>
+                    <input class="form-control" id="website_slug" name="website_slug" value="<?= h($websiteSlug) ?>">
+                </div>
+                <div class="form-text">Used in the player's profile link. Leave to auto-generate from the name.</div>
+            </div>
+
+            <div class="mt-3">
+                <label class="form-label" for="bio">Short bio</label>
+                <textarea class="form-control" id="bio" name="bio" rows="5" placeholder="A paragraph or two about the player."><?= h((string) ($player['bio'] ?? '')) ?></textarea>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center gap-2 mt-3">
+                <?php if ($onWebsite === 1 && ($player['status'] ?? '') === 'current'): ?>
+                    <a class="btn btn-outline-secondary" href="/team/<?= h($websiteSlug) ?>" target="_blank" rel="noopener">View on website</a>
+                <?php else: ?><span></span><?php endif; ?>
+                <button class="btn btn-brand" type="submit">Save website profile</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="card player-edit-celebration hub-section">
+        <div class="card-body">
+            <div class="player-edit-kicker">Graphics library</div>
+            <h2 class="player-edit-title mb-1">Goal celebration picture</h2>
+            <p class="player-edit-help mb-3">Used on the Goal graphic instead of the profile photo. Best as a cut-out (PNG with a see-through background), head and shoulders. The profile photo is used if none is added.</p>
+            <?php if (($_GET['celebration'] ?? '') === 'saved'): ?><div class="alert alert-success py-2">Celebration picture saved.</div>
+            <?php elseif (($_GET['celebration'] ?? '') === 'removed'): ?><div class="alert alert-success py-2">Celebration picture removed.</div>
+            <?php elseif (($_GET['celebration'] ?? '') !== ''): ?><div class="alert alert-danger py-2">That picture could not be saved. Use a PNG, JPG or WebP under 10MB.</div><?php endif; ?>
+            <div class="d-flex flex-wrap gap-3 align-items-end">
+                <?php if ($celebrationAvailable): ?>
+                    <img src="/uploads/players/<?= rawurlencode($celebrationFile) ?>" alt="" style="height:160px;width:auto;border-radius:.6rem;background:repeating-conic-gradient(#e9e6e1 0 25%,#fff 0 50%) 0 0/16px 16px">
+                <?php endif; ?>
+                <form method="post" enctype="multipart/form-data" action="/admin/player_celebration_save.php" class="d-flex flex-wrap gap-2 align-items-center">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="player_id" value="<?= (int) $player['id'] ?>">
+                    <input type="file" name="celebration" accept="image/png,image/jpeg,image/webp" class="form-control" style="max-width:20rem" required>
+                    <button type="submit" class="btn btn-brand"><?= $celebrationAvailable ? 'Replace picture' : 'Upload picture' ?></button>
+                </form>
+                <?php if ($celebrationAvailable): ?>
+                <form method="post" action="/admin/player_celebration_save.php">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="player_id" value="<?= (int) $player['id'] ?>">
+                    <input type="hidden" name="remove" value="1">
+                    <button type="submit" class="btn btn-outline-danger">Remove</button>
+                </form>
+                <?php endif; ?>
+            </div>
         </div>
     </div>
 

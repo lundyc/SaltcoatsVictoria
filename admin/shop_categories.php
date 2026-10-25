@@ -61,7 +61,7 @@ $pageHero = [
     'eyebrow' => 'Shop',
     'title' => 'Categories',
     'subtitle' => 'Group products into sections of the storefront.',
-    'actions' => [['label' => 'Back to shop', 'href' => '/shop_overview.php', 'class' => 'btn btn-outline-light btn-sm']],
+    'actions' => [],
 ];
 require_once __DIR__ . '/header.php';
 

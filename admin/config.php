@@ -98,6 +98,22 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
     // closing the session-fixation gap left by PHP-FPM's default
     // session.use_strict_mode=0. Must be set before session_start().
     ini_set('session.use_strict_mode', '1');
+    // "Remember me": keep logins for 180 days. Session files live in a private
+    // folder because the system's cleanup job deletes anything in the default
+    // folder after ~24 minutes, which was logging everyone out. The cookie
+    // lifetime is renewed on every visit, so active users stay signed in.
+    $sessionDir = dirname(__DIR__, 2) . '/php-sessions';
+    if (is_dir($sessionDir) && is_writable($sessionDir)) {
+        ini_set('session.save_path', $sessionDir);
+    }
+    ini_set('session.gc_maxlifetime', '15552000');
+    session_set_cookie_params([
+        'lifetime' => 15552000,
+        'path' => '/',
+        'secure' => (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'),
+        'httponly' => true,
+        'samesite' => 'Lax',
+    ]);
     session_start();
 }
 

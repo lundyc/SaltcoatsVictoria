@@ -352,10 +352,7 @@ $pageHero = [
     'eyebrow' => 'Publishing',
     'title' => 'League Table',
     'subtitle' => $leagueConfig['league_title'] . ' standings and publish tools.',
-    'actions' => [
-        ['label' => 'Update from WOSFL', 'href' => '/league_table_manual_update.php', 'class' => 'btn btn-brand btn-sm'],
-        ['label' => 'Historical tables', 'href' => '/league_table_history.php', 'class' => 'btn btn-outline-secondary btn-sm'],
-    ],
+    'actions' => [],
 ];
 
 require_once __DIR__ . '/header.php';
@@ -407,7 +404,7 @@ function league_table_render_row(array $team): string
 
     <div class="card dashboard-card hub-section mb-4">
         <div class="card-body py-3">
-            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+            <div class="league-toolbar">
                 <div class="btn-group league-table-style-toggle" role="group" aria-label="League table design">
                     <button type="button" class="btn btn-outline-primary" data-table-style="standard" aria-pressed="false" title="Standard table" aria-label="Standard table">
                         <i class="fa-solid fa-table" aria-hidden="true"></i>
@@ -419,7 +416,20 @@ function league_table_render_row(array $team): string
                         <i class="fa-solid fa-chart-line" aria-hidden="true"></i>
                     </button>
                 </div>
-                <div class="btn-group league-table-actions hub-actions ms-auto" role="group" aria-label="League table actions">
+                <div class="league-toolbar__center">
+                    <button type="button" class="btn btn-outline-secondary league-update-btn" id="updateFromWosflBtn" data-state="idle" data-fallback-url="/admin/league_table_manual_update.php">
+                        <span class="league-update-btn__icon" aria-hidden="true">
+                            <i class="fa-solid fa-arrows-rotate league-update-btn__idle"></i>
+                            <span class="league-update-btn__spinner"></span>
+                            <i class="fa-solid fa-check league-update-btn__done"></i>
+                            <i class="fa-solid fa-triangle-exclamation league-update-btn__fail"></i>
+                        </span>
+                        <span class="league-update-btn__label" id="updateFromWosflLabel" aria-live="polite">Update from WOSFL</span>
+                        <span class="league-update-btn__bar" aria-hidden="true"></span>
+                    </button>
+                    <a class="btn btn-outline-secondary" href="/admin/league_table_history.php"><i class="fa-solid fa-clock-rotate-left me-1" aria-hidden="true"></i>Historical tables</a>
+                </div>
+                <div class="btn-group league-table-actions" role="group" aria-label="League table actions">
                     <button id="saveAsImageBtn" class="btn btn-brand" type="button" title="Download PNG" aria-label="Download PNG">
                         <i class="fa-solid fa-download" aria-hidden="true"></i>
                     </button>
@@ -479,7 +489,7 @@ function league_table_render_row(array $team): string
                 </table>
             </div>
 
-            <div class="text-center small text-muted mt-3">Last Updated: <?= htmlspecialchars($lastUpdatedString, ENT_QUOTES, 'UTF-8') ?></div>
+            <div class="text-center small text-muted mt-3">Last Updated: <span id="leagueLastUpdated"><?= htmlspecialchars($lastUpdatedString, ENT_QUOTES, 'UTF-8') ?></span></div>
         </div>
     </div>
 </div>
@@ -515,6 +525,118 @@ function league_table_render_row(array $team): string
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        (function () {
+            var btn = document.getElementById('updateFromWosflBtn');
+            var card = document.getElementById('leagueTableCard');
+            var label = document.getElementById('updateFromWosflLabel');
+            if (!btn || !card || !label) { return; }
+            var tbody = card.querySelector('#tableWrapper tbody');
+            var steps = ['Contacting WOSFL\u2026', 'Reading standings\u2026', 'Checking recent form\u2026', 'Updating the table\u2026'];
+            var stepTimer = null;
+            var running = false;
+
+            function setState(state, text) {
+                btn.dataset.state = state;
+                label.textContent = text;
+            }
+
+            function startSteps() {
+                var i = 0;
+                setState('loading', steps[0]);
+                stepTimer = window.setInterval(function () {
+                    i = Math.min(i + 1, steps.length - 1);
+                    label.textContent = steps[i];
+                }, 2200);
+            }
+
+            function stopSteps() {
+                if (stepTimer) { window.clearInterval(stepTimer); stepTimer = null; }
+            }
+
+            function wait(ms) { return new Promise(function (resolve) { window.setTimeout(resolve, ms); }); }
+
+            function showError(message) {
+                var existing = document.getElementById('leagueUpdateError');
+                if (existing) { existing.remove(); }
+                var box = document.createElement('div');
+                box.id = 'leagueUpdateError';
+                box.className = 'alert alert-danger border-0 shadow-sm mb-4';
+                box.textContent = message + ' ';
+                var link = document.createElement('a');
+                link.href = btn.dataset.fallbackUrl;
+                link.className = 'alert-link';
+                link.textContent = 'Paste the table in manually instead';
+                box.appendChild(link);
+                card.parentNode.insertBefore(box, card);
+            }
+
+            btn.addEventListener('click', function () {
+                if (running) { return; }
+                running = true;
+                btn.disabled = true;
+                var oldError = document.getElementById('leagueUpdateError');
+                if (oldError) { oldError.remove(); }
+                card.classList.add('is-refreshing');
+                startSteps();
+                var started = Date.now();
+
+                fetch('refresh.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: 'csrf_token=' + encodeURIComponent(postComposerCsrfToken),
+                    credentials: 'same-origin'
+                }).then(function (response) {
+                    return response.json().catch(function () { return {}; }).then(function (json) {
+                        return { ok: response.ok, json: json };
+                    });
+                }).then(function (result) {
+                    // The table itself is refreshed once the standings step succeeds; a failure
+                    // in the later export-image step must not block showing the new rows.
+                    var standingsRefreshed = result.json && typeof result.json.summary === 'string'
+                        && result.json.summary.indexOf('Standings refreshed') === 0;
+                    if (!standingsRefreshed) {
+                        var detail = (result.json && result.json.details && result.json.details[0]) || (result.json && result.json.summary) || 'WOSFL could not be reached.';
+                        throw new Error(detail);
+                    }
+                    label.textContent = 'Updating the table\u2026';
+                    return fetch('league_table.php', { credentials: 'same-origin', cache: 'no-store' });
+                }).then(function (response) {
+                    if (!response.ok) { throw new Error('The refreshed table could not be loaded.'); }
+                    return response.text();
+                }).then(function (html) {
+                    var doc = new DOMParser().parseFromString(html, 'text/html');
+                    var fresh = doc.querySelector('#tableWrapper tbody');
+                    if (!fresh || !fresh.children.length) { throw new Error('The refreshed table was empty.'); }
+                    var week = doc.querySelector('#leagueTableCard .compact-matchweek strong');
+                    var updated = doc.getElementById('leagueLastUpdated');
+                    // Keep the shimmer on screen long enough to read as a deliberate refresh.
+                    return wait(Math.max(0, 1600 - (Date.now() - started))).then(function () {
+                        tbody.innerHTML = fresh.innerHTML;
+                        var weekEl = card.querySelector('.compact-matchweek strong');
+                        if (weekEl && week) { weekEl.textContent = week.textContent; }
+                        var updatedEl = document.getElementById('leagueLastUpdated');
+                        if (updatedEl && updated) { updatedEl.textContent = updated.textContent; }
+                        stopSteps();
+                        card.classList.remove('is-refreshing');
+                        card.classList.add('is-fresh');
+                        setState('done', 'Table updated');
+                        window.setTimeout(function () { card.classList.remove('is-fresh'); }, 1500);
+                    });
+                }).catch(function (error) {
+                    stopSteps();
+                    card.classList.remove('is-refreshing');
+                    setState('error', 'Update failed');
+                    showError((error && error.message) ? error.message : 'The update failed.');
+                }).then(function () {
+                    return wait(2600);
+                }).then(function () {
+                    setState('idle', 'Update from WOSFL');
+                    btn.disabled = false;
+                    running = false;
+                });
+            });
+        })();
+
         var selectedTableStyle = 'compact';
         var leagueTableCard = document.getElementById('leagueTableCard');
         var leagueBanner = leagueTableCard ? leagueTableCard.querySelector('.banner-img') : null;
@@ -522,16 +644,16 @@ function league_table_render_row(array $team): string
 
         function setTableStyle(style) {
             selectedTableStyle = ['standard', 'compact', 'expanded'].indexOf(style) !== -1 ? style : 'standard';
-            // Mirrors download/league_table_graphic.php: compact and standard use the
-            // sidebar layout; expanded uses the full-width layout with the banner on top.
+            // Mirrors download/league_table_graphic.php: every style uses the compact
+            // sidebar layout. Standard and expanded add the full columns; expanded adds form.
             var expanded = selectedTableStyle === 'expanded';
-            leagueTableCard.classList.toggle('table-card--compact', !expanded);
-            leagueTableCard.classList.toggle('table-card--standard', selectedTableStyle === 'standard');
+            leagueTableCard.classList.add('table-card--compact');
+            leagueTableCard.classList.toggle('table-card--standard', selectedTableStyle !== 'compact');
             leagueTableCard.classList.toggle('table-card--expanded', expanded);
             leagueTableCard.dataset.tableStyleCurrent = selectedTableStyle;
             if (leagueBanner) {
-                leagueBanner.src = expanded ? leagueBanner.dataset.standardSrc : leagueBanner.dataset.compactSrc;
-                leagueBanner.classList.toggle('banner-img--small', !expanded);
+                leagueBanner.src = leagueBanner.dataset.compactSrc;
+                leagueBanner.classList.add('banner-img--small');
             }
             tableStyleButtons.forEach(function(button) {
                 var active = button.dataset.tableStyle === selectedTableStyle;

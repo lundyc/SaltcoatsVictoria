@@ -7,6 +7,7 @@ require_once __DIR__ . '/functions.php';
 require_once __DIR__ . '/mailer.php';
 require_once __DIR__ . '/sponsorship_catalog.php';
 require_once __DIR__ . '/match_sponsorship.php';
+require_once __DIR__ . '/access.php';
 
 const STRIPE_API_BASE = 'https://api.stripe.com/v1';
 const STRIPE_DEFAULT_LINK_EXPIRY_HOURS = 24; // Stripe Checkout Sessions cannot expire more than 24h after creation.
@@ -161,7 +162,7 @@ function ensureStripeSchema(PDO $pdo): void
         $pdo->exec('ALTER TABLE stripe_payment_links ADD KEY idx_stripe_payment_links_session (stripe_checkout_session_id)');
     }
 
-    // Short, on-brand redirect slug (myclubhub.co.uk/p/<slug>) that forwards to the
+    // Short, on-brand redirect slug (saltcoatsvictoria.co.uk/p/<slug>) that forwards to the
     // long Stripe Checkout URL — the URL actually handed to a sponsor. A bundle's
     // several rows share one slug, so this is a plain index, not unique.
     $linkColumns = [];
@@ -239,6 +240,9 @@ function stripe_request(string $method, string $path, array $params = []): array
 
     $method = strtoupper($method);
     $url = STRIPE_API_BASE . '/' . ltrim($path, '/');
+    // Optional: pass '_idempotency_key' in $params so Stripe treats a retried POST as the same request.
+    $idempotencyKey = isset($params['_idempotency_key']) ? (string) $params['_idempotency_key'] : '';
+    unset($params['_idempotency_key']);
     $body = http_build_query($params, '', '&', PHP_QUERY_RFC3986);
 
     if ($method === 'GET' && $body !== '') {
@@ -253,7 +257,7 @@ function stripe_request(string $method, string $path, array $params = []): array
         CURLOPT_HTTPHEADER => [
             'Authorization: Bearer ' . $secretKey,
             'Content-Type: application/x-www-form-urlencoded',
-        ],
+        ] + ($idempotencyKey !== '' ? [2 => 'Idempotency-Key: ' . $idempotencyKey] : []),
         CURLOPT_TIMEOUT => 20,
         CURLOPT_CONNECTTIMEOUT => 10,
     ]);
@@ -326,6 +330,16 @@ function stripe_public_base_url(): string
         $host = 'saltcoatsvictoria.co.uk';
     }
     return ($https ? 'https://' : 'http://') . $host;
+}
+
+/**
+ * Where Stripe sends a sponsor after paying an agreement's link: the public, login-free
+ * confirmation page. The session id goes in the path, not the query string, because the
+ * live server's firewall returns 403 for a session_id= query parameter.
+ */
+function stripe_agreement_success_url(): string
+{
+    return stripe_public_base_url() . '/sponsorship/thankyou/{CHECKOUT_SESSION_ID}';
 }
 
 /**
@@ -481,7 +495,7 @@ function stripe_refresh_payment_link_checkout_session(PDO $pdo, array $link): ar
 
     $firstAgreement = $chargeable[0]['agreement'];
     $baseUrl = stripe_public_base_url() . '/sponsorship_agreement.php?id=' . (int) $firstAgreement['id'];
-    $successUrl = $baseUrl . '&stripe=success&session_id={CHECKOUT_SESSION_ID}';
+    $successUrl = stripe_agreement_success_url();
     $cancelUrl = $baseUrl . '&stripe=cancelled';
 
     if (count($chargeable) === 1) {
@@ -1069,6 +1083,26 @@ function stripe_handle_webhook_event(PDO $pdo, array $event): void
         return;
     }
 
+    if ($kind === 'match_sponsorship' && in_array($type, ['checkout.session.completed', 'checkout.session.expired'], true)) {
+        require_once __DIR__ . '/match_sponsorship_shop.php';
+        if ($type === 'checkout.session.completed') {
+            match_sponsorship_handle_checkout_completed($pdo, $object);
+        } else {
+            match_sponsorship_handle_checkout_expired($pdo, $object);
+        }
+        return;
+    }
+
+    if ($kind === 'hospitality' && in_array($type, ['checkout.session.completed', 'checkout.session.expired'], true)) {
+        require_once __DIR__ . '/hospitality.php';
+        if ($type === 'checkout.session.completed') {
+            hospitality_handle_checkout_completed($pdo, $object);
+        } else {
+            hospitality_handle_checkout_expired($pdo, $object);
+        }
+        return;
+    }
+
     if ($kind === 'member_sponsorship') {
         // Member self-serve sponsorships (lib/member_sponsorship.php) never create
         // an agreement until Stripe confirms payment, so there's nothing to do here
@@ -1076,6 +1110,16 @@ function stripe_handle_webhook_event(PDO $pdo, array $event): void
         require_once __DIR__ . '/member_sponsorship.php';
         if ($type === 'checkout.session.completed') {
             member_sponsorship_stripe_handle_checkout_completed($pdo, $object);
+        }
+        return;
+    }
+
+    if ($kind === 'event_ticket' && in_array($type, ['checkout.session.completed', 'checkout.session.expired'], true)) {
+        require_once __DIR__ . '/events_orders.php';
+        if ($type === 'checkout.session.completed') {
+            events_stripe_handle_checkout_completed($pdo, $object);
+        } else {
+            events_stripe_handle_checkout_expired($pdo, $object);
         }
         return;
     }
@@ -1163,6 +1207,7 @@ function stripe_handle_checkout_session_completed(PDO $pdo, array $session): voi
         return;
     }
 
+    $recorded = [];
     foreach ($links as $link) {
         // Idempotency is scoped per payment_link_id (one row = one agreement's slice of
         // this session), not per payment_intent_id — a session-wide check would find the
@@ -1206,7 +1251,57 @@ function stripe_handle_checkout_session_completed(PDO $pdo, array $session): voi
             (string) ($agreement['package_name'] ?? 'Sponsorship') . ' agreement #' . (int) $agreement['id'],
             stripe_public_base_url() . '/sponsorship_agreement.php?id=' . (int) $agreement['id']
         );
+        $recorded[] = ['agreement' => $agreement, 'amount' => $amount];
     }
+
+    stripe_send_payment_receipt($recorded);
+}
+
+/**
+ * Customer receipt for a payment just recorded by the webhook. Sent once per delivery,
+ * covering every agreement that delivery credited, and only when one of them has a valid
+ * sponsor contact email. Retries skip already-recorded rows, so no duplicate receipt.
+ *
+ * @param list<array{agreement: array<string, mixed>, amount: float}> $recorded
+ */
+function stripe_send_payment_receipt(array $recorded): void
+{
+    if ($recorded === []) {
+        return;
+    }
+
+    $toEmail = '';
+    foreach ($recorded as $item) {
+        $candidate = trim((string) ($item['agreement']['sponsor_contact_email'] ?? ''));
+        if ($candidate !== '' && filter_var($candidate, FILTER_VALIDATE_EMAIL)) {
+            $toEmail = $candidate;
+            break;
+        }
+    }
+    if ($toEmail === '') {
+        return;
+    }
+
+    $total = 0.0;
+    $lines = [];
+    $lines[] = 'Thanks for your support! We have received your sponsorship payment. Here are the details:';
+    $lines[] = '';
+    foreach ($recorded as $item) {
+        foreach (stripe_agreement_context_lines($item['agreement']) as $line) {
+            $lines[] = $line['label'] . ': ' . $line['value'];
+        }
+        $lines[] = 'Amount paid: ' . gbp($item['amount']);
+        $lines[] = '';
+        $total += $item['amount'];
+    }
+    if (count($recorded) > 1) {
+        $lines[] = 'Total paid: ' . gbp($total);
+        $lines[] = '';
+    }
+    $lines[] = 'Thanks again for your support,';
+    $lines[] = 'Saltcoats Victoria FC';
+
+    hub_send_mail($toEmail, 'Payment received — ' . gbp($total), implode("\n", $lines), false);
 }
 
 /**
@@ -1594,20 +1689,40 @@ function stripe_notification_recipients(PDO $pdo): array
         }
     }
 
-    if (!$hasExplicitRecipients && stripe_table_exists($pdo, 'users')) {
-        try {
-            $stmt = $pdo->query("SELECT email FROM users WHERE is_active = 1 AND role IN ('admin','super_admin','treasurer') ORDER BY id LIMIT 10");
-            foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $email) {
-                $email = trim((string) $email);
-                if ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                    $emails[strtolower($email)] = $email;
-                }
-            }
-        } catch (Throwable $e) {
+    if (!$hasExplicitRecipients) {
+        foreach (stripe_people_with_capability_emails($pdo, 'finance_manage', 10) as $email) {
+            $emails[strtolower($email)] = $email;
         }
     }
 
     return array_values($emails);
+}
+
+/**
+ * Login emails of active people whose access includes a capability, or who are
+ * Administrators. Used when no explicit payment recipients are set.
+ */
+function stripe_people_with_capability_emails(PDO $pdo, string $capability, int $limit): array
+{
+    $emails = [];
+    $rows = $pdo->query('SELECT p.id, a.email
+        FROM people p JOIN accounts a ON a.person_id = p.id
+        WHERE a.is_active = 1 AND p.is_active = 1
+        ORDER BY p.id')->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($rows as $row) {
+        $effective = access_effective($pdo, (int) $row['id'], false);
+        if (!$effective['bypass'] && !in_array($capability, $effective['capabilities'], true)) {
+            continue;
+        }
+        $email = trim((string) $row['email']);
+        if ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $emails[] = $email;
+        }
+        if (count($emails) >= $limit) {
+            break;
+        }
+    }
+    return $emails;
 }
 
 function stripe_send_payment_notification(PDO $pdo, string $source, string $customerName, string $customerEmail, float $amount, string $reference, ?string $manageUrl = null): void

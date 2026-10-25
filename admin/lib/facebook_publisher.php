@@ -50,9 +50,9 @@ function facebook_env(): array
         }
     }
 
-    $graphApiVersion = trim((string) ($vars['GRAPH_API_VERSION'] ?? 'v24.0'));
+    $graphApiVersion = trim((string) ($vars['GRAPH_API_VERSION'] ?? 'v26.0'));
     if (!preg_match('/^v\d+\.\d+$/', $graphApiVersion)) {
-        $graphApiVersion = 'v24.0';
+        $graphApiVersion = 'v26.0';
     }
 
     $cached = [
@@ -397,6 +397,9 @@ function facebook_post_type_defaults(): array
         'yellow_card' => ['priority' => 'low', 'facebook_enabled' => false, 'x_enabled' => true, 'facebook_include_sponsor' => false],
         'red_card' => ['priority' => 'low', 'facebook_enabled' => false, 'x_enabled' => true, 'facebook_include_sponsor' => false],
         'penalty' => ['priority' => 'low', 'facebook_enabled' => false, 'x_enabled' => true, 'facebook_include_sponsor' => false],
+        'penalty_awarded' => ['priority' => 'low', 'facebook_enabled' => false, 'x_enabled' => true, 'facebook_include_sponsor' => false],
+        'penalty_saved' => ['priority' => 'low', 'facebook_enabled' => false, 'x_enabled' => true, 'facebook_include_sponsor' => false],
+        'penalty_missed' => ['priority' => 'low', 'facebook_enabled' => false, 'x_enabled' => true, 'facebook_include_sponsor' => false],
         'match_update' => ['priority' => 'low', 'facebook_enabled' => false, 'x_enabled' => true, 'facebook_include_sponsor' => false], // covers "injury" / general live events too
         'sponsor_shoutout' => ['priority' => 'high', 'facebook_enabled' => true, 'x_enabled' => true, 'facebook_include_sponsor' => true],
     ];

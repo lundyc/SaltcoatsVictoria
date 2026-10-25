@@ -33,8 +33,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>POS Login - Hub</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.3.1/css/all.min.css" rel="stylesheet">
     <style>
         body { min-height:100vh; display:grid; place-items:center; margin:0; font-family:Inter,system-ui,sans-serif; background:linear-gradient(135deg,#4b0818,#8a1538 52%,#ba8f2a); color:#24151a; }
         .pos-login { width:min(440px, calc(100vw - 2rem)); background:#fff; border-radius:1rem; padding:2rem; box-shadow:0 24px 80px rgba(24,7,12,.35); }

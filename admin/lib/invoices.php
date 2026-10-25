@@ -212,6 +212,51 @@ function invoices_mark_paid(PDO $pdo, int $id): void
     $pdo->prepare("UPDATE invoices SET status = 'paid' WHERE id = :id")->execute([':id' => $id]);
 }
 
+/** Latest non-void invoice for a source record, used to prevent routine duplicates. */
+function invoices_latest_active_for_source(PDO $pdo, string $sourceType, int $sourceId): ?array
+{
+    invoices_ensure_schema($pdo);
+    $stmt = $pdo->prepare("SELECT * FROM invoices WHERE source_type = :type AND source_id = :id AND status <> 'void' ORDER BY id DESC LIMIT 1");
+    $stmt->execute([':type' => $sourceType, ':id' => $sourceId]);
+    return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+}
+
+/** Render and email the canonical PDF for an existing invoice. */
+function invoices_email_pdf(PDO $pdo, array $invoice, string $email): bool
+{
+    $email = trim($email);
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        throw new InvalidArgumentException('The customer does not have a valid email address.');
+    }
+    if (!class_exists(Dompdf\Dompdf::class)) {
+        foreach ([dirname(__DIR__) . '/vendor/autoload.php', dirname(__DIR__, 2) . '/project_1/vendor/autoload.php'] as $autoloader) {
+            if (is_file($autoloader)) {
+                require_once $autoloader;
+                if (class_exists(Dompdf\Dompdf::class)) {
+                    break;
+                }
+            }
+        }
+    }
+    if (!class_exists(Dompdf\Dompdf::class)) {
+        throw new RuntimeException('PDF export is unavailable.');
+    }
+    require_once __DIR__ . '/mailer.php';
+    $items = invoices_get_items($pdo, (int) $invoice['id']);
+    $pdfBytes = invoice_pdf_render($pdo, $invoice, $items, false, true);
+    $subject = 'Invoice ' . (string) $invoice['invoice_number'];
+    $body = '<p>Please find attached invoice <strong>' . h((string) $invoice['invoice_number']) . '</strong> for ' . h(gbp((float) $invoice['total'])) . '.</p>';
+    $sent = hub_send_mail_with_attachment($email, $subject, $body, [
+        'filename' => (string) $invoice['invoice_number'] . '.pdf',
+        'content' => $pdfBytes,
+        'mime' => 'application/pdf',
+    ]);
+    if ($sent) {
+        invoices_mark_sent($pdo, (int) $invoice['id'], $email);
+    }
+    return $sent;
+}
+
 /**
  * True if the current actor has the same access the host page an invoice was
  * raised from would require — sponsorship agreements and player sponsorship
@@ -511,7 +556,7 @@ function invoice_pdf_render(PDO $pdo, array $invoice, array $items, bool $forceD
     require_once __DIR__ . '/site_settings.php';
     require_once __DIR__ . '/functions.php';
     $settings = site_settings_all($pdo);
-    $clubName = $settings['club_name'] ?: 'MyClubHub';
+    $clubName = $settings['club_name'] ?: 'Saltcoats Victoria';
     $crest = invoice_pdf_image_data_uri(dirname(__DIR__) . ($settings['crest_url'] ?: ''));
     $companyNumber = $settings['company_number'] ?? '';
     $bankDetails = $settings['bank_details'] ?? '';
@@ -651,12 +696,12 @@ function invoice_pdf_image_data_uri(string $path): string
  *
  * @param list<array<string,mixed>> $invoices
  */
-function invoices_render_admin_section(array $invoices, string $generateButtonHtml): string
+function invoices_render_admin_section(array $invoices, string $generateButtonHtml, bool $showHeading = true): string
 {
     ob_start();
     $activeCount = count(array_filter($invoices, static fn(array $inv): bool => (string) $inv['status'] !== 'void'));
     ?>
-    <h2 class="h6 fw-bold text-uppercase text-muted">Invoices</h2>
+    <?php if ($showHeading): ?><h2 class="h6 fw-bold text-uppercase text-muted">Invoices</h2><?php endif; ?>
     <?php if ($activeCount > 0): ?>
     <div class="alert alert-warning py-2 px-3 small mb-2"><?= $activeCount === 1 ? 'An invoice has already been generated for this record.' : ($activeCount . ' invoices have already been generated for this record.') ?> Generating another will raise an additional invoice rather than replace it — use this for a deposit/balance split or a re-issue, not a routine re-click.</div>
     <?php endif; ?>

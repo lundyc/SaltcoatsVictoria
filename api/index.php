@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-use MyClubHub\Api\{ApiError, Application, Request, Response};
+use SaltcoatsApi\Api\{ApiError, Application, Request, Response};
 
 ini_set('display_errors', '0');
 ini_set('log_errors', '1');
@@ -9,8 +9,8 @@ require_once __DIR__ . '/../admin/lib/mobile_api/bootstrap.php';
 
 try {
     $request = Request::fromGlobals();
-    $config = MyClubHub\Api\configuration();
-    $application = new Application(MyClubHub\Api\connect($config), $config);
+    $config = SaltcoatsApi\Api\configuration();
+    $application = new Application(SaltcoatsApi\Api\connect($config), $config);
     $application->handle($request)->send();
 } catch (Throwable $e) {
     $requestId = bin2hex(random_bytes(16));

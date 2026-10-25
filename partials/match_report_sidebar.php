@@ -166,7 +166,7 @@ $squadRow = static function (array $p, bool $isSub) use ($squadByName, $goalsByP
   <?php $matchSponsors = pub_match_sponsors((int) $fixture['id']); ?>
   <?php if ($matchSponsors): ?>
     <div class="mrs__panel mrs__sponsors">
-      <h3 class="mrs__heading">Match sponsors</h3>
+      <h2 class="mrs__heading">Match sponsors</h2>
       <ul class="mrs__sponsor-list">
         <?php foreach ($matchSponsors as $sp): ?>
           <li class="mrs__sponsor">
@@ -186,12 +186,12 @@ $squadRow = static function (array $p, bool $isSub) use ($squadByName, $goalsByP
   <?php endif; ?>
 
   <div class="mrs__panel">
-    <h3 class="mrs__heading">Saltcoats Starting XI</h3>
+    <h2 class="mrs__heading">Saltcoats Starting XI</h2>
     <ul class="mrs__list">
       <?php foreach ($starters as $p) { $squadRow($p, false); } ?>
     </ul>
     <?php if ($subs): ?>
-      <h3 class="mrs__heading mrs__heading--sub">On the Bench</h3>
+      <h2 class="mrs__heading mrs__heading--sub">On the Bench</h2>
       <ul class="mrs__list">
         <?php foreach ($subs as $p) { $squadRow($p, true); } ?>
       </ul>

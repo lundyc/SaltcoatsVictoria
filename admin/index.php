@@ -21,6 +21,15 @@ require_once __DIR__ . '/lib/pos_reconciliation.php';
 require_once __DIR__ . '/lib/stripe.php';
 require_once __DIR__ . '/lib/shop.php';
 
+if (function_exists('hub_auth_has_capability') && hub_auth_has_capability('club_setup')) {
+    require_once __DIR__ . '/lib/season.php';
+    foreach (getSeasonsAwaitingArchive($pdo) as $awaitingSeason) {
+        echo '<div class="alert alert-warning d-flex flex-wrap align-items-center justify-content-between gap-2" role="alert">'
+            . '<span><strong>' . htmlspecialchars((string) $awaitingSeason['name'], ENT_QUOTES, 'UTF-8') . '</strong> has finished. Commit it to the archive so it is kept as historical data?</span>'
+            . '<a class="btn btn-sm btn-brand" href="seasons.php">Review on Seasons</a></div>';
+    }
+}
+
 function hub_index_load_json_array(string $path): array
 {
     if (!is_file($path)) {
@@ -502,10 +511,11 @@ if (hub_index_can(['sponsorship', 'finance_view', 'tickets_ops'])) {
 
 <div class="hub-index-page">
 
-    <div class="hub-context-bar" role="status">
-        <div><i class="fa-solid fa-calendar-days" aria-hidden="true"></i><span>Showing <strong><?= htmlspecialchars((string) ($selectedSeason['name'] ?? 'the selected season'), ENT_QUOTES, 'UTF-8') ?></strong></span><?php if (!empty($selectedSeason['is_locked'])): ?><span class="badge text-bg-secondary">Locked</span><?php endif; ?></div>
-        <span>Change season from the navigation menu.</span>
-    </div>
+    <div class="hub-context-bar hub-index-bar" role="status">
+        <div class="hub-index-bar__row">
+            <div><i class="fa-solid fa-calendar-days" aria-hidden="true"></i><span>Showing <strong><?= htmlspecialchars((string) ($selectedSeason['name'] ?? 'the selected season'), ENT_QUOTES, 'UTF-8') ?></strong></span><?php if (!empty($selectedSeason['is_locked'])): ?><span class="badge text-bg-secondary">Locked</span><?php endif; ?></div>
+            <span>Change season from the navigation menu.</span>
+        </div>
 
     <?php $quickActions = hub_index_filter_by_capability([
         ['cap' => ['matchday'], 'href' => '/admin/match.php?action=new', 'class' => 'btn btn-brand btn-sm', 'icon' => 'fa-plus', 'label' => 'Add fixture'],
@@ -516,22 +526,22 @@ if (hub_index_can(['sponsorship', 'finance_view', 'tickets_ops'])) {
         ['cap' => ['shop'], 'href' => '/admin/shop_product.php', 'class' => 'btn btn-outline-secondary btn-sm', 'icon' => 'fa-bag-shopping', 'label' => 'Add shop product'],
     ]); ?>
     <?php if ($quickActions !== []): ?>
-    <section class="hub-section-commandbar" aria-labelledby="quickActionsTitle">
-        <div><h2 id="quickActionsTitle">Common actions</h2><p>Create the records used most often across match-day and sponsorship workflows.</p></div>
-        <div class="hub-local-actions">
-            <?php foreach ($quickActions as $action): ?>
-                <a href="<?= h((string) $action['href']) ?>" class="<?= h((string) $action['class']) ?>"><i class="fa-solid <?= h((string) $action['icon']) ?> me-1" aria-hidden="true"></i><?= h((string) $action['label']) ?></a>
-            <?php endforeach; ?>
+        <div class="hub-index-bar__row hub-index-bar__actions" role="group" aria-labelledby="quickActionsTitle">
+            <div class="hub-index-bar__intro"><h2 id="quickActionsTitle">Common actions</h2><p>Create the records used most often across match-day and sponsorship workflows.</p></div>
+            <div class="hub-local-actions">
+                <?php foreach ($quickActions as $action): ?>
+                    <a href="<?= h((string) $action['href']) ?>" class="<?= h((string) $action['class']) ?>"><i class="fa-solid <?= h((string) $action['icon']) ?> me-1" aria-hidden="true"></i><?= h((string) $action['label']) ?></a>
+                <?php endforeach; ?>
+            </div>
         </div>
-    </section>
     <?php endif; ?>
+    </div>
 
     <?php $canSeeBirthdays = hub_index_can(['admin_settings']); ?>
     <?php if ($canSeeBirthdays): ?>
-    <section class="hub-index-section" aria-labelledby="birthdaysTitle">
+    <section class="hub-index-section hub-dash-card" aria-labelledby="birthdaysTitle">
         <div class="hub-index-section__header">
             <div>
-                <p class="page-kicker mb-1">People</p>
                 <h2 id="birthdaysTitle" class="h4 mb-0">Club birthdays</h2>
             </div>
         </div>
@@ -554,8 +564,11 @@ if (hub_index_can(['sponsorship', 'finance_view', 'tickets_ops'])) {
                                 </span>
                             </a>
                         <?php endforeach; ?>
+                        <a class="dashboard-birthdays__item dashboard-birthdays__item--all" href="/admin/club_birthdays.php">
+                            <span class="dashboard-birthdays__all-icon" aria-hidden="true"><i class="fa-solid fa-chevron-right"></i></span>
+                            <span class="visually-hidden">View all birthdays</span>
+                        </a>
                     </div>
-                    <div class="text-end mt-2"><a href="/admin/club_birthdays.php" class="small">View all</a></div>
                 <?php endif; ?>
             </div>
         </div>
@@ -575,17 +588,12 @@ if (hub_index_can(['sponsorship', 'finance_view', 'tickets_ops'])) {
     $showMoneySection = $moneyMetrics !== [] || $revenueSources !== [];
     ?>
     <?php if ($showMoneySection): ?>
-        <section class="hub-index-section" aria-labelledby="recentOrdersTitle">
-            <div class="hub-index-section__header">
-                <div>
-                    <p class="page-kicker mb-1">Money</p>
-                    <h2 id="recentOrdersTitle" class="h4 mb-0">Income this season</h2>
-                </div>
-            </div>
+        <section class="hub-index-money-section" aria-label="Income this season">
 
             <div class="hub-index-money">
                 <?php if (hub_auth_has_capability('finance_view')): ?>
-                <div class="card shadow-sm border-0 hub-panel hub-index-money__stripe">
+                <div class="card hub-panel hub-dash-card hub-index-money__stripe">
+                    <div class="hub-dash-head"><h2 class="h5 mb-0">Recent payments</h2></div>
                     <div class="card-body p-0">
                         <?php if ($recentStripeOrders === []): ?>
                             <div class="hub-empty-state p-4">No online payments have been recorded yet.</div>
@@ -612,7 +620,8 @@ if (hub_index_can(['sponsorship', 'finance_view', 'tickets_ops'])) {
                 <?php endif; ?>
 
                 <?php if ($revenueSources !== []): ?>
-                <div class="card shadow-sm border-0 hub-panel hub-index-money__charts">
+                <div class="card hub-panel hub-dash-card hub-index-money__charts">
+                    <div class="hub-dash-head"><h2 class="h5 mb-0">Revenue this season</h2></div>
                     <div class="card-body p-4">
                         <div class="dashboard-season-charts dashboard-season-charts--row">
                             <div class="dashboard-season-charts__block">
@@ -625,8 +634,11 @@ if (hub_index_can(['sponsorship', 'finance_view', 'tickets_ops'])) {
                 <?php endif; ?>
 
                 <?php if ($moneyMetrics !== []): ?>
-                <div class="hub-index-money__metrics">
-                    <?php hub_render_metric_grid($moneyMetrics, 'Income this season'); ?>
+                <div class="hub-dash-card hub-index-money__metrics">
+                    <div class="hub-dash-head"><h2 class="h5 mb-0">Season income</h2></div>
+                    <div class="hub-dash-card__body">
+                        <?php hub_render_metric_grid($moneyMetrics, 'Income this season'); ?>
+                    </div>
                 </div>
                 <?php endif; ?>
             </div>
@@ -636,9 +648,9 @@ if (hub_index_can(['sponsorship', 'finance_view', 'tickets_ops'])) {
     <?php if ($canSeeMatchdayFocus || $attentionItems !== []): ?>
     <section class="dashboard-command-centre" aria-labelledby="dashboardCommandTitle">
         <?php if ($canSeeMatchdayFocus): ?>
-        <div class="dashboard-command-centre__main">
-            <p class="page-kicker mb-1">Today&apos;s focus</p>
-            <h2 id="dashboardCommandTitle">Upcoming fixtures</h2>
+        <div class="dashboard-command-centre__main hub-dash-card">
+            <div class="hub-index-section__header"><h2 id="dashboardCommandTitle">Upcoming fixtures</h2></div>
+            <div class="hub-dash-card__body">
             <?php if ($upcomingFixtures === []): ?>
                 <p class="dashboard-command-centre__summary">No upcoming fixtures are recorded for <?= htmlspecialchars((string) ($selectedSeason['name'] ?? 'the selected season'), ENT_QUOTES, 'UTF-8') ?>.</p>
                 <div class="dashboard-command-centre__actions">
@@ -663,15 +675,17 @@ if (hub_index_can(['sponsorship', 'finance_view', 'tickets_ops'])) {
                 </a>
                 <?php endforeach; ?>
             <?php endif; ?>
+            </div>
         </div>
         <?php endif; ?>
 
         <?php if ($attentionItems !== []): ?>
-        <aside class="dashboard-command-centre__side" aria-label="Attention summary">
-            <div class="dashboard-attention-score">
+        <aside class="dashboard-command-centre__side hub-dash-card" aria-label="Attention summary">
+            <div class="dashboard-attention-score hub-index-section__header">
                 <span>Needs attention</span>
                 <strong><?= (int) $attentionCount ?></strong>
             </div>
+            <div class="hub-dash-card__body">
             <div class="dashboard-attention__list dashboard-attention__list--compact">
                 <?php foreach ($attentionItems as $item): ?>
                 <a href="<?= h((string) $item['href']) ?>" class="dashboard-attention__item">
@@ -680,6 +694,7 @@ if (hub_index_can(['sponsorship', 'finance_view', 'tickets_ops'])) {
                     <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
                 </a>
                 <?php endforeach; ?>
+            </div>
             </div>
         </aside>
         <?php endif; ?>
@@ -691,32 +706,38 @@ if (hub_index_can(['sponsorship', 'finance_view', 'tickets_ops'])) {
     $showMatchdaySection = $canSeeMatchdayFocus || $canSeeLeagueTable;
     ?>
     <?php if ($showMatchdaySection): ?>
-    <section class="hub-index-section" aria-labelledby="matchDayTitle">
-        <div class="hub-index-section__header">
-            <div>
-                <p class="page-kicker mb-1">Overview</p>
-                <h2 id="matchDayTitle" class="h4 mb-0">Season overview</h2>
-            </div>
-        </div>
-
+    <section class="hub-index-section hub-index-season" aria-label="Season overview">
         <div class="hub-index-matchday">
             <?php if ($canSeeLeagueTable): ?>
-            <section class="card shadow-sm border-0 hub-panel hub-index-matchday__league">
+            <section class="card hub-panel hub-dash-card hub-index-matchday__league">
+                <div class="hub-index-card__header">
+                    <h3 class="h5 mb-0">League position</h3>
+                </div>
                 <div class="card-body p-4">
-                    <h3 class="h5 mb-3">League position: <?= htmlspecialchars($leaguePosition, ENT_QUOTES, 'UTF-8') ?></h3>
 
                     <?php if ($leagueSnapshot === null): ?>
                         <div class="alert alert-light border mb-0 hub-empty-state">No league table cache is available yet.</div>
                     <?php else: ?>
-                        <div class="hub-index__league-card mb-3">
-                            <div class="hub-index__league-pos"><?= htmlspecialchars((string) ($leagueSnapshot['pos'] ?? '—'), ENT_QUOTES, 'UTF-8') ?></div>
-                            <div>
-                                <div class="fw-semibold"><?= htmlspecialchars((string) ($leagueSnapshot['club'] ?? 'Saltcoats Victoria'), ENT_QUOTES, 'UTF-8') ?></div>
-                                <div class="text-muted small">
-                                    <?= htmlspecialchars((string) ($leagueSnapshot['p'] ?? '0'), ENT_QUOTES, 'UTF-8') ?> played
-                                    &middot; <?= htmlspecialchars((string) ($leagueSnapshot['pts'] ?? '0'), ENT_QUOTES, 'UTF-8') ?> points
-                                    &middot; GD <?= htmlspecialchars((string) ($leagueSnapshot['gd'] ?? '0'), ENT_QUOTES, 'UTF-8') ?>
-                                </div>
+                        <div class="hub-index__band hub-index__band--4">
+                            <div class="hub-index__fact hub-index__fact--primary">
+                                <span class="hub-index__fact-icon" aria-hidden="true"><i class="fa-solid fa-trophy"></i></span>
+                                <span class="hub-index__fact-label">League pos</span>
+                                <span class="hub-index__fact-value"><?= htmlspecialchars((string) ($leagueSnapshot['pos'] ?? '—'), ENT_QUOTES, 'UTF-8') ?></span>
+                            </div>
+                            <div class="hub-index__fact hub-index__fact--neutral">
+                                <span class="hub-index__fact-icon" aria-hidden="true"><i class="fa-solid fa-futbol"></i></span>
+                                <span class="hub-index__fact-label">Played</span>
+                                <span class="hub-index__fact-value"><?= htmlspecialchars((string) ($leagueSnapshot['p'] ?? '0'), ENT_QUOTES, 'UTF-8') ?></span>
+                            </div>
+                            <div class="hub-index__fact hub-index__fact--warning">
+                                <span class="hub-index__fact-icon" aria-hidden="true"><i class="fa-solid fa-star"></i></span>
+                                <span class="hub-index__fact-label">Points</span>
+                                <span class="hub-index__fact-value"><?= htmlspecialchars((string) ($leagueSnapshot['pts'] ?? '0'), ENT_QUOTES, 'UTF-8') ?></span>
+                            </div>
+                            <div class="hub-index__fact hub-index__fact--info">
+                                <span class="hub-index__fact-icon" aria-hidden="true"><i class="fa-solid fa-plus-minus"></i></span>
+                                <span class="hub-index__fact-label">GD</span>
+                                <span class="hub-index__fact-value"><?= htmlspecialchars((string) ($leagueSnapshot['gd'] ?? '0'), ENT_QUOTES, 'UTF-8') ?></span>
                             </div>
                         </div>
                         <?php
@@ -724,20 +745,24 @@ if (hub_index_can(['sponsorship', 'finance_view', 'tickets_ops'])) {
                         $leagueWon = (int) ($leagueSnapshot['w'] ?? 0);
                         $winPercentage = $leaguePlayed > 0 ? round(($leagueWon / $leaguePlayed) * 100) : 0;
                         ?>
-                        <div class="hub-index__fact-list mb-0">
-                            <div class="hub-index__fact">
+                        <div class="hub-index__band hub-index__band--4">
+                            <div class="hub-index__fact hub-index__fact--success">
+                                <span class="hub-index__fact-icon" aria-hidden="true"><i class="fa-solid fa-circle-check"></i></span>
                                 <span class="hub-index__fact-label">Won</span>
                                 <span class="hub-index__fact-value"><?= htmlspecialchars((string) ($leagueSnapshot['w'] ?? '0'), ENT_QUOTES, 'UTF-8') ?></span>
                             </div>
-                            <div class="hub-index__fact">
+                            <div class="hub-index__fact hub-index__fact--neutral">
+                                <span class="hub-index__fact-icon" aria-hidden="true"><i class="fa-solid fa-scale-balanced"></i></span>
                                 <span class="hub-index__fact-label">Drawn</span>
                                 <span class="hub-index__fact-value"><?= htmlspecialchars((string) ($leagueSnapshot['d'] ?? '0'), ENT_QUOTES, 'UTF-8') ?></span>
                             </div>
-                            <div class="hub-index__fact">
+                            <div class="hub-index__fact hub-index__fact--danger">
+                                <span class="hub-index__fact-icon" aria-hidden="true"><i class="fa-solid fa-circle-xmark"></i></span>
                                 <span class="hub-index__fact-label">Lost</span>
                                 <span class="hub-index__fact-value"><?= htmlspecialchars((string) ($leagueSnapshot['l'] ?? '0'), ENT_QUOTES, 'UTF-8') ?></span>
                             </div>
-                            <div class="hub-index__fact">
+                            <div class="hub-index__fact hub-index__fact--primary">
+                                <span class="hub-index__fact-icon" aria-hidden="true"><i class="fa-solid fa-percent"></i></span>
                                 <span class="hub-index__fact-label">Win %</span>
                                 <span class="hub-index__fact-value"><?= (int) $winPercentage ?>%</span>
                             </div>
@@ -748,12 +773,12 @@ if (hub_index_can(['sponsorship', 'finance_view', 'tickets_ops'])) {
             <?php endif; ?>
 
             <?php if ($canSeeMatchdayFocus): ?>
-            <section class="card shadow-sm border-0 hub-panel hub-index-matchday__fixtures">
+            <section class="card hub-panel hub-dash-card hub-index-matchday__fixtures">
+                <div class="hub-index-card__header">
+                    <h3 class="h5 mb-0">Recent results</h3>
+                    <span class="badge text-bg-light">Latest <?= (int) count($recentResults) ?> of <?= (int) $fixtureTotals['played'] ?></span>
+                </div>
                 <div class="card-body p-4">
-                    <div class="d-flex justify-content-between align-items-center gap-3 mb-3">
-                        <h3 class="h5 mb-0">Recent results</h3>
-                        <span class="badge text-bg-light">Latest <?= (int) count($recentResults) ?> of <?= (int) $fixtureTotals['played'] ?></span>
-                    </div>
                     <?php if ($recentResults === []): ?>
                         <div class="alert alert-light border mb-0 hub-empty-state">No results have been recorded yet.</div>
                     <?php else: ?>
@@ -815,10 +840,10 @@ if (hub_index_can(['sponsorship', 'finance_view', 'tickets_ops'])) {
 
 </div>
 
-<link rel="stylesheet" href="/admin/assets/css/index.css">
+<link rel="stylesheet" href="/admin/assets/css/index.css?v=<?= (int) (@filemtime(__DIR__ . '/assets/css/index.css') ?: time()) ?>">
 
 <?php if ($revenueSources !== []): ?>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
+<script src="/admin/assets/vendor/chartjs/chart.umd.min.js"></script>
 <script>
 (() => {
     const brandFont = getComputedStyle(document.body).fontFamily;

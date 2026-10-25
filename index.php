@@ -7,6 +7,15 @@ declare(strict_types=1);
  * under public/ is rewritten here by .htaccess.
  */
 
+/*
+ * Page-cache fast path. Anonymous GET requests for plain read-only pages are
+ * answered from a 60-second file copy written by public_render() (see
+ * pub_page_cache_*() in helpers.php), skipping PHP bootstrap and the database.
+ * Any visitor with a session or member cookie, or a query string, bypasses it.
+ */
+require __DIR__ . '/lib/page_cache.php';
+page_cache_serve();
+
 require __DIR__ . '/bootstrap.php';
 
 // Optimised image variants: /img/{width}/uploads/... (see lib/imgopt.php).

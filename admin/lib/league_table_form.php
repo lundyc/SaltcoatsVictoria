@@ -271,6 +271,27 @@ function league_table_form_fetch_page(string $pageUrl, string $referer, string $
 }
 
 /**
+ * True once every club known from the first page also has five results in the
+ * newer pages fetched so far, so nothing older can enter its latest five.
+ *
+ * @param array<int, array{played_at: int, match_order: int, team_key: string, result: string}> $laterEntries
+ * @param array<int, string> $knownTeamKeys
+ */
+function league_table_form_all_teams_have_form(array $laterEntries, array $knownTeamKeys): bool
+{
+    $counts = [];
+    foreach ($laterEntries as $entry) {
+        $counts[$entry['team_key']] = ($counts[$entry['team_key']] ?? 0) + 1;
+    }
+    foreach (array_unique($knownTeamKeys) as $teamKey) {
+        if (($counts[$teamKey] ?? 0) < 5) {
+            return false;
+        }
+    }
+    return $knownTeamKeys !== [];
+}
+
+/**
  * Fetch and parse the results feed using the session established for standings.
  *
  * The feed is paginated oldest-match-first, so the page addressed by the
@@ -303,23 +324,27 @@ function league_table_form_fetch(string $standingsHtml, string $cookieFile): ?ar
     $paginationUrls = league_table_form_pagination_urls($firstPageHtml);
     $lastPageNumber = $paginationUrls === [] ? 1 : max(array_keys($paginationUrls));
 
-    if ($lastPageNumber > 1) {
-        $trailingPages = [$lastPageNumber];
-        if ($lastPageNumber - 1 > 1) {
-            $trailingPages[] = $lastPageNumber - 1;
+    // Walk back from the newest page until every club has its five latest
+    // results. A fixed "last two pages" window misses clubs whose recent games
+    // straddle an earlier page (or have a gap from postponements).
+    $laterEntries = [];
+    for ($pageNumber = $lastPageNumber; $pageNumber > 1; $pageNumber--) {
+        if (!isset($paginationUrls[$pageNumber])) {
+            continue;
         }
 
-        foreach ($trailingPages as $pageNumber) {
-            if (!isset($paginationUrls[$pageNumber])) {
-                continue;
-            }
+        $pageHtml = league_table_form_fetch_page($paginationUrls[$pageNumber], $referer, $cookieFile);
+        if ($pageHtml !== null) {
+            $laterEntries = array_merge($laterEntries, league_table_form_extract_rows($pageHtml));
+        }
 
-            $pageHtml = league_table_form_fetch_page($paginationUrls[$pageNumber], $referer, $cookieFile);
-            if ($pageHtml !== null) {
-                $entries = array_merge($entries, league_table_form_extract_rows($pageHtml));
-            }
+        // Pages are only counted once they hold five results for every club,
+        // including the earliest page's clubs, so none can be displaced.
+        if (league_table_form_all_teams_have_form($laterEntries, array_column($entries, 'team_key'))) {
+            break;
         }
     }
+    $entries = array_merge($entries, $laterEntries);
 
     return league_table_form_aggregate_rows($entries);
 }

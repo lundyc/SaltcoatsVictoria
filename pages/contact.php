@@ -3,21 +3,22 @@
 declare(strict_types=1);
 
 require_once HUB_ROOT . '/lib/mailer.php';
+require_once HUB_ROOT . '/lib/enquiries.php';
 
 $sent = false;
 $errors = [];
 $form = ['name' => '', 'email' => '', 'subject' => '', 'message' => ''];
+// Links from other pages (e.g. the pitchside boards page) can pre-fill the subject and message.
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
+    $form['subject'] = mb_substr(trim((string) ($_GET['subject'] ?? '')), 0, 120);
+    $form['message'] = mb_substr(trim((string) ($_GET['message'] ?? '')), 0, 600);
+}
 
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     // CSRF (session token is created by the Hub's config.php on bootstrap)
     $token = (string) ($_POST['csrf_token'] ?? '');
     if (!hash_equals((string) ($_SESSION['csrf_token'] ?? ''), $token)) {
         $errors[] = 'Your session expired — please try again.';
-    }
-
-    // Honeypot: real users leave this empty.
-    if (trim((string) ($_POST['website'] ?? '')) !== '') {
-        $errors[] = 'Your message could not be sent.';
     }
 
     // Rate limit: 3 messages / 15 minutes / session.
@@ -30,33 +31,30 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     foreach (['name', 'email', 'subject', 'message'] as $f) {
         $form[$f] = trim((string) ($_POST[$f] ?? ''));
     }
-    if ($form['name'] === '' || $form['message'] === '') {
-        $errors[] = 'Please add your name and a message.';
-    }
-    if (!filter_var($form['email'], FILTER_VALIDATE_EMAIL)) {
-        $errors[] = 'Please enter a valid email address.';
-    }
 
-    $to = club('contact_email');
-    if (!$errors && $to === '') {
-        $errors[] = 'The contact form is not configured yet — please use the details on this page.';
-    }
-
+    $spamFake = false;
     if (!$errors) {
-        $subject = 'Website enquiry: ' . ($form['subject'] !== '' ? $form['subject'] : 'No subject');
-        $body = "New enquiry from the club website\n\n"
-            . 'Name:    ' . $form['name'] . "\n"
-            . 'Email:   ' . $form['email'] . "\n"
-            . 'Subject: ' . $form['subject'] . "\n\n"
-            . $form['message'] . "\n";
-        $ok = hub_send_mail($to, $subject, $body, false, $form['email']);
-        if ($ok) {
+        $guard = enquiry_guard(db(), $_POST);
+        if ($guard['status'] === 'limit') {
+            $errors[] = $guard['message'];
+        } elseif ($guard['status'] === 'spam') {
+            enquiry_spam_log($guard['reason']);
+            $spamFake = true;
+            $sent = true;
+            $form = ['name' => '', 'email' => '', 'subject' => '', 'message' => ''];
+        }
+    }
+
+    if (!$errors && !$spamFake) {
+        $res = enquiry_submit(db(), 'general', $_POST);
+        if ($res['ok']) {
+            enquiry_guard_record(db(), $guard);
             $hits[] = $now;
             $_SESSION['contact_hits'] = array_values($hits);
             $sent = true;
             $form = ['name' => '', 'email' => '', 'subject' => '', 'message' => ''];
         } else {
-            $errors[] = 'Sorry — the message could not be sent right now. Please email us directly.';
+            $errors = $res['errors'];
         }
     }
 }
@@ -77,6 +75,7 @@ if ($mapsUrl === '') {
 
 set_meta(['title' => 'Contact & find us', 'description' => 'Get in touch with ' . club('club_name') . ' and how to find ' . $groundName . '.']);
 ?>
+<?php seo_breadcrumbs([['Contact', url('contact')]]); ?>
 <?php partial('page_hero', ['eyebrow' => 'Get in touch', 'title' => 'Contact & find us']); ?>
 
 <div class="page">
@@ -112,6 +111,7 @@ set_meta(['title' => 'Contact & find us', 'description' => 'Get in touch with ' 
 
       <form method="post" novalidate>
         <input type="hidden" name="csrf_token" value="<?= e($_SESSION['csrf_token'] ?? '') ?>">
+        <?= enquiry_spam_fields() ?>
         <p class="hp" aria-hidden="true"><label>Leave this blank <input type="text" name="website" tabindex="-1" autocomplete="off"></label></p>
 
         <label class="field"><span>Your name</span>

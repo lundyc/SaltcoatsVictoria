@@ -34,6 +34,8 @@ foreach ($tokenMap as $name => $value) {
 <link rel="icon" type="image/png" sizes="192x192" href="<?= e(pub_icon_url(192)) ?>">
 <link rel="apple-touch-icon" href="<?= e(pub_icon_url(180)) ?>">
 <?php if (is_file(PUBLIC_ROOT . '/uploads/club/site.webmanifest')): ?><link rel="manifest" href="/uploads/club/site.webmanifest"><?php endif; ?>
+<link rel="preload" href="/assets/fonts/Montserrat.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/assets/fonts/Roboto.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="<?= e(asset('css/public.css')) ?>">
 <link rel="alternate" type="application/rss+xml" title="<?= e($clubName) ?> news" href="<?= e(url('news/feed.xml')) ?>">
 <?php if ($tokenCss !== ''): ?><style>:root{<?= $tokenCss /* colour literals, validated on save */ ?>}</style><?php endif; ?>
@@ -45,7 +47,14 @@ function gtag(){dataLayer.push(arguments);}
 /* Analytics storage stays denied until the visitor accepts the cookie banner (see site_footer.php). */
 gtag('consent','default',{'analytics_storage':'denied'});
 </script>
-<script async src="https://www.googletagmanager.com/gtag/js?id=<?= e(club('ga_measurement_id')) ?>"></script>
+<script>
+/* Google's analytics script (about 175 KB) loads once the page has finished loading, so it does not
+   compete with the page's own pictures. The commands queued above and below (consent default, config)
+   are kept in order and run as soon as it arrives. */
+(function(){var id=<?= json_encode((string) club('ga_measurement_id'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+function load(){var s=document.createElement('script');s.async=true;s.src='https://www.googletagmanager.com/gtag/js?id='+encodeURIComponent(id);document.head.appendChild(s);}
+if(document.readyState==='complete'){load();}else{window.addEventListener('load',function(){setTimeout(load,0);});}})();
+</script>
 <script>gtag('js',new Date());gtag('config','<?= e(club('ga_measurement_id')) ?>');</script>
 <?php endif; ?>
 </head>
@@ -60,6 +69,14 @@ $utilityLinks = [
     'Tickets'   => url('tickets'),
     'Contact'   => url('contact'),
 ];
+// Events link appears only while there are public upcoming events, so it never leads to an empty page.
+require_once HUB_ROOT . '/lib/events.php';
+$hasPublicEvents = (int) cache_remember('events_public_count', 60, static fn (): string => (string) events_public_upcoming_count(db())) > 0;
+if ($hasPublicEvents) {
+    $utilityLinks = ['Club shop' => url('shop'), 'Tickets' => url('tickets'), 'Events' => url('events'), 'Contact' => url('contact')];
+}
+require_once HUB_ROOT . '/lib/member_hint.php';
+$memberHint = member_hint_read();
 ?>
   <div class="utility-bar">
     <div class="container">
@@ -68,6 +85,14 @@ $utilityLinks = [
           <a href="<?= e($href) ?>"><?= e($label) ?></a>
         <?php endforeach; ?>
       </nav>
+      <div class="utility-bar__account">
+        <?php if ($memberHint): ?>
+          <a class="utility-bar__me" href="/members/index.php"><?= pub_icon('user') ?: '' ?><span>My Vics<span class="utility-bar__name"> · <?= e($memberHint['name']) ?></span></span></a>
+          <a href="/members/logout.php?all=1">Log out</a>
+        <?php else: ?>
+          <a class="utility-bar__login" href="/members/login.php">Log in</a>
+        <?php endif; ?>
+      </div>
       <?php if ($social): ?>
         <div class="utility-bar__social">
           <?php foreach ($social as $network => $href): ?>
@@ -95,4 +120,3 @@ $utilityLinks = [
 </header>
 
 <main id="main">
-<?= seo_breadcrumb_html() ?>

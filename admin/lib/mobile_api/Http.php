@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace MyClubHub\Api;
+namespace SaltcoatsApi\Api;
 
 final class ApiError extends \RuntimeException
 {

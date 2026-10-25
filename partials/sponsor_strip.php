@@ -4,7 +4,7 @@
 declare(strict_types=1);
 
 /** @var list<array<string,mixed>> $sponsors */
-$sponsors = $sponsors ?? [];
+$sponsors = array_values(array_filter($sponsors ?? [], static fn ($s) => trim((string) ($s['logo_path'] ?? '')) !== ''));
 if ($sponsors === []) {
     return;
 }
@@ -13,10 +13,24 @@ $main = array_values(array_filter($sponsors, static fn ($s) => (int) $s['is_main
 $rest = array_values(array_filter($sponsors, static fn ($s) => (int) $s['is_main_sponsor'] !== 1));
 
 $tile = static function (array $s, bool $isMain): void {
-    $logo = uploads('sponsors/' . $s['logo_path']);
     $website = trim((string) ($s['website_url'] ?? ''));
-    $img = '<img src="' . e($logo) . '" alt="' . e($s['name']) . '" loading="lazy">';
-    $cls = $isMain ? ' class="is-main"' : '';
+    // Use the edge-to-edge copy of the logo (white margin trimmed off) when there is one.
+    $fit = pub_partner_logo_fit((string) $s['logo_path']);
+    $src = $fit['url'] ?? uploads('sponsors/' . $s['logo_path']);
+    $dims = $fit ? ' width="' . $fit['w'] . '" height="' . $fit['h'] . '"' : '';
+    $img = '<img src="' . e($src) . '" alt="' . e($s['name']) . '" loading="lazy" decoding="async"' . $dims . '>';
+    // Tiles are shaped like the typical logo (about 1.9:1, principal partners 2.18:1). A logo close to that
+    // shape fills its tile edge to edge; an unusual shape (very wide or square) is shown whole instead.
+    $ratio = $fit && $fit['h'] > 0 ? $fit['w'] / $fit['h'] : 1.9;
+    $tileRatio = $isMain ? 2.18 : 1.9;
+    $classes = [];
+    if ($isMain) {
+        $classes[] = 'is-main';
+    }
+    if (abs($ratio / $tileRatio - 1) > 0.15) {
+        $classes[] = 'is-contain';
+    }
+    $cls = $classes ? ' class="' . implode(' ', $classes) . '"' : '';
     if ($website !== '') {
         echo '<a' . $cls . ' href="' . e($website) . '" rel="noopener" target="_blank" title="' . e($s['name']) . '">' . $img . '</a>';
     } else {
@@ -41,8 +55,10 @@ $tile = static function (array $s, bool $isMain): void {
     <?php if ($rest !== []): ?>
       <div class="partners__group">
         <p class="partners__label">Club partners</p>
-        <div class="partners__grid">
-          <?php foreach ($rest as $s) { $tile($s, false); } ?>
+        <div class="partners__marquee" data-marquee>
+          <div class="partners__grid" data-marquee-track>
+            <?php foreach ($rest as $s) { $tile($s, false); } ?>
+          </div>
         </div>
       </div>
     <?php endif; ?>

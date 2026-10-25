@@ -1,6 +1,10 @@
 <?php
 require_once __DIR__ . '/header.php';
 require_once __DIR__ . '/../admin/lib/season_passes.php';
+require_once __DIR__ . '/../admin/lib/google_wallet.php';
+require_once __DIR__ . '/../admin/lib/site_settings.php';
+$walletOn = wallet_is_configured($pdo);
+$walletCfg = $walletOn ? wallet_config($pdo) : [];
 
 $currentPersonId = member_auth_current_person_id() ?? 0;
 $currentPerson = member_auth_current_person();
@@ -113,7 +117,7 @@ $host = (string) ($_SERVER['HTTP_HOST'] ?? 'lundy.me.uk');
     <div class="member-grid member-grid--aside">
         <div class="member-grid">
             <?php foreach ($passes as $pass): ?>
-                <?php $verifyUrl = $scheme . '://' . $host . '/verify_ticket.php?token=' . rawurlencode((string) $pass['token']); ?>
+                <?php $credentialValue = (string) $pass['token']; ?>
                 <article class="member-ticket-card">
                     <div class="member-ticket-card__top">
                         <div class="d-flex justify-content-between align-items-start gap-3">
@@ -127,9 +131,13 @@ $host = (string) ($_SERVER['HTTP_HOST'] ?? 'lundy.me.uk');
                     <div class="member-card__body">
                         <div class="member-ticket-detail-grid">
                             <div class="member-ticket-qr-panel text-center">
-                                <div class="member-ticket-qr" data-qr data-qr-url="<?= h($verifyUrl) ?>" aria-label="Season ticket QR code"></div>
+                                <div class="member-ticket-qr" data-qr data-qr-url="<?= h($credentialValue) ?>" aria-label="Season ticket QR code"></div>
                                 <div class="small text-muted mt-2 mb-1">If the QR code won't scan, give the gate this code:</div>
                                 <div class="fw-bold font-monospace user-select-all fs-4" style="letter-spacing: 0.1em;"><?= h((string) ($pass['manual_code'] ?? '')) ?></div>
+                                <?php if ($walletOn && strtolower((string) $pass['entitlement_status']) === 'active'): ?>
+                                    <?php try { $walletUrl = wallet_save_url(wallet_build_season_jwt($walletCfg, $pass, $credentialValue, site_setting($pdo, 'ground_name', 'Campbell Park'), $scheme . '://' . $host . '/scan/icon-512.png')); } catch (Throwable) { $walletUrl = ''; } ?>
+                                    <?php if ($walletUrl !== ''): ?><?= wallet_button_html($walletUrl) ?><?php endif; ?>
+                                <?php endif; ?>
                             </div>
                             <div class="member-ticket-info-panel">
                                 <h2 class="h4 mb-3"><?= h((string) ($viewingPerson['display_name'] ?? '')) ?></h2>

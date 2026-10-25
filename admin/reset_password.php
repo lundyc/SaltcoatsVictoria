@@ -35,7 +35,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Reset password – <?= htmlspecialchars(APP_NAME, ENT_QUOTES, 'UTF-8') ?></title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/admin/assets/vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
   <link href="/admin/assets/css/style.css" rel="stylesheet">
 </head>
 <body class="auth-shell">
@@ -50,8 +50,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
       <form method="post" class="d-grid gap-3">
         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(hub_auth_csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
         <input type="hidden" name="token" value="<?= htmlspecialchars($token, ENT_QUOTES, 'UTF-8') ?>">
-        <div><label class="form-label" for="newPassword">New password</label><input class="form-control" id="newPassword" name="password" type="password" minlength="8" autocomplete="new-password" required></div>
-        <div><label class="form-label" for="confirmPassword">Confirm password</label><input class="form-control" id="confirmPassword" name="password_confirm" type="password" minlength="8" autocomplete="new-password" required></div>
+        <div><label class="form-label" for="newPassword">New password</label><input class="form-control" id="newPassword" name="password" type="password" minlength="12" maxlength="200" autocomplete="new-password" required></div>
+        <div><label class="form-label" for="confirmPassword">Confirm password</label><input class="form-control" id="confirmPassword" name="password_confirm" type="password" minlength="12" maxlength="200" autocomplete="new-password" required></div>
         <div class="d-flex flex-wrap gap-2">
           <button class="btn btn-primary" type="submit">Update password</button>
           <a class="btn btn-outline-secondary" href="login.php">Back to sign in</a>

@@ -10,6 +10,7 @@ if (!hub_auth_has_capability('matchday')) {
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/lib/functions.php';
 require_once __DIR__ . '/lib/player_birthdays.php';
+require_once __DIR__ . '/lib/birthday_calendar.php';
 require_once __DIR__ . '/sync_social_directory.php';
 require_once __DIR__ . '/lib/audit.php';
 
@@ -72,6 +73,7 @@ try {
           $newId = $pdo->lastInsertId();
 
           auditLog($pdo, 'player_created', "Created player '{$name}'");
+          birthday_calendar_queue_sync($pdo);
 
           if ($isAjax) {
                     header('Content-Type: application/json');

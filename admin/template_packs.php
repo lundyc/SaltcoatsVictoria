@@ -17,7 +17,7 @@ if (!hub_auth_is_authenticated()) {
 $currentUser = hub_auth_current_user();
 if (!hub_auth_has_capability('content_social')) {
     http_response_code(403);
-    echo '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Template Packs</title><link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"><link href="/admin/assets/css/style.css" rel="stylesheet"></head><body class="hub-shell"><main class="hub-main"><div class="container-fluid"><div class="alert alert-danger mb-0">You do not have permission to manage template packs.</div></div></main></body></html>';
+    echo '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Template Packs</title><link href="/admin/assets/vendor/bootstrap/bootstrap.min.css" rel="stylesheet"><link href="/admin/assets/css/style.css" rel="stylesheet"></head><body class="hub-shell"><main class="hub-main"><div class="container-fluid"><div class="alert alert-danger mb-0">You do not have permission to manage template packs.</div></div></main></body></html>';
     exit;
 }
 

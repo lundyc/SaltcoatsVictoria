@@ -12,6 +12,8 @@ if (!hub_auth_has_capability('content_social')) {
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/lib/functions.php';
+require_once __DIR__ . '/lib/season.php';
+require_once __DIR__ . '/lib/match_sponsorship.php';
 
 header('Content-Type: application/json; charset=UTF-8');
 
@@ -98,9 +100,14 @@ if (!move_uploaded_file($tmpPath, $targetPath)) {
 }
 @chmod($targetPath, 0664);
 
-$previousPath = trim((string)($fixture['next_match_background_image'] ?? ''));
+require_once __DIR__ . '/lib/next_match_graphic.php';
+next_match_graphic_ensure_schema($pdo);
+$bgCol = next_match_graphic_cols(next_match_graphic_type($_POST['type'] ?? ''))['bg'];
+$prevStmt = $pdo->prepare('SELECT ' . $bgCol . ' FROM match_fixtures WHERE id = :id');
+$prevStmt->execute([':id' => $fixtureId]);
+$previousPath = trim((string)$prevStmt->fetchColumn());
 try {
-          $stmt = $pdo->prepare('UPDATE match_fixtures SET next_match_background_image = :background_image WHERE id = :id LIMIT 1');
+          $stmt = $pdo->prepare('UPDATE match_fixtures SET ' . $bgCol . ' = :background_image WHERE id = :id LIMIT 1');
           $stmt->execute([
                     ':background_image' => $relativePath,
                     ':id' => $fixtureId,
@@ -110,7 +117,7 @@ try {
           nextMatchBackgroundRespond(false, 'The fixture could not be updated.', 500);
 }
 
-if ($previousPath !== '' && str_starts_with($previousPath, 'uploads/matches/')) {
+if ($previousPath !== '' && preg_match('#^uploads/matches/fixture_[^/]+$#', $previousPath) === 1) {
           $previousAbsolutePath = __DIR__ . '/' . $previousPath;
           if (is_file($previousAbsolutePath)) {
                     @unlink($previousAbsolutePath);

@@ -31,6 +31,7 @@ set_meta([
     'description' => 'Safeguarding, conduct, equality, complaints, health & safety, data protection and ground regulations for ' . club('club_name') . '.',
 ]);
 ?>
+<?php seo_breadcrumbs([['Club', url('club/history')], ['Policies', url('club/policies')]]); ?>
 <?php partial('page_hero', [
     'eyebrow' => 'The club',
     'title'   => 'Policies & governance',

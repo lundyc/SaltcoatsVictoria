@@ -1,4 +1,28 @@
 document.addEventListener('DOMContentLoaded', () => {
+  // Asks before giving or removing the Administrator role. Returns false if the change should not be submitted.
+  const confirmAdministratorChange = (container) => {
+    const initialValue = container.dataset.initialValue || '';
+    const selected = container.querySelector('input[name="access_template_id"]:checked');
+    if (!selected || selected.value === initialValue) return true;
+    const initial = container.querySelector(`input[name="access_template_id"][value="${initialValue}"]`);
+    const personName = container.dataset.personName || 'this person';
+    if (selected.dataset.bypass === '1'
+      && !window.confirm(`Administrator gives ${personName} full access to every administration area. Continue?`)) {
+      return false;
+    }
+    if (initial?.dataset.bypass === '1'
+      && !window.confirm(`${personName} will lose full Administrator access. Continue?`)) {
+      return false;
+    }
+    return true;
+  };
+  document.querySelectorAll('[data-access-role-options]').forEach((container) => {
+    const form = container.dataset.form ? document.getElementById(container.dataset.form) : container.closest('form');
+    form?.addEventListener('submit', (event) => {
+      if (!confirmAdministratorChange(container)) event.preventDefault();
+    });
+  });
+
   const page = document.querySelector('[data-club-person-page]');
   if (!page) return;
 
@@ -7,6 +31,64 @@ document.addEventListener('DOMContentLoaded', () => {
   const positionTable = document.querySelector('[data-people-position-table]');
   const relationshipTable = document.querySelector('[data-people-relationship-table]');
   const positionOptionsSource = document.querySelector('[data-people-ajax="position-add"] select[name="position_id"]');
+  const tabs = document.getElementById('clubPersonTabs');
+  document.getElementById('personErrorSummary')?.focus();
+
+  const activeTabName = () => {
+    const pane = page.querySelector('.tab-pane.active');
+    return pane?.id?.replace(/^tab-/, '') || 'details';
+  };
+
+  const openTab = (selector) => {
+    if (!selector || !/^#tab-[a-z-]+$/.test(selector)) return;
+    const button = Array.from(tabs?.querySelectorAll('[data-bs-target]') || [])
+      .find((candidate) => candidate.getAttribute('data-bs-target') === selector);
+    if (!button) return;
+    if (window.bootstrap?.Tab) {
+      window.bootstrap.Tab.getOrCreateInstance(button).show();
+    } else {
+      button.click();
+    }
+  };
+
+  // Older links and saved tab choices still use the names from before tabs were merged.
+  const renamedTabs = { '#tab-history': '#tab-ticketing', '#tab-roles': '#tab-account' };
+  const requestedHash = renamedTabs[window.location.hash] || window.location.hash;
+  const savedTab = sessionStorage.getItem(`club-person-tab-${personId}`);
+  const initialTab = /^#tab-[a-z-]+$/.test(requestedHash)
+    ? requestedHash
+    : renamedTabs[savedTab] || savedTab;
+  if (initialTab) openTab(initialTab);
+
+  tabs?.addEventListener('shown.bs.tab', (event) => {
+    const selector = event.target.getAttribute('data-bs-target');
+    if (!selector) return;
+    tabs.querySelectorAll('.rpt-picker__item').forEach((item) => {
+      const isActive = item === event.target;
+      item.classList.toggle('is-active', isActive);
+      if (isActive) item.setAttribute('aria-current', 'page');
+      else item.removeAttribute('aria-current');
+    });
+    history.replaceState(null, '', `${window.location.pathname}${window.location.search}${selector}`);
+    sessionStorage.setItem(`club-person-tab-${personId}`, selector);
+  });
+
+  document.addEventListener('submit', (event) => {
+    const form = event.target;
+    if (!(form instanceof HTMLFormElement) || !page.contains(form)) return;
+    if (form.dataset.confirm && !window.confirm(form.dataset.confirm)) {
+      event.preventDefault();
+      return;
+    }
+    let returnTab = form.querySelector('input[name="return_tab"]');
+    if (!returnTab) {
+      returnTab = document.createElement('input');
+      returnTab.type = 'hidden';
+      returnTab.name = 'return_tab';
+      form.appendChild(returnTab);
+    }
+    returnTab.value = activeTabName();
+  }, true);
 
   const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
     '&': '&amp;',
@@ -22,8 +104,7 @@ document.addEventListener('DOMContentLoaded', () => {
       status = document.createElement('div');
       status.setAttribute('data-people-inline-status', '');
       status.setAttribute('role', tone === 'danger' ? 'alert' : 'status');
-      const tabs = document.getElementById('clubPersonTabs');
-      if (tabs) tabs.insertAdjacentElement('afterend', status);
+      page.insertAdjacentElement('beforebegin', status);
     }
     status.className = 'alert alert-' + tone + ' py-2 mt-0 mb-3';
     status.textContent = message;

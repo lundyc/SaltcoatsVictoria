@@ -43,7 +43,7 @@ $pageHero = [
     'eyebrow' => 'Shop',
     'title' => 'Discount codes',
     'subtitle' => 'Create and manage checkout discount codes.',
-    'actions' => [['label' => 'Back to shop', 'href' => '/shop_overview.php', 'class' => 'btn btn-outline-light btn-sm']],
+    'actions' => [],
 ];
 require_once __DIR__ . '/header.php';
 

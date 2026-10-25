@@ -27,7 +27,7 @@ if (!file_exists($imagePath)) {
 
 // Prepare CURL
 $ch = curl_init();
-curl_setopt($ch, CURLOPT_URL, "https://graph.facebook.com/v24.0/{$pageId}/photos");
+curl_setopt($ch, CURLOPT_URL, "https://graph.facebook.com/v26.0/{$pageId}/photos");
 curl_setopt($ch, CURLOPT_POST, true);
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 curl_setopt($ch, CURLOPT_POSTFIELDS, [

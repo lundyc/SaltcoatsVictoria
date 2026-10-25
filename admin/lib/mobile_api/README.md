@@ -1,6 +1,6 @@
-# MyClubHub Mobile API v1
+# Saltcoats Victoria Mobile API v1
 
-Base URL: `https://myclubhub.co.uk/api/v1`
+Base URL: `https://saltcoatsvictoria.co.uk/api/v1`
 
 Machine-readable contract: `GET /api/v1/openapi.json`. The checked-in `openapi.json` is the source contract. Native iOS/Android clients can use the same API; no app framework is required by the server.
 
@@ -65,7 +65,7 @@ One in 100 successful requests performs bounded cleanup of expired rate counters
 Read existing `admin/.env` using its existing parser; nonempty process environment values take precedence:
 
 - `HUB_DB_HOST`, `HUB_DB_NAME`, `HUB_DB_FALLBACK_NAME`, `HUB_DB_USER`, `HUB_DB_PASS`: same database preference/fallback as the site.
-- `MCH_API_BASE_URL`: canonical HTTPS site origin, default `https://myclubhub.co.uk`. Never derived from a request Host header. Update the OpenAPI `servers` entry if this changes.
+- `MCH_API_BASE_URL`: canonical HTTPS site origin, default `https://saltcoatsvictoria.co.uk`. Never derived from a request Host header. Update the OpenAPI `servers` entry if this changes.
 - `MCH_API_TIMEZONE`: fixture timezone, default `Europe/London`.
 - `MCH_API_CORS_ORIGINS`: comma-separated exact browser origins; empty by default.
 

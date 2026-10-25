@@ -190,6 +190,10 @@ function ensureMatchSchema(PDO $pdo): void
           if ($venuesExists && !$venuePostcodeExists) {
                     $pdo->exec("ALTER TABLE match_venues ADD COLUMN postcode VARCHAR(20) DEFAULT NULL AFTER town");
           }
+          $venueLatitudeExists = (bool)$pdo->query("SHOW COLUMNS FROM match_venues LIKE 'latitude'")->fetchColumn();
+          if ($venuesExists && !$venueLatitudeExists) {
+                    $pdo->exec("ALTER TABLE match_venues ADD COLUMN latitude DECIMAL(9,6) DEFAULT NULL AFTER postcode, ADD COLUMN longitude DECIMAL(9,6) DEFAULT NULL AFTER latitude");
+          }
           $venueNotesExists = (bool)$pdo->query("SHOW COLUMNS FROM match_venues LIKE 'notes'")->fetchColumn();
           if ($venuesExists && !$venueNotesExists) {
                     $pdo->exec("ALTER TABLE match_venues ADD COLUMN notes VARCHAR(255) DEFAULT NULL AFTER postcode");
@@ -2107,11 +2111,18 @@ function saveMatchVenue(
           ?string $addressLine1 = null,
           ?string $town = null,
           ?string $postcode = null,
-          ?string $notes = null
+          ?string $notes = null,
+          ?float $latitude = null,
+          ?float $longitude = null
 ): int
 {
           ensureMatchSchema($pdo);
           $name = trim($name);
+          // A pin needs both halves and must be a real coordinate on Earth.
+          if ($latitude === null || $longitude === null || abs($latitude) > 90 || abs($longitude) > 180) {
+                    $latitude = null;
+                    $longitude = null;
+          }
           $clubName = trim((string) $clubName);
           if ($name === '') {
                     throw new RuntimeException('Venue name is required.');
@@ -2155,6 +2166,8 @@ function saveMatchVenue(
                                   address_line1 = :address_line1,
                                   town = :town,
                                   postcode = :postcode,
+                                  latitude = :latitude,
+                                  longitude = :longitude,
                                   notes = :notes
                               WHERE id = :id
                               LIMIT 1
@@ -2165,6 +2178,8 @@ function saveMatchVenue(
                               ':address_line1' => $addressLine1 !== '' ? $addressLine1 : null,
                               ':town' => $town !== '' ? $town : null,
                               ':postcode' => $postcode !== '' ? $postcode : null,
+                              ':latitude' => $latitude,
+                              ':longitude' => $longitude,
                               ':notes' => $notes !== '' ? $notes : null,
                               ':id' => $venueId,
                     ]);
@@ -2172,8 +2187,8 @@ function saveMatchVenue(
           }
 
           $stmt = $pdo->prepare("
-                    INSERT INTO match_venues (club_name, name, address_line1, town, postcode, notes)
-                    VALUES (:club_name, :name, :address_line1, :town, :postcode, :notes)
+                    INSERT INTO match_venues (club_name, name, address_line1, town, postcode, latitude, longitude, notes)
+                    VALUES (:club_name, :name, :address_line1, :town, :postcode, :latitude, :longitude, :notes)
           ");
           $stmt->execute([
                     ':club_name' => $clubName !== '' ? $clubName : null,
@@ -2181,6 +2196,8 @@ function saveMatchVenue(
                     ':address_line1' => $addressLine1 !== '' ? $addressLine1 : null,
                     ':town' => $town !== '' ? $town : null,
                     ':postcode' => $postcode !== '' ? $postcode : null,
+                    ':latitude' => $latitude,
+                    ':longitude' => $longitude,
                     ':notes' => $notes !== '' ? $notes : null,
           ]);
           return (int) $pdo->lastInsertId();
@@ -2488,6 +2505,11 @@ function getMatchSponsorshipRows(PDO $pdo, int $fixtureId): array
  */
 function matchSponsorshipCanBeDisplayed(array $row): bool
 {
+          // Placements from a season deal can be kept off public graphics at deal level.
+          if ((int)($row['hide_from_public'] ?? 0) === 1) {
+                    return false;
+          }
+
           if ((int)($row['is_complimentary'] ?? 0) === 1) {
                     return true;
           }
@@ -2723,6 +2745,11 @@ function recalculateMatchFixtureSponsorshipAmounts(PDO $pdo, int $fixtureId): vo
 
           foreach ($rows as $row) {
                     if ($row['sponsorship_role'] !== 'match_day' || (int)($row['is_complimentary'] ?? 0) === 1) {
+                              continue;
+                    }
+                    // Keep agreed prices: placements that belong to a season deal, or that already
+                    // have money recorded against them, are never silently re-priced.
+                    if (!empty($row['deal_id']) || (float)($row['paid_total'] ?? 0) > 0.0001) {
                               continue;
                     }
                     $amount = calculateMatchSponsorshipAmount($pdo, (int)$fixture['season_id'], 'match_day', (int)$fixture['is_home'] === 1);

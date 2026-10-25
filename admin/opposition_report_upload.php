@@ -67,11 +67,15 @@ if ($action === 'delete') {
     $path = $file !== '' ? hub_opposition_report_dir() . '/' . $file : '';
     if ($path !== '' && str_ends_with($file, '.json') && is_file($path)) {
         unlink($path);
+        if ($isAjax) {
+            header('Content-Type: application/json');
+            echo json_encode(['ok' => true, 'message' => 'Report deleted.']);
+            exit;
+        }
         header('Location: /admin/stats.php?tab=opposition&deleted=1');
         exit;
     }
-    header('Location: /admin/stats.php?tab=opposition&error=notfound');
-    exit;
+    $fail('notfound');
 }
 
 $upload = $_FILES['json_file'] ?? null;
@@ -102,13 +106,23 @@ $dir = hub_opposition_report_dir();
 if (!is_dir($dir)) {
     mkdir($dir, 0775, true);
 }
+$previous = null;
+$added = count($data['matches']);
+if (is_file($dir . '/' . $filename)) {
+    $prevData = json_decode((string)file_get_contents($dir . '/' . $filename), true);
+    if (is_array($prevData) && is_array($prevData['matches'] ?? null)) {
+        $prevIds = array_flip(array_map(static fn($m) => is_array($m) ? ($m['matchId'] ?? null) : null, $prevData['matches']));
+        $previous = count($prevIds);
+        $added = count(array_filter($data['matches'], static fn($m) => !is_array($m) || !isset($prevIds[$m['matchId'] ?? null])));
+    }
+}
 if (!move_uploaded_file($upload['tmp_name'], $dir . '/' . $filename)) {
     $fail('save');
 }
 
 if ($isAjax) {
     header('Content-Type: application/json');
-    echo json_encode(['ok' => true, 'message' => 'Report uploaded.', 'team' => $team]);
+    echo json_encode(['ok' => true, 'message' => 'Report uploaded.', 'team' => $team, 'matches' => count($data['matches']), 'previous' => $previous, 'added' => $added]);
     exit;
 }
 header('Location: /admin/stats.php?tab=opposition&uploaded=1');

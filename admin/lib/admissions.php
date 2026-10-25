@@ -1,9 +1,29 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/schema_guard.php';
+
 require_once __DIR__ . '/season_passes.php';
 
+/**
+ * The scanner's "today". The day runs until 5am, so a late kick-off or an event that finishes after
+ * midnight can still be scanned, and a match is never scannable before its own day starts.
+ */
+function scan_business_date(?int $now = null): string
+{
+    return date('Y-m-d', ($now ?? time()) - 5 * 3600);
+}
+
 function ensureAdmissionsSchema(PDO $pdo): void
+{
+    if (schema_guard_done('ensureAdmissionsSchema')) {
+        return;
+    }
+    ensureAdmissionsSchema_run($pdo);
+    schema_guard_mark('ensureAdmissionsSchema');
+}
+
+function ensureAdmissionsSchema_run(PDO $pdo): void
 {
     ensureSeasonPassSchema($pdo);
 
@@ -242,13 +262,20 @@ function recordAdmission(PDO $pdo, int $fixtureId, string $scanInput, ?int $scan
             return ['found' => true, 'valid' => false, 'status' => $status, 'message' => $message, 'credential' => $credential, 'scan_log' => $log];
         }
     }
+    if ($type === 'event_ticket') {
+        $log = admissionsLog($pdo, $fixtureId, $credential, 'wrong_fixture', 'This is an event ticket, not a match ticket.', false, $scannerAccountId);
+        return ['found' => true, 'valid' => false, 'status' => 'wrong_fixture', 'message' => 'This is an event ticket, not a match ticket.', 'credential' => $credential, 'scan_log' => $log];
+    }
     if ($type === 'match_ticket' && (int) ($credential['ticket_fixture_id'] ?? 0) !== $fixtureId) {
         $log = admissionsLog($pdo, $fixtureId, $credential, 'wrong_fixture', 'This match ticket is for another fixture.', false, $scannerAccountId);
         return ['found' => true, 'valid' => false, 'status' => 'wrong_fixture', 'message' => 'This match ticket is for another fixture.', 'credential' => $credential, 'scan_log' => $log];
     }
     if ((int) ($credential['credential_is_active'] ?? 0) !== 1 || (string) ($credential['entitlement_status'] ?? '') !== 'active' || (string) ($credential['order_status'] ?? '') !== 'paid') {
-        $log = admissionsLog($pdo, $fixtureId, $credential, 'not_active', 'This ticket is not active or paid.', false, $scannerAccountId);
-        return ['found' => true, 'valid' => false, 'status' => 'not_active', 'message' => 'This ticket is not active or paid.', 'credential' => $credential, 'scan_log' => $log];
+        $inactiveMessage = in_array('cancelled', [(string) ($credential['entitlement_status'] ?? ''), (string) ($credential['order_status'] ?? '')], true)
+            ? 'This ticket has been cancelled.'
+            : 'This ticket is not active or paid.';
+        $log = admissionsLog($pdo, $fixtureId, $credential, 'not_active', $inactiveMessage, false, $scannerAccountId);
+        return ['found' => true, 'valid' => false, 'status' => 'not_active', 'message' => $inactiveMessage, 'credential' => $credential, 'scan_log' => $log];
     }
 
     $quantity = $type === 'match_ticket' ? max(1, (int) ($credential['admits_count'] ?? 1)) : 1;
@@ -323,7 +350,7 @@ function admissionsCount(PDO $pdo, int $fixtureId): int
 function admissionsScanLogSummary(PDO $pdo, int $fixtureId): array
 {
     ensureAdmissionsSchema($pdo);
-    $stmt = $pdo->prepare('SELECT COUNT(*) AS total, COALESCE(SUM(accepted = 1),0) AS valid, COALESCE(SUM(accepted = 0),0) AS invalid FROM scan_logs WHERE fixture_id = :fixture');
+    $stmt = $pdo->prepare('SELECT COUNT(*) AS total, COALESCE(SUM(accepted = 1),0) AS valid, COALESCE(SUM(accepted = 0),0) AS invalid FROM scan_logs WHERE fixture_id = :fixture AND result <> \'wrong_fixture\'');
     $stmt->execute([':fixture' => $fixtureId]);
     $row = $stmt->fetch(PDO::FETCH_ASSOC) ?: ['total' => 0, 'valid' => 0, 'invalid' => 0];
     return ['total' => (int) $row['total'], 'valid' => (int) $row['valid'], 'invalid' => (int) $row['invalid']];
@@ -332,7 +359,7 @@ function admissionsScanLogSummary(PDO $pdo, int $fixtureId): array
 function admissionsRecentScanLogs(PDO $pdo, int $fixtureId, int $limit = 20): array
 {
     ensureAdmissionsSchema($pdo);
-    $stmt = $pdo->prepare('SELECT result AS status, message, accepted, ticket_kind, ticket_label, holder_name, scanned_at FROM scan_logs WHERE fixture_id = :fixture ORDER BY scanned_at DESC, id DESC LIMIT ' . max(1, min(100, $limit)));
+    $stmt = $pdo->prepare('SELECT result AS status, message, accepted, ticket_kind, ticket_label, holder_name, scanned_at FROM scan_logs WHERE fixture_id = :fixture AND result <> \'wrong_fixture\' ORDER BY scanned_at DESC, id DESC LIMIT ' . max(1, min(100, $limit)));
     $stmt->execute([':fixture' => $fixtureId]);
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }

@@ -154,6 +154,7 @@ $tkt_meta = static function (array $g): string {
 };
 
 set_meta(['title' => 'Match tickets', 'description' => 'Buy tickets for ' . club('club_name') . ' home games — digital QR entry.']);
+seo_breadcrumbs([['Match tickets', url('tickets')]]);
 ?>
 <?php if (!$fixture): ?>
 
@@ -165,6 +166,9 @@ set_meta(['title' => 'Match tickets', 'description' => 'Buy tickets for ' . club
 
   <div class="page">
     <div class="container">
+      <?php require_once HUB_ROOT . '/lib/events.php'; if (events_public_upcoming_count(db()) > 0): ?>
+        <div class="notice notice--ok"><p>Looking for a club event? <a href="<?= e(url('events')) ?>">See upcoming events and book tickets</a>.</p></div>
+      <?php endif; ?>
       <?php if (isset($_GET['cancelled'])): ?>
         <div class="notice notice--warn"><p>Payment was cancelled — no money was taken.</p></div>
       <?php endif; ?>
@@ -252,7 +256,7 @@ set_meta(['title' => 'Match tickets', 'description' => 'Buy tickets for ' . club
       'eyebrow' => 'Match day tickets',
       'title'   => $clubShort . ' v ' . (string) $fixture['opponent'],
       'sub'     => $heroSub,
-      'back'    => ['href' => url('tickets'), 'label' => '‹ All home games'],
+      'back'    => ['href' => url('tickets'), 'label' => 'All home games'],
   ]);
   ?>
 
@@ -263,6 +267,45 @@ set_meta(['title' => 'Match tickets', 'description' => 'Buy tickets for ' . club
       <?php endif; ?>
       <?php foreach ($errors as $er): ?><div class="notice notice--err"><p><?= e($er) ?></p></div><?php endforeach; ?>
 
+      <?php
+      $calUrl = '';
+      try {
+          $calStart = new DateTimeImmutable($fixture['match_date'] . ' ' . (!empty($fixture['kickoff_time']) ? $fixture['kickoff_time'] : '15:00:00'), new DateTimeZone('Europe/London'));
+          $calEnd = $calStart->modify('+2 hours');
+          $calUtc = static fn (DateTimeImmutable $d): string => $d->setTimezone(new DateTimeZone('UTC'))->format('Ymd\THis\Z');
+          $calUrl = 'https://calendar.google.com/calendar/render?' . http_build_query([
+              'action' => 'TEMPLATE',
+              'text' => $clubShort . ' v ' . (string) $fixture['opponent'],
+              'dates' => $calUtc($calStart) . '/' . $calUtc($calEnd),
+              'location' => trim(club('ground_name', 'Campbell Park') . ', ' . club('ground_address', ''), ', '),
+          ]);
+      } catch (Throwable $ex) {
+          $calUrl = '';
+      }
+      ?>
+      <h2 class="tkt-event__label tkt-event__label--wide">Event date</h2>
+      <div class="tkt-date" role="group" aria-label="Event date and venue">
+        <div class="tkt-date__item">
+          <span class="tkt-date__k">Date</span>
+          <span class="tkt-date__v"><?= e(format_date($fixture['match_date'], 'l j F Y')) ?></span>
+        </div>
+        <div class="tkt-date__item">
+          <span class="tkt-date__k">Kick-off</span>
+          <span class="tkt-date__v"><?= !empty($fixture['kickoff_time']) ? e(format_time($fixture['kickoff_time'])) : 'TBC' ?></span>
+        </div>
+        <div class="tkt-date__item">
+          <span class="tkt-date__k">Venue</span>
+          <span class="tkt-date__v"><?= e(!empty($fixture['venue']) ? (string) $fixture['venue'] : club('ground_name', 'Campbell Park')) ?></span>
+        </div>
+        <?php if ($calUrl !== ''): ?>
+          <a class="btn tkt-date__cal" href="<?= e($calUrl) ?>" target="_blank" rel="noopener">Add to calendar</a>
+        <?php endif; ?>
+      </div>
+
+      <div class="tkt-event">
+      <div class="tkt-event__main">
+      <h2 class="tkt-event__label tkt-o-info-l">Information</h2>
+      <div class="tkt-event__card tkt-o-info">
       <div class="tkt-matchhead">
         <span class="tkt-matchhead__crests">
           <?php if ($tkt_crest_light() !== ''): ?><img src="<?= e($tkt_crest_light()) ?>" alt="" loading="lazy"><?php endif; ?>
@@ -281,6 +324,35 @@ set_meta(['title' => 'Match tickets', 'description' => 'Buy tickets for ' . club
         </span>
       </div>
 
+      <?php
+      $infoGround = club('ground_name', 'Campbell Park');
+      $infoAddr = club('ground_address', '');
+      ?>
+      <section class="tkt-info" aria-labelledby="tkt-info-h">
+        <h2 id="tkt-info-h" class="tkt-info__h">Match information</h2>
+        <p>Buy your tickets online below for <strong><?= e($clubShort) ?> v <?= e((string) $fixture['opponent']) ?></strong> on <strong><?= e($db['full']) ?></strong><?= !empty($fixture['kickoff_time']) ? ', kick-off ' . e(format_time($fixture['kickoff_time'])) : '' ?>, at <?= e($infoGround) ?><?= $infoAddr !== '' ? ' (' . e($infoAddr) . ')' : '' ?>.</p>
+        <?php if ($packages): ?>
+          <h3 class="tkt-info__sub tkt-info__sub--prices">Online ticket prices</h3>
+          <ul class="tkt-info__prices">
+            <?php foreach ($packages as $pk): ?>
+              <li><span><?= e((string) $pk['name']) ?></span><b><?= e(gbp((float) $pk['price'])) ?></b></li>
+            <?php endforeach; ?>
+          </ul>
+        <?php endif; ?>
+        <h3 class="tkt-info__sub">How it works</h3>
+        <ul class="tkt-info__list">
+          <li>Choose your tickets, pay securely by card and your digital tickets are emailed to you straight away.</li>
+          <li>Show the QR code on your phone (or a printout) at the turnstile &mdash; there&rsquo;s nothing to collect.</li>
+          <li>Prefer cash? You can still pay at the gate on matchday.</li>
+          <li>Need help, or have access requirements? <a href="<?= e(url('contact')) ?>">Get in touch</a> before matchday and we&rsquo;ll sort it out.</li>
+        </ul>
+      </section>
+      </div>
+      </div>
+
+      <aside class="tkt-event__side">
+        <h2 class="tkt-event__label tkt-o-order-l">Order</h2>
+        <div class="tkt-event__card tkt-order tkt-o-order">
       <?php if (!$packages): ?>
         <div class="emptystate tkt-empty">
           <p><strong>Tickets for this game aren’t on sale online yet.</strong></p>
@@ -288,12 +360,12 @@ set_meta(['title' => 'Match tickets', 'description' => 'Buy tickets for ' . club
           <p><a class="btn btn--sm" href="<?= e(url('tickets')) ?>">‹ Back to all home games</a></p>
         </div>
       <?php else: ?>
-        <form method="post" class="basket-layout" data-ticket-form>
+        <form method="post" class="tkt-orderform" data-ticket-form>
           <?= csrf_field() ?>
           <input type="hidden" name="fixture_id" value="<?= (int) $fixture['id'] ?>">
 
           <div>
-            <h2 class="tkt-h">Choose your tickets</h2>
+            <h3 class="tkt-order__h">Available tickets</h3>
             <?php
             /* Group packages by their package_group (set per template in the Hub).
                "General" always leads, "Hospitality" next, anything else after. */
@@ -364,8 +436,8 @@ set_meta(['title' => 'Match tickets', 'description' => 'Buy tickets for ' . club
             <?php endforeach; ?>
           </div>
 
-          <aside class="osummary tkt-summary">
-            <h2>Order summary</h2>
+          <div class="tkt-summary">
+            <h3 class="tkt-order__h">Order summary</h3>
             <div class="osummary__items js-tkt-items">
               <p class="tkt-summary__empty">No tickets selected yet.</p>
             </div>
@@ -373,7 +445,7 @@ set_meta(['title' => 'Match tickets', 'description' => 'Buy tickets for ' . club
               <span>Total</span><span class="js-tkt-total"><?= e(gbp(0)) ?></span>
             </div>
 
-            <h2 class="tkt-summary__details">Your details</h2>
+            <h3 class="tkt-order__h tkt-summary__details">Your details</h3>
             <label class="tkt-field">
               <span>Full name</span>
               <input name="buyer_name" autocomplete="name" value="<?= e((string) ($_POST['buyer_name'] ?? '')) ?>" required>
@@ -389,9 +461,12 @@ set_meta(['title' => 'Match tickets', 'description' => 'Buy tickets for ' . club
 
             <button type="submit" class="btn btn--lg btn--block js-tkt-submit" disabled>Continue to payment</button>
             <p class="tkt-summary__note"><?= pub_icon('basket') ?> Secure card payment via Stripe. Your tickets and QR codes are emailed to you straight away.</p>
-          </aside>
+          </div>
         </form>
       <?php endif; ?>
+        </div>
+      </aside>
+      </div>
     </div>
   </div>
 

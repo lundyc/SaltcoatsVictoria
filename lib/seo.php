@@ -16,7 +16,7 @@ const SEO_CANONICAL_PARAMS = ['page'];
 /** Routes (prefix match) that must never be indexed: transactional / private / utility. */
 const SEO_NOINDEX_ROUTES = [
     'shop/basket', 'shop/checkout', 'shop/order',
-    'tickets/order', 'table/pdf',
+    'tickets/order', 'events/order', 'table/pdf',
 ];
 
 /** Absolute URL for a site-relative path (or pass-through for absolute URLs). */
@@ -111,6 +111,17 @@ function seo_tame_caps(string $title): string
     return preg_replace_callback('/\b(Fc|Afc|Ym|Wosfl|Agm|Ko)\b/', static fn (array $m): string => strtoupper($m[1]), $t) ?? $t;
 }
 
+/** First candidate title that fits the ~60 character search-result limit, else the shortest. */
+function seo_fit_title(array $candidates, int $max = 60): string
+{
+    foreach ($candidates as $c) {
+        if (mb_strlen($c) <= $max) {
+            return $c;
+        }
+    }
+    return (string) end($candidates);
+}
+
 /** Full <title>: page title plus the club name unless already present. */
 function seo_title(): string
 {
@@ -128,13 +139,22 @@ function seo_title(): string
         || stripos($title, club('club_short_name', $clubName)) !== false) {
         return $title;
     }
-    return $title . ' | ' . $clubName;
+    $full = $title . ' | ' . $clubName;
+    // Keep within the ~60 character search-result limit: the club name is added only when it fits.
+    return mb_strlen($full) > 60 && mb_strlen($title) <= 60 ? $title : $full;
 }
 
 /** Trim a description to search-snippet length on a word boundary. */
 function seo_description(): string
 {
     $desc = trim(preg_replace('/\s+/', ' ', meta('description', club('club_name') . ' — official website. Fixtures, results, news, squad and more.')) ?? '');
+    if (mb_strlen($desc) < 70) {
+        $tail = ' Official website of ' . club('club_name') . ' — fixtures, results, news, squad and club information.';
+        if (stripos($desc, club('club_name')) !== false) {
+            $tail = ' Fixtures, results, news, squad and club information from the official website.';
+        }
+        $desc = rtrim($desc, " .—-") . '.' . $tail;
+    }
     return excerpt($desc, 160);
 }
 
@@ -145,11 +165,34 @@ function seo_default_share_image(): string
     return is_file(PUBLIC_ROOT . $rel) ? $rel : club_crest();
 }
 
-/** Absolute social-share image: page image, else the branded default card. */
+/**
+ * Share photo per site section, used when a page sets no image of its own.
+ * Longest matching route prefix wins; edit the paths to change what each section shows.
+ */
+function seo_section_share_image(): string
+{
+    static $map = [
+        'matchday-sponsorship' => '/uploads/site/match-balls.jpg',
+        'playersponsors'       => '/uploads/site/big-jays.jpg',
+        'pitchside-boards'     => '/uploads/site/pitchside-cta.jpg',
+        'partners'             => '/uploads/site/partners-board.jpg',
+        'commercial'           => '/uploads/site/sponsor-cta.jpg',
+        'hospitality'          => '/uploads/site/sponsor-cta.jpg',
+    ];
+    $route = trim(current_route(), '/');
+    foreach ($map as $prefix => $rel) {
+        if (($route === $prefix || str_starts_with($route, $prefix . '/')) && is_file(PUBLIC_ROOT . $rel)) {
+            return $rel;
+        }
+    }
+    return '';
+}
+
+/** Absolute social-share image: page image, else the section photo, else the branded default card. */
 function seo_image(): string
 {
     $img = meta('image');
-    $img = $img !== '' ? $img : seo_default_share_image();
+    $img = $img !== '' ? $img : (seo_section_share_image() ?: seo_default_share_image());
     // Social crawlers choke on multi-MB originals: hand them the resized variant.
     $file = imgopt_resolve((string) parse_url($img, PHP_URL_PATH));
     if ($file !== null && filesize($file) > 400000) {
@@ -221,6 +264,19 @@ function seo_jsonld_documents(): array
     $crumbs = seo_breadcrumb_jsonld();
     if ($crumbs !== null) {
         $docs[] = $crumbs;
+    }
+    if (!$docs && http_response_code() < 400) {
+        // Pages that describe nothing specific still identify themselves as a WebPage of the club's site.
+        $docs[] = [
+            '@context' => 'https://schema.org',
+            '@type' => 'WebPage',
+            'name' => seo_title(),
+            'description' => seo_description(),
+            'url' => seo_canonical(),
+            'inLanguage' => 'en-GB',
+            'isPartOf' => ['@type' => 'WebSite', 'name' => club('club_name'), 'url' => current_url_origin() . '/'],
+            'about' => ['@id' => current_url_origin() . '/#club'],
+        ];
     }
     $out = [];
     foreach ($docs as $doc) {
@@ -312,7 +368,7 @@ function seo_head_tags(): string
     $t .= '<meta property="og:description" content="' . e($desc) . '">' . "\n";
     $t .= '<meta property="og:image" content="' . e($image) . '">' . "\n";
     $t .= '<meta property="og:image:alt" content="' . e($clubName) . '">' . "\n";
-    $t .= '<meta name="twitter:card" content="' . (meta('image') !== '' || seo_default_share_image() !== club_crest() ? 'summary_large_image' : 'summary') . '">' . "\n";
+    $t .= '<meta name="twitter:card" content="' . (meta('image') !== '' || seo_section_share_image() !== '' || seo_default_share_image() !== club_crest() ? 'summary_large_image' : 'summary') . '">' . "\n";
     $t .= '<meta name="twitter:title" content="' . e($ogTitle) . '">' . "\n";
     $t .= '<meta name="twitter:description" content="' . e($desc) . '">' . "\n";
     $t .= '<meta name="twitter:image" content="' . e($image) . '">' . "\n";
@@ -335,4 +391,23 @@ function seo_head_tags(): string
         $t .= '<script type="application/ld+json">' . $json . '</script>' . "\n";
     }
     return $t;
+}
+
+
+/**
+ * Re-levels headings inside authored HTML so the first/highest one becomes $top (default h2),
+ * keeping the relative structure. Stops hand-written content jumping h1 -> h3/h4 on the page.
+ */
+function seo_normalize_headings(string $html, int $top = 2): string
+{
+    if ($html === '' || !preg_match_all('~<h([1-6])\b~i', $html, $m)) {
+        return $html;
+    }
+    $shift = $top - min(array_map('intval', $m[1]));
+    if ($shift === 0) {
+        return $html;
+    }
+    return (string) preg_replace_callback('~<(/?)h([1-6])\b~i', static function (array $x) use ($shift): string {
+        return '<' . $x[1] . 'h' . max(1, min(6, (int) $x[2] + $shift));
+    }, $html);
 }

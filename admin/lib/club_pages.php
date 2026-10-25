@@ -117,7 +117,12 @@ function club_page_save(PDO $pdo, ?int $id, array $data, ?int $userId = null): i
 {
     club_pages_ensure_schema($pdo);
 
-    $slug = news_slugify(trim((string) ($data['slug'] ?? ($data['title'] ?? ''))));
+    // A slug may be nested one level ("hire-the-ground/weddings"); slugify each segment.
+    $rawSlug = trim((string) ($data['slug'] ?? ($data['title'] ?? '')));
+    $slug = implode('/', array_map('news_slugify', array_slice(array_filter(explode('/', $rawSlug), 'strlen'), 0, 2)));
+    if ($slug === '') {
+        $slug = news_slugify($rawSlug);
+    }
     $fields = [
         'slug'         => $slug,
         'title'        => trim((string) ($data['title'] ?? '')),

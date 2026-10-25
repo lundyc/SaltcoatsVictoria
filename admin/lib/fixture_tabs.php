@@ -34,6 +34,12 @@ function renderFixtureTabs(int $fixtureId, int $seasonId, string $activeTab, boo
                               'href' => 'match_record_events.php?fixture_id=' . $fixtureId . '&season_id=' . $seasonId,
                               'target' => '',
                     ],
+                    'next_match' => [
+                              'label' => 'Graphics',
+                              'icon' => 'fa-image',
+                              'href' => 'match_next_match.php?fixture_id=' . $fixtureId . '&season_id=' . $seasonId,
+                              'target' => '',
+                    ],
                     'media' => [
                               'label' => 'Media',
                               'icon' => 'fa-images',

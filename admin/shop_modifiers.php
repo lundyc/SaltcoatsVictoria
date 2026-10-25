@@ -21,12 +21,14 @@ if ($isAdmin && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     }
     $action = (string) ($_POST['action'] ?? '');
     $groupId = (int) ($_POST['group_id'] ?? 0);
-    $back = '/shop_modifiers.php' . ($groupId ? '?group=' . $groupId : '');
+    $returnProduct = (int) ($_POST['return_product'] ?? 0);
+    $rp = $returnProduct > 0 ? '&return_product=' . $returnProduct : '';
+    $back = '/shop_modifiers.php' . ($groupId ? '?group=' . $groupId . $rp : ($rp !== '' ? '?' . ltrim($rp, '&') : ''));
     try {
         if ($action === 'save_group') {
             $savedId = shop_save_modifier_group($pdo, (int) ($_POST['id'] ?? 0) ?: null, $_POST);
             auditLog($pdo, 'shop_modifier_group_saved', 'Modifier group "' . (string) ($_POST['name'] ?? '') . '" (#' . $savedId . ')');
-            header('Location: /admin/shop_modifiers.php?group=' . $savedId . '&m=' . rawurlencode('Modifier saved.'));
+            header('Location: /admin/shop_modifiers.php?group=' . $savedId . $rp . '&m=' . rawurlencode('Modifier saved.'));
             exit;
         }
         if ($action === 'delete_group') {
@@ -57,7 +59,7 @@ $pageHero = [
     'eyebrow' => 'Shop',
     'title' => 'Modifiers',
     'subtitle' => 'Reusable option groups such as sizes, colours or personalisation.',
-    'actions' => [['label' => 'Back to shop', 'href' => '/shop_overview.php', 'class' => 'btn btn-outline-light btn-sm']],
+    'actions' => [],
 ];
 require_once __DIR__ . '/header.php';
 
@@ -74,10 +76,24 @@ foreach ($options as $o) {
     }
 }
 $newGroup = isset($_GET['new']);
+// Set when the admin arrived from a product's "Sizes & options" tab.
+$returnProduct = (int) ($_GET['return_product'] ?? 0);
+$returnProductRow = $returnProduct > 0 ? shop_get_product($pdo, $returnProduct) : null;
+$rpq = $returnProduct > 0 ? '&amp;return_product=' . $returnProduct : '';
+$rpField = $returnProduct > 0 ? '<input type="hidden" name="return_product" value="' . $returnProduct . '">' : '';
 ?>
 <div class="shop-admin-page">
     <nav class="hub-breadcrumb" aria-label="Breadcrumb"><a href="/admin/shop_overview.php">Shop</a> <i class="fa-solid fa-chevron-right" aria-hidden="true"></i> <span aria-current="page">Modifiers</span></nav>
 
+    <?php if ($returnProductRow): ?>
+        <div class="alert alert-info d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <span>Setting up options for <strong><?= h((string) $returnProductRow['name']) ?></strong>.</span>
+            <span class="d-flex gap-2">
+                <?php if ($group): ?><a class="btn btn-sm btn-brand" href="/admin/shop_product.php?id=<?= $returnProduct ?>&amp;add_group=<?= (int) $group['id'] ?>&amp;tab=options">Add &ldquo;<?= h((string) $group['name']) ?>&rdquo; to this product</a><?php endif; ?>
+                <a class="btn btn-sm btn-outline-secondary" href="/admin/shop_product.php?id=<?= $returnProduct ?>&amp;tab=options">Back to product</a>
+            </span>
+        </div>
+    <?php endif; ?>
     <?php if (isset($_GET['m'])): ?><div class="alert alert-success"><?= h((string) $_GET['m']) ?></div><?php endif; ?>
     <?php if (isset($_GET['e'])): ?><div class="alert alert-danger"><?= h((string) $_GET['e']) ?></div><?php endif; ?>
 
@@ -86,12 +102,12 @@ $newGroup = isset($_GET['new']);
             <section class="card hub-panel">
                 <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
                     <strong>Modifier groups</strong>
-                    <a class="btn btn-sm btn-dark" href="/admin/shop_modifiers.php?new=1">New</a>
+                    <a class="btn btn-sm btn-dark" href="/admin/shop_modifiers.php?new=1<?= $returnProduct > 0 ? '&amp;return_product=' . $returnProduct : '' ?>">New</a>
                 </div>
                 <div class="list-group list-group-flush">
                     <?php if (!$groups): ?><div class="list-group-item text-muted">None yet.</div><?php endif; ?>
                     <?php foreach ($groups as $g): ?>
-                        <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center <?= (int) $g['id'] === $selectedId ? 'active' : '' ?>" href="/admin/shop_modifiers.php?group=<?= (int) $g['id'] ?>">
+                        <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center <?= (int) $g['id'] === $selectedId ? 'active' : '' ?>" href="/admin/shop_modifiers.php?group=<?= (int) $g['id'] ?><?= $rpq ?>">
                             <span><?= h((string) $g['name']) ?><br><small class="<?= (int) $g['id'] === $selectedId ? 'text-white-50' : 'text-muted' ?>"><?= h((string) $g['selection_type']) ?> · <?= (int) $g['option_count'] ?> options<?= (int) $g['is_required'] === 1 ? ' · required' : '' ?></small></span>
                         </a>
                     <?php endforeach; ?>
@@ -107,6 +123,7 @@ $newGroup = isset($_GET['new']);
                         <?= csrf_field() ?>
                         <input type="hidden" name="action" value="save_group">
                         <?php if ($group): ?><input type="hidden" name="id" value="<?= (int) $group['id'] ?>"><?php endif; ?>
+                        <?php if ($returnProduct > 0): ?><input type="hidden" name="return_product" value="<?= $returnProduct ?>"><?php endif; ?>
                         <div class="col-md-6"><label class="form-label">Name</label>
                             <input class="form-control" name="name" required value="<?= h((string) ($group['name'] ?? '')) ?>" placeholder="Kit Size"></div>
                         <div class="col-md-3"><label class="form-label">Type</label>
@@ -155,9 +172,9 @@ $newGroup = isset($_GET['new']);
                                     <td class="text-end"><?= $o['stock_qty'] === null ? '∞' : (int) $o['stock_qty'] ?></td>
                                     <td><?= (int) $o['is_active'] === 1 ? '<span class="badge text-bg-success">Yes</span>' : '<span class="badge text-bg-secondary">No</span>' ?></td>
                                     <td class="text-end text-nowrap">
-                                        <a class="btn btn-sm btn-outline-secondary" href="/admin/shop_modifiers.php?group=<?= (int) $group['id'] ?>&option=<?= (int) $o['id'] ?>">Edit</a>
+                                        <a class="btn btn-sm btn-outline-secondary" href="/admin/shop_modifiers.php?group=<?= (int) $group['id'] ?>&option=<?= (int) $o['id'] ?><?= $rpq ?>">Edit</a>
                                         <form method="post" class="d-inline" data-confirm="Remove this option?" data-confirm-action="Remove">
-                                            <?= csrf_field() ?><input type="hidden" name="action" value="delete_option"><input type="hidden" name="group_id" value="<?= (int) $group['id'] ?>"><input type="hidden" name="id" value="<?= (int) $o['id'] ?>">
+                                            <?= csrf_field() ?><input type="hidden" name="action" value="delete_option"><?= $rpField ?><input type="hidden" name="group_id" value="<?= (int) ($group['id'] ?? 0) ?>"><input type="hidden" name="group_id" value="<?= (int) $group['id'] ?>"><input type="hidden" name="id" value="<?= (int) $o['id'] ?>">
                                             <button class="btn btn-sm btn-outline-danger" type="submit">×</button>
                                         </form>
                                     </td>
@@ -170,7 +187,7 @@ $newGroup = isset($_GET['new']);
                     <h3 class="h6 fw-bold"><?= $editOption ? 'Edit option' : 'Add option' ?></h3>
                     <form method="post" class="row g-2">
                         <?= csrf_field() ?>
-                        <input type="hidden" name="action" value="save_option">
+                        <input type="hidden" name="action" value="save_option"><?= $rpField ?>
                         <input type="hidden" name="group_id" value="<?= (int) $group['id'] ?>">
                         <?php if ($editOption): ?><input type="hidden" name="id" value="<?= (int) $editOption['id'] ?>"><?php endif; ?>
                         <div class="col-md-3"><label class="form-label">Group / heading</label>
@@ -200,7 +217,7 @@ $newGroup = isset($_GET['new']);
                         </div>
                         <div class="col-12 d-flex gap-2">
                             <button class="btn btn-dark" type="submit"><?= $editOption ? 'Save option' : 'Add option' ?></button>
-                            <?php if ($editOption): ?><a class="btn btn-outline-secondary" href="/admin/shop_modifiers.php?group=<?= (int) $group['id'] ?>">Cancel</a><?php endif; ?>
+                            <?php if ($editOption): ?><a class="btn btn-outline-secondary" href="/admin/shop_modifiers.php?group=<?= (int) $group['id'] ?><?= $rpq ?>">Cancel</a><?php endif; ?>
                         </div>
                     </form>
                 </section>

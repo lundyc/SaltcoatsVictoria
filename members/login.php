@@ -5,6 +5,9 @@ declare(strict_types=1);
 // hub/login.php's look exactly. Re-does the slice of header.php's bootstrap
 // this page actually needs: staff-session capture + auto-login, and the
 // already-authenticated redirect.
+require_once __DIR__ . '/../bootstrap.php';
+require_once __DIR__ . '/_shell.php';
+require_once __DIR__ . '/../admin/lib/member_google.php';
 require_once __DIR__ . '/../admin/auth.php';
 require_once __DIR__ . '/../admin/member_auth.php';
 require_once __DIR__ . '/../admin/lib/functions.php';
@@ -26,6 +29,10 @@ if (member_auth_is_authenticated()) {
 }
 
 $error = '';
+if (!empty($_SESSION['member_flash_error'])) {
+    $error = (string) $_SESSION['member_flash_error'];
+    unset($_SESSION['member_flash_error']);
+}
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     $identifier = trim((string) ($_POST['email'] ?? ''));
     $password = (string) ($_POST['password'] ?? '');
@@ -45,17 +52,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     }
 }
 ?>
-<!doctype html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Login - <?= h(APP_NAME) ?></title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="/admin/assets/css/style.css" rel="stylesheet">
-    <link rel="stylesheet" href="/admin/assets/css/login.css">
-</head>
-<body>
+<?php member_auth_page_open('Log in'); ?>
     <div class="login-card">
         <img
             src="/admin/Saltcoats Victoria FC -White_Transparent.png"
@@ -86,17 +83,12 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 <div class="login-caps-lock" id="capsLockNotice" role="status" hidden>Caps Lock is on.</div>
             </div>
             <button type="submit" class="btn btn-login">Log in</button>
+            <?php if (member_google_configured()): ?>
+                <div class="login-or"><span>or</span></div>
+                <a class="btn-google" href="google_start.php"><?= member_google_logo_svg() ?>Continue with Google</a>
+            <?php endif; ?>
             <div class="text-center mt-3">
-                <a href="forgot_password.php">Set up or reset your password</a>
-            </div>
-            <div class="text-center mt-2">
-                <a href="register.php">New here? Create an account</a>
-            </div>
-            <div class="text-center mt-3 small">
-                <a href="matches.php">Browse fixtures, results &amp; the league table</a>
-            </div>
-            <div class="text-center mt-2 small">
-                Club staff? <a href="/admin/login.php">Sign in to the Hub</a>
+                <a href="forgot_password.php">Forgot password?</a>
             </div>
         </form>
     </div>
@@ -117,5 +109,4 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             });
         }());
     </script>
-</body>
-</html>
+<?php member_auth_page_close(); ?>

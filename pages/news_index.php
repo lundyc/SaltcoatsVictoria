@@ -61,8 +61,8 @@ seo_breadcrumbs($activeCategory !== '' ? [['News', url('news')], [$activeCategor
       <div class="emptystate"><p>No articles here yet — check back soon.</p></div>
     <?php else: ?>
       <div class="news-grid">
-        <?php foreach ($articles as $article): ?>
-          <?php partial('news_card', ['article' => $article]); ?>
+        <?php foreach ($articles as $i => $article): ?>
+          <?php partial('news_card', ['article' => $article, 'priority' => $i === array_key_first($articles), 'headingLevel' => 2]); ?>
         <?php endforeach; ?>
       </div>
 

@@ -57,6 +57,14 @@ function getAccessRoleCapabilitySlugs(PDO $pdo, int $roleId): array
  */
 function setAccessRoleCapabilities(PDO $pdo, int $roleId, array $capabilityIds): void
 {
+    $role = getAccessRole($pdo, $roleId);
+    if ($role === null) {
+        throw new InvalidArgumentException('Choose a valid role.');
+    }
+    if ((string) $role['slug'] === 'member' && $capabilityIds !== []) {
+        throw new InvalidArgumentException('The Member role cannot be granted administration capabilities.');
+    }
+
     $pdo->prepare('DELETE FROM access_template_capabilities WHERE template_id = :role_id')->execute([':role_id' => $roleId]);
     if ($capabilityIds === []) {
         return;
@@ -178,20 +186,64 @@ function getPersonAccessRoles(PDO $pdo, int $personId): array
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
+/** The one WordPress-style role currently assigned to this person. */
+function getPersonPrimaryAccessRole(PDO $pdo, int $personId): ?array
+{
+    $stmt = $pdo->prepare('SELECT t.*
+        FROM person_access_templates pat
+        JOIN access_templates t ON t.id = pat.template_id
+        WHERE pat.person_id = :person_id
+        ORDER BY t.bypass_all DESC, t.sort_order, t.id
+        LIMIT 1');
+    $stmt->execute([':person_id' => $personId]);
+    return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+}
+
+/** Assign exactly one primary role, replacing the previous assignment. */
+function setPersonPrimaryAccessRole(PDO $pdo, int $personId, int $templateId): array
+{
+    $role = getAccessRole($pdo, $templateId);
+    if ($role === null) {
+        throw new InvalidArgumentException('Choose a valid role.');
+    }
+
+    setPersonAccessRoles($pdo, $personId, [$templateId]);
+    return $role;
+}
+
+/** Ensure the default Member role exists and return it. */
+function getMemberAccessRole(PDO $pdo): array
+{
+    $stmt = $pdo->query("SELECT * FROM access_templates WHERE slug = 'member' LIMIT 1");
+    $role = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$role) {
+        throw new RuntimeException('The Member access role has not been installed.');
+    }
+    return $role;
+}
+
 /**
- * Replaces the full set of access roles assigned to a person — the save
- * handler for club_person.php's "Access roles" panel.
+ * Compatibility entry point for assigning the person's one primary role.
+ * Multiple roles are rejected so older callers cannot bypass the invariant.
  *
  * @param list<int> $roleIds
  */
 function setPersonAccessRoles(PDO $pdo, int $personId, array $roleIds): void
 {
-    $pdo->prepare('DELETE FROM person_access_templates WHERE person_id = :person_id')->execute([':person_id' => $personId]);
-    $insert = $pdo->prepare('INSERT IGNORE INTO person_access_templates (person_id, template_id) VALUES (:person_id, :role_id)');
-    foreach ($roleIds as $roleId) {
-        $insert->execute([':person_id' => $personId, ':role_id' => (int) $roleId]);
+    $roleIds = array_values(array_unique(array_map('intval', $roleIds)));
+    if (count($roleIds) !== 1 || $roleIds[0] <= 0) {
+        throw new InvalidArgumentException('Choose exactly one primary role.');
     }
-    identityAuditLog($pdo, 'person_access_templates_changed', 'Updated access roles for person #' . $personId);
+    if (getAccessRole($pdo, $roleIds[0]) === null) {
+        throw new InvalidArgumentException('Choose a valid role.');
+    }
+
+    $pdo->prepare(
+        'INSERT INTO person_access_templates (person_id, template_id)
+         VALUES (:person_id, :role_id)
+         ON DUPLICATE KEY UPDATE template_id = VALUES(template_id)'
+    )->execute([':person_id' => $personId, ':role_id' => $roleIds[0]]);
+    identityAuditLog($pdo, 'person_access_template_changed', 'Updated primary access role for person #' . $personId);
 }
 
 
@@ -245,4 +297,32 @@ function removePersonAccessOverride(PDO $pdo, int $personId, int $overrideId): v
     $pdo->prepare('DELETE FROM person_access_overrides WHERE id = :id AND person_id = :person')
         ->execute([':id' => $overrideId, ':person' => $personId]);
     identityAuditLog($pdo, 'person_access_override_removed', "Removed access override #{$overrideId} for person #{$personId}");
+}
+
+/**
+ * Give a person exactly one access role, WordPress-style. The caller holds the
+ * transaction. Changing or removing Administrator needs an Administrator, and
+ * removing it needs another active Administrator left behind.
+ */
+function person_apply_access_role(PDO $pdo, int $personId, int $templateId): void
+{
+    $newRole = getAccessRole($pdo, $templateId);
+    if (!$newRole) {
+        throw new InvalidArgumentException('Choose a valid role.');
+    }
+    $currentRole = getPersonPrimaryAccessRole($pdo, $personId);
+    $changesAdministrator = (int) ($newRole['bypass_all'] ?? 0) === 1
+        || (int) ($currentRole['bypass_all'] ?? 0) === 1;
+    if ($changesAdministrator && !hub_auth_is_admin()) {
+        throw new RuntimeException('Only an Administrator can assign or remove the Administrator role.');
+    }
+    if ((int) ($currentRole['bypass_all'] ?? 0) === 1 && (int) $newRole['bypass_all'] !== 1) {
+        assertPersonMayLoseLoginOrAdministrator($pdo, $personId);
+    }
+
+    setPersonPrimaryAccessRole($pdo, $personId, $templateId);
+    if (!$currentRole || (int) $currentRole['id'] !== (int) $newRole['id']) {
+        $pdo->prepare('UPDATE accounts SET auth_version = auth_version + 1 WHERE person_id = :person')
+            ->execute([':person' => $personId]);
+    }
 }

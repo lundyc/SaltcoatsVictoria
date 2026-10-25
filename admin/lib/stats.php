@@ -20,6 +20,47 @@ declare(strict_types=1);
  * @param list<int> $fixtureIds empty = every fixture
  * @return array<int, list<array<string, mixed>>>
  */
+/**
+ * Friendlies never count in the stats. A competition is a friendly when its type is
+ * "friendly" in match_competitions, or its name says so.
+ *
+ * @return list<string> names of friendly competitions
+ */
+function hub_stats_friendly_names(PDO $pdo): array
+{
+    static $names = null;
+    if ($names === null) {
+        try {
+            $names = array_map('strval', $pdo->query("SELECT name FROM match_competitions WHERE competition_type = 'friendly'")->fetchAll(PDO::FETCH_COLUMN));
+        } catch (Throwable $e) {
+            $names = [];
+        }
+    }
+    return $names;
+}
+
+function hub_stats_is_friendly(PDO $pdo, ?string $competition): bool
+{
+    $competition = (string)$competition;
+    return $competition !== '' && (stripos($competition, 'friendly') !== false || in_array($competition, hub_stats_friendly_names($pdo), true));
+}
+
+/** Drop friendlies from a list of fixture rows (each with a "competition" key). */
+function hub_stats_exclude_friendlies(PDO $pdo, array $fixtures): array
+{
+    return array_values(array_filter($fixtures, static fn(array $f): bool => !hub_stats_is_friendly($pdo, $f['competition'] ?? '')));
+}
+
+/** SQL condition (starts with AND) that keeps friendlies out of a match_fixtures query. */
+function hub_stats_not_friendly_sql(PDO $pdo, string $column = 'competition'): string
+{
+    $sql = " AND ($column IS NULL OR $column NOT LIKE '%friendly%')";
+    foreach (hub_stats_friendly_names($pdo) as $n) {
+        $sql .= " AND ($column IS NULL OR $column <> " . $pdo->quote($n) . ')';
+    }
+    return $sql;
+}
+
 function hub_matchday_events_by_fixture(PDO $pdo, array $fixtureIds = []): array
 {
     require_once __DIR__ . '/matchday_record.php';
@@ -198,7 +239,7 @@ function hub_stats_compare_build(PDO $pdo, array $allSeasons, array $opts): arra
         $stmt = $pdo->prepare(
             "SELECT DISTINCT competition FROM match_fixtures
              WHERE season_id IN ($ph) AND status = 'played'
-               AND competition IS NOT NULL AND competition <> '' ORDER BY competition"
+               AND competition IS NOT NULL AND competition <> ''" . hub_stats_not_friendly_sql($pdo) . " ORDER BY competition"
         );
         $stmt->execute($seasonIds);
         $competitionsAvailable = array_map('strval', $stmt->fetchAll(PDO::FETCH_COLUMN));
@@ -256,7 +297,7 @@ function hub_stats_compare_build(PDO $pdo, array $allSeasons, array $opts): arra
     $stmt = $pdo->prepare('SELECT * FROM match_fixtures WHERE season_id = ? AND status = ? ORDER BY match_date ASC, kickoff_time ASC, id ASC');
     foreach ($seasonIds as $sid) {
         $stmt->execute([$sid, 'played']);
-        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $rows = hub_stats_exclude_friendlies($pdo, $stmt->fetchAll(PDO::FETCH_ASSOC));
         if ($venue !== '') {
             $want = $venue === 'home' ? 1 : 0;
             $rows = array_values(array_filter($rows, static fn(array $f): bool => (int)$f['is_home'] === $want));
@@ -427,7 +468,7 @@ function hub_player_stat_match_rows(
     $stmt = $pdo->prepare('SELECT * FROM match_fixtures WHERE season_id = ? AND status = ? ORDER BY match_date ASC, kickoff_time ASC, id ASC');
     foreach ($seasonIds as $sid) {
         $stmt->execute([$sid, 'played']);
-        $fixtures = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $fixtures = hub_stats_exclude_friendlies($pdo, $stmt->fetchAll(PDO::FETCH_ASSOC));
         if ($venue !== '') {
             $want = $venue === 'home' ? 1 : 0;
             $fixtures = array_values(array_filter($fixtures, static fn(array $f): bool => (int)$f['is_home'] === $want));
@@ -667,7 +708,7 @@ function hub_player_all_events_match_rows(
     $stmt = $pdo->prepare('SELECT * FROM match_fixtures WHERE season_id = ? AND status = ? ORDER BY match_date ASC, kickoff_time ASC, id ASC');
     foreach ($seasonIds as $sid) {
         $stmt->execute([$sid, 'played']);
-        $fixtures = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $fixtures = hub_stats_exclude_friendlies($pdo, $stmt->fetchAll(PDO::FETCH_ASSOC));
         if ($venue !== '') {
             $want = $venue === 'home' ? 1 : 0;
             $fixtures = array_values(array_filter($fixtures, static fn(array $f): bool => (int)$f['is_home'] === $want));
@@ -866,7 +907,7 @@ function hub_player_match_detail_pdf_render(
     require_once __DIR__ . '/site_settings.php';
     require_once __DIR__ . '/functions.php';
     $settings = site_settings_all($pdo);
-    $clubName = $settings['club_name'] ?: 'MyClubHub';
+    $clubName = $settings['club_name'] ?: 'Saltcoats Victoria';
 
     $html = '<!doctype html><html><head><meta charset="UTF-8"><style>
         @page { margin: 36px 40px; }
@@ -942,4 +983,161 @@ function hub_player_match_detail_pdf_render(
     }
     $safeName = (string)preg_replace('/[^A-Za-z0-9]+/', '-', $playerName);
     $dompdf->stream(trim($safeName, '-') . '-match-by-match.pdf', ['Attachment' => $forceDownload]);
+}
+
+/* -------------------------------------------------------------------------
+ * Players tab model: player contributions for the screen (stats.php?tab=players)
+ * and the PDF export (stats_players_pdf.php).
+ * ---------------------------------------------------------------------- */
+
+/** Played fixtures for a season in the given competitions, optionally only home or away. */
+function hub_stats_player_fixtures(PDO $pdo, int $seasonId, array $competitions, string $venue): array
+{
+    $stmt = $pdo->prepare('SELECT * FROM match_fixtures WHERE season_id = ? AND status = ? ORDER BY match_date ASC, kickoff_time ASC, id ASC');
+    $stmt->execute([$seasonId, 'played']);
+    $fixtures = [];
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $f) {
+        if ($venue !== '' && (int)$f['is_home'] !== ($venue === 'home' ? 1 : 0)) continue;
+        if (!in_array((string)($f['competition'] ?? ''), $competitions, true)) continue;
+        $fixtures[] = $f;
+    }
+    return $fixtures;
+}
+
+/** Recorded match events keyed by fixture id, from the matches data file. */
+function hub_stats_events_by_fixture(string $dataFile): array
+{
+    $eventsByFixture = [];
+    $records = is_readable($dataFile) ? json_decode((string)file_get_contents($dataFile), true) : null;
+    foreach (is_array($records) ? $records : [] as $record) {
+        if (is_array($record) && isset($record['id'])) $eventsByFixture[(int)$record['id']] = array_values(array_filter(is_array($record['events'] ?? null) ? $record['events'] : [], 'is_array'));
+    }
+    return $eventsByFixture;
+}
+
+/**
+ * Player rows for the Players tab, sorted by the requested column (anything unknown falls back to goals,
+ * high to low) and split into the current squad and players whose record says they have left.
+ *
+ * @param list<array<string,mixed>> $fixtures from hub_stats_player_fixtures()
+ * @param array<int,list<array<string,mixed>>> $eventsByFixture from hub_stats_events_by_fixture()
+ * @return array{sorts:array<string,string>,sort:string,direction:string,current:list<array<string,mixed>>,left:list<array<string,mixed>>}
+ */
+function hub_stats_player_contributions(PDO $pdo, int $seasonId, array $fixtures, array $eventsByFixture, string $dataFile, mixed $sort, mixed $direction): array
+{
+    // Include names in historic lineups/events even when their player record has since left the club.
+    $names = [];
+    foreach ($fixtures as $f) {
+        foreach (['starting11_starters_json', 'starting11_substitutes_json'] as $field) {
+            $lineup = json_decode((string)($f[$field] ?? '[]'), true);
+            foreach (is_array($lineup) ? $lineup : [] as $name) if (is_string($name) && trim($name) !== '') $names[hub_player_stats_normalize_name($name)] = $name;
+        }
+        foreach ($eventsByFixture[(int)$f['id']] ?? [] as $event) {
+            if (hub_player_stats_is_club_player_event($event) && trim((string)($event['player'] ?? '')) !== '') $names[hub_player_stats_normalize_name((string)$event['player'])] = (string)$event['player'];
+        }
+    }
+    $players = [];
+    foreach ($names as $name) $players[] = ['name' => $name] + hub_player_match_stats($pdo, $seasonId, $name, $dataFile, $fixtures, $eventsByFixture);
+
+    $sorts = ['name' => 'Player', 'appearances' => 'Apps', 'starts' => 'Starts', 'substitute_appearances' => 'Sub apps', 'minutes_played' => 'Minutes', 'goals' => 'Goals', 'yellow_cards' => 'Yellow cards', 'red_cards' => 'Red cards', 'clean_sheets' => 'Clean sheets'];
+    $sort = is_string($sort) && isset($sorts[$sort]) ? $sort : 'goals';
+    $direction = is_string($direction) && in_array($direction, ['asc', 'desc'], true) ? $direction : ($sort === 'name' ? 'asc' : 'desc');
+    usort($players, static function (array $a, array $b) use ($sort, $direction): int {
+        // Keep the displayed em dashes below goalkeeper clean-sheet values.
+        if ($sort === 'clean_sheets' && $a['is_goalkeeper'] !== $b['is_goalkeeper']) {
+            return $a['is_goalkeeper'] ? -1 : 1;
+        }
+        $comparison = $sort === 'name' ? strcasecmp($a['name'], $b['name']) : ($a[$sort] <=> $b[$sort]);
+        return ($direction === 'asc' ? $comparison : -$comparison) ?: strcasecmp($a['name'], $b['name']);
+    });
+
+    // Players whose record says they have left get their own table under the current squad.
+    $leftNames = hub_player_stats_left_names($pdo);
+    $table = ['sorts' => $sorts, 'sort' => $sort, 'direction' => $direction, 'current' => [], 'left' => []];
+    foreach ($players as $player) {
+        $table[isset($leftNames[hub_player_stats_normalize_name($player['name'])]) ? 'left' : 'current'][] = $player;
+    }
+    return $table;
+}
+
+/**
+ * PDF of the Players tab table, laid out like the player PDFs.
+ *
+ * @param array{sorts:array<string,string>,sort:string,direction:string,current:list<array<string,mixed>>,left:list<array<string,mixed>>} $table from hub_stats_player_contributions()
+ */
+function hub_stats_players_pdf_render(PDO $pdo, string $subtitle, array $table): void
+{
+    require_once __DIR__ . '/site_settings.php';
+    $settings = site_settings_all($pdo);
+    $clubName = $settings['club_name'] ?: 'Saltcoats Victoria';
+
+    $html = '<!doctype html><html><head><meta charset="UTF-8"><style>
+        @page { margin: 36px 40px; }
+        body { font-family: DejaVu Sans, Arial, sans-serif; color:#21141a; font-size:11px; margin:0; }
+        h1 { margin:0 0 2px; color:#4b0818; font-size:20px; }
+        h2 { margin:16px 0 0; color:#4b0818; font-size:13px; }
+        .muted { color:#6f6470; }
+        .note { color:#6f6470; font-size:9px; margin:6px 0 0; }
+        table.items { width:100%; border-collapse:collapse; margin-top:8px; }
+        thead { display:table-header-group; }
+        tr { page-break-inside:avoid; }
+        table.items th { background:#4b0818; color:#fff; text-align:left; font-size:9px; text-transform:uppercase; letter-spacing:.03em; padding:5px 6px; }
+        table.items td { border-bottom:1px solid #eadfdf; padding:5px 6px; vertical-align:top; }
+        table.items td.num, table.items th.num { text-align:right; white-space:nowrap; }
+    </style></head><body>';
+
+    $html .= '<div><strong>' . h($clubName) . '</strong></div>';
+    $html .= '<h1>Player contributions</h1>';
+    $html .= '<div class="muted">' . h($subtitle) . '</div>';
+    $html .= '<div class="muted">Generated ' . h(date('d/m/Y H:i')) . '</div>';
+    $html .= '<p class="note">From recorded lineups and match events. Minutes are estimated over 90 minutes; unused substitutes do not count as appearances. Clean sheets apply to the starting goalkeeper.</p>';
+
+    $hasPlayers = $table['current'] || $table['left'];
+    $groups = ['Current' => $table['current']];
+    if ($table['left']) {
+        $groups['Left'] = $table['left'];
+    }
+    foreach ($groups as $label => $rows) {
+        $html .= '<h2>' . h($label) . '</h2><table class="items"><thead><tr>';
+        foreach ($table['sorts'] as $key => $heading) {
+            $html .= '<th' . ($key === 'name' ? '' : ' class="num"') . '>' . h($heading) . '</th>';
+        }
+        $html .= '</tr></thead><tbody>';
+        foreach ($rows as $player) {
+            $html .= '<tr><td>' . h((string)$player['name']) . '</td>';
+            foreach (['appearances', 'starts', 'substitute_appearances', 'minutes_played', 'goals', 'yellow_cards', 'red_cards', 'clean_sheets'] as $key) {
+                $value = $key === 'clean_sheets' && !$player['is_goalkeeper'] ? '&#8212;' : (string)(int)$player[$key];
+                $html .= '<td class="num">' . $value . '</td>';
+            }
+            $html .= '</tr>';
+        }
+        if ($rows === []) {
+            $html .= '<tr><td colspan="' . count($table['sorts']) . '">' . ($hasPlayers ? 'No current players in these matches.' : 'No player lineups or events recorded for these matches yet.') . '</td></tr>';
+        }
+        $html .= '</tbody></table>';
+    }
+    $html .= '</body></html>';
+
+    if (!class_exists(Dompdf\Dompdf::class)) {
+        $autoloaders = [dirname(__DIR__) . '/vendor/autoload.php', dirname(__DIR__, 2) . '/project_1/vendor/autoload.php'];
+        foreach ($autoloaders as $autoloader) {
+            if (is_file($autoloader)) {
+                require_once $autoloader;
+                break;
+            }
+        }
+    }
+    if (!class_exists(Dompdf\Dompdf::class)) {
+        throw new RuntimeException('PDF export is unavailable.');
+    }
+
+    $dompdf = new Dompdf\Dompdf();
+    $dompdf->loadHtml($html);
+    $dompdf->setPaper('A4', 'portrait');
+    $dompdf->render();
+
+    if (ob_get_length() !== false) {
+        ob_clean();
+    }
+    $dompdf->stream('player-contributions-' . date('Ymd') . '.pdf', ['Attachment' => true]);
 }

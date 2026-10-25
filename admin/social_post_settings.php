@@ -66,6 +66,9 @@ function social_post_content_definitions(string $channel): array
         'yellow_card' => "🟨 {Minute} YELLOW CARD | {Team Full}",
         'red_card' => "🟥 {Minute} RED CARD | {Team Full}",
         'penalty' => "⚠️ {Minute} PENALTY | {Team Full}",
+        'penalty_awarded' => "⚠️ {Minute} PENALTY AWARDED | {Team Full}",
+        'penalty_saved' => "🧤 {Minute} PENALTY SAVED!\n\n{Player} keeps it out.\n\n{Score Full}",
+        'penalty_missed' => "❌ {Minute} PENALTY MISSED\n\n{Score Full}",
         'match_update' => "{Event Headline}\n{Score Full}",
     ];
 
@@ -83,6 +86,9 @@ function social_post_content_definitions(string $channel): array
         'yellow_card' => "🟨 {Minute} Yellow card\n\n{Team Full}",
         'red_card' => "🟥 {Minute} RED CARD\n\n{Team Full}",
         'penalty' => "⚠️ {Minute} PENALTY\n\n{Team Full}",
+        'penalty_awarded' => "⚠️ {Minute} PENALTY AWARDED\n\n{Team Full}",
+        'penalty_saved' => "🧤 {Minute} PENALTY SAVED\n\n{Player}\n\n{Score Full}",
+        'penalty_missed' => "❌ {Minute} PENALTY MISSED\n\n{Score Full}",
         'match_update' => "{Event Headline}\n{Score Full}",
     ];
 
@@ -104,6 +110,9 @@ function social_post_content_definitions(string $channel): array
         'yellow_card' => ['label' => 'Yellow Card', 'default' => $liveTemplates['yellow_card']],
         'red_card' => ['label' => 'Red Card', 'default' => $liveTemplates['red_card']],
         'penalty' => ['label' => 'Penalty', 'default' => $liveTemplates['penalty']],
+        'penalty_awarded' => ['label' => 'Penalty Awarded', 'default' => $liveTemplates['penalty_awarded']],
+        'penalty_saved' => ['label' => 'Penalty Saved', 'default' => $liveTemplates['penalty_saved']],
+        'penalty_missed' => ['label' => 'Penalty Missed', 'default' => $liveTemplates['penalty_missed']],
         'match_update' => ['label' => 'General Match Update', 'default' => $liveTemplates['match_update']],
         'sponsor_shoutout' => ['label' => 'Match Sponsors', 'default' => "🙌 TODAY'S MATCH SPONSORS 🙌\n\n{Sponsor Shoutout Lines}\n\nThank you for your support of {Home Team} v {Away Team}!\n\nOur Club. Our Town. 🔴🟡"],
     ];

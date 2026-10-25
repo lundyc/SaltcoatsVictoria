@@ -5,7 +5,7 @@ declare(strict_types=1);
 if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }
 require_once __DIR__ . '/../lib/mobile_api/bootstrap.php';
 
-use MyClubHub\Api\{Application, Auth, Request, Resources};
+use SaltcoatsApi\Api\{Application, Auth, Request, Resources};
 
 function testConnection(?string $database = null): PDO
 {
@@ -19,7 +19,7 @@ if (($argv[1] ?? '') === '--refresh-worker') {
     $db = $argv[2] ?? '';
     if (!preg_match('/^mch_api_test_[a-f0-9]{16}$/D', $db)) exit(2);
     $p = testConnection($db);
-    $app = new Application($p, MyClubHub\Api\configuration());
+    $app = new Application($p, SaltcoatsApi\Api\configuration());
     $token = trim(stream_get_contents(STDIN));
     $res = $app->handle(new Request('POST', '/api/v1/auth/refresh', [], ['content-type' => 'application/json'], json_encode(['refresh_token' => $token]), '192.0.2.250'));
     echo $res->status;
@@ -40,7 +40,7 @@ function check(bool $condition, string $message): void
 
 try {
     $p = testConnection($db);
-    $source = MyClubHub\Api\connect(MyClubHub\Api\configuration());
+    $source = SaltcoatsApi\Api\connect(SaltcoatsApi\Api\configuration());
     $tables = ['accounts','people','season_ticket_holders','identity_migration_map','orders','order_items','entitlements','ticket_credentials',
         'match_tickets','season_passes','season_ticket_types','seasons','match_fixtures','match_opponents','players','player_website_photos',
         'news_articles','site_settings','league_table_history','admissions'];
@@ -95,7 +95,7 @@ try {
     }
     // Same email alone must never grant order access.
     $insert('orders', ['id' => 3, 'customer_name' => 'Guest', 'customer_email' => 'test1@example.invalid', 'status' => 'paid']);
-    $config = MyClubHub\Api\configuration();
+    $config = SaltcoatsApi\Api\configuration();
     $app = new Application($p, $config);
     $samples = [];
     $call = static function (string $method, string $path, ?array $body = null, ?string $token = null, array $query = [], array $headers = [], bool $secure = true) use ($app, &$samples) {
@@ -226,7 +226,7 @@ try {
     $limiter = new Auth($p, str_repeat('f',32));
     $limiter->rateLimit('test-limit',1,900);
     try { $limiter->rateLimit('test-limit',1,900); throw new RuntimeException('Limit not enforced'); }
-    catch (MyClubHub\Api\ApiError $e) { check($e->status===429 && (int)$e->headers['Retry-After']>0, 'atomic rate limit and retry delay'); }
+    catch (SaltcoatsApi\Api\ApiError $e) { check($e->status===429 && (int)$e->headers['Retry-After']>0, 'atomic rate limit and retry delay'); }
     check(!str_contains(json_encode($p->query('SELECT * FROM mobile_api_audit')->fetchAll()), $password), 'audit trail excludes passwords');
     $spec = $call('GET', '/openapi.json');
     check($spec->status===200 && isset($spec->body['openapi']), 'OpenAPI document served');

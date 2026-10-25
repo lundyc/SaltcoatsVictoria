@@ -170,6 +170,218 @@ function leagueTableHistoryParseSeasonLabel(string $raw): ?array
 }
 
 /**
+ * Find (by start date, then exact name) or create the season for a parsed
+ * label. Matching on the computed start date first is the reliable key: two
+ * imports of "1988-89" always compute 1988-07-01 however the name is
+ * punctuated, which is how duplicate rows for one season used to appear.
+ *
+ * @param array{name:string,start:string,end:string} $spec
+ * @return array{id:int,name:string,created:bool}
+ */
+function leagueTableHistoryEnsureSeason(PDO $pdo, array $spec): array
+{
+    ensureSeasonSchema($pdo);
+    $stmt = $pdo->prepare('SELECT id, name FROM seasons WHERE start_date = ? LIMIT 1');
+    $stmt->execute([$spec['start']]);
+    $found = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$found) {
+        $stmt = $pdo->prepare('SELECT id, name FROM seasons WHERE name = ? LIMIT 1');
+        $stmt->execute([$spec['name']]);
+        $found = $stmt->fetch(PDO::FETCH_ASSOC);
+    }
+    if ($found) {
+        return ['id' => (int) $found['id'], 'name' => (string) $found['name'], 'created' => false];
+    }
+
+    $ins = $pdo->prepare('INSERT INTO seasons (name, start_date, end_date, is_current, is_locked) VALUES (?, ?, ?, 0, 1)');
+    $ins->execute([$spec['name'], $spec['start'], $spec['end']]);
+    return ['id' => (int) $pdo->lastInsertId(), 'name' => $spec['name'], 'created' => true];
+}
+
+/** @return array{id:int,name:string,created:bool}|null null when no name is given. */
+function leagueTableHistoryEnsureCompetition(PDO $pdo, string $name): ?array
+{
+    $name = trim($name);
+    if ($name === '') {
+        return null;
+    }
+    $stmt = $pdo->prepare('SELECT id FROM match_competitions WHERE name = ?');
+    $stmt->execute([$name]);
+    $id = (int) $stmt->fetchColumn();
+    $created = false;
+    if ($id === 0) {
+        $ins = $pdo->prepare("INSERT INTO match_competitions (name, competition_type, is_league) VALUES (?, 'league', 1)");
+        $ins->execute([$name]);
+        $id = (int) $pdo->lastInsertId();
+        $created = true;
+    }
+    return ['id' => $id, 'name' => $name, 'created' => $created];
+}
+
+/**
+ * Standings rows as stored in league_table_history: numbers as ints, no live
+ * "form" data (it only means something for the current season).
+ *
+ * @param array<int, array<string, mixed>> $rows
+ * @return list<array<string, mixed>>
+ */
+function leagueTableHistoryNormalizeRows(array $rows): array
+{
+    $out = [];
+    foreach ($rows as $i => $row) {
+        $club = trim((string) ($row['club'] ?? ''));
+        if ($club === '') {
+            continue;
+        }
+        $out[] = [
+            'pos' => (int) ($row['pos'] ?? 0) ?: $i + 1,
+            'club' => $club,
+            'p' => (int) ($row['p'] ?? 0),
+            'w' => (int) ($row['w'] ?? 0),
+            'd' => (int) ($row['d'] ?? 0),
+            'l' => (int) ($row['l'] ?? 0),
+            'f' => (int) ($row['f'] ?? 0),
+            'a' => (int) ($row['a'] ?? 0),
+            'gd' => (int) ($row['gd'] ?? 0),
+            'pts' => (int) ($row['pts'] ?? 0),
+            'logo' => (string) ($row['logo'] ?? ''),
+        ];
+    }
+    return $out;
+}
+
+/**
+ * Fetch a WOSFL standings page once and parse it. Only wosfl.co.uk is allowed.
+ * wosfl.co.uk's AWS WAF challenges cold requests, so a session is warmed up on
+ * the homepage first (same approach as wosfl-table.php).
+ *
+ * @param array<string, string> $badgeOverrides
+ * @return array{ok:bool, rows:list<array<string,mixed>>, title:string, error:string}
+ */
+function leagueTableHistoryFetchWosfl(string $url, string $badgeDir, array $badgeOverrides): array
+{
+    $fail = static fn (string $error): array => ['ok' => false, 'rows' => [], 'title' => '', 'error' => $error];
+
+    $url = trim($url);
+    $parts = parse_url($url);
+    $host = strtolower((string) ($parts['host'] ?? ''));
+    if (($parts['scheme'] ?? '') !== 'https' || !in_array($host, ['www.wosfl.co.uk', 'wosfl.co.uk'], true)) {
+        return $fail('Enter a full https://www.wosfl.co.uk/ standings page URL.');
+    }
+
+    $cookieFile = tempnam(sys_get_temp_dir(), 'wosfl-hist-');
+    if ($cookieFile === false) {
+        return $fail('Could not start a fetch session on the server.');
+    }
+
+    $userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36';
+    $get = static function (string $target, string $referer = '') use ($cookieFile, $userAgent): array {
+        $ch = curl_init($target);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_MAXREDIRS => 3,
+            CURLOPT_TIMEOUT => 20,
+            CURLOPT_USERAGENT => $userAgent,
+            CURLOPT_REFERER => $referer,
+            CURLOPT_COOKIEFILE => $cookieFile,
+            CURLOPT_COOKIEJAR => $cookieFile,
+            CURLOPT_PROTOCOLS => CURLPROTO_HTTPS,
+            CURLOPT_REDIR_PROTOCOLS => CURLPROTO_HTTPS,
+        ]);
+        $body = curl_exec($ch);
+        $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $finalHost = strtolower((string) parse_url((string) curl_getinfo($ch, CURLINFO_EFFECTIVE_URL), PHP_URL_HOST));
+        curl_close($ch);
+        return [is_string($body) ? $body : '', $code, $finalHost];
+    };
+
+    try {
+        $get('https://' . $host . '/');
+        [$html, $code, $finalHost] = $get($url, 'https://' . $host . '/');
+    } finally {
+        @unlink($cookieFile);
+    }
+
+    if ($html === '' || $code !== 200) {
+        return $fail('WOSFL did not return that page (HTTP ' . $code . '). Check the link, or try again in a minute.');
+    }
+    if (!in_array($finalHost, ['www.wosfl.co.uk', 'wosfl.co.uk'], true)) {
+        return $fail('That link redirected away from wosfl.co.uk, so it was not used.');
+    }
+
+    $rows = leagueTableHistoryNormalizeRows(wosfl_parse_standings_html($html, $badgeDir, $badgeOverrides));
+    if (count($rows) < 2) {
+        return $fail('No standings table was found on that page. Use the page that shows the league table.');
+    }
+
+    $title = '';
+    if (preg_match('~<title>\s*([^<]+?)\s*</title>~i', $html, $m) === 1) {
+        $title = trim(preg_replace('/\s+/', ' ', str_replace(' - ', ' ', html_entity_decode($m[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'))) ?? '');
+    }
+
+    return ['ok' => true, 'rows' => $rows, 'title' => $title, 'error' => ''];
+}
+
+/**
+ * Details of the live (current-season) table, for archiving it.
+ *
+ * @return array{rows:list<array<string,mixed>>, updated:?int, title:string, promotion:?int, relegation:?int}
+ */
+function leagueTableHistoryLiveSnapshot(PDO $pdo, ?array $currentSeason): array
+{
+    $cacheFile = dirname(__DIR__) . '/cache/wosfl_table.json';
+    $decoded = is_file($cacheFile) ? json_decode((string) file_get_contents($cacheFile), true) : null;
+    $rows = leagueTableHistoryNormalizeRows(is_array($decoded) ? array_values(array_filter($decoded, 'is_array')) : []);
+
+    $config = [];
+    $configFile = dirname(__DIR__) . '/league-config.json';
+    if (is_file($configFile)) {
+        $json = (string) file_get_contents($configFile);
+        $json = preg_replace('~/\*.*?\*/~s', '', $json) ?? $json;
+        $json = preg_replace('/^\s*(\/\/|#).*$/m', '', $json) ?? $json;
+        $config = json_decode($json, true) ?: [];
+    }
+    $title = trim((string) ($config['league_title'] ?? ''));
+    $promotion = isset($config['promotion_spots']) ? (int) $config['promotion_spots'] : null;
+    $relegation = isset($config['relegation_spots']) ? (int) $config['relegation_spots'] : null;
+
+    // Same precedence as the League Table page: competition, then its edition for this season.
+    if ($currentSeason && !empty($currentSeason['competition_id']) && function_exists('getMatchCompetitionById')) {
+        $competition = getMatchCompetitionById($pdo, (int) $currentSeason['competition_id']);
+        if (is_array($competition) && !empty($competition['is_league'])) {
+            $title = trim((string) ($competition['name'] ?? '')) ?: $title;
+            if (isset($competition['promotion_spots'])) {
+                $promotion = (int) $competition['promotion_spots'];
+            }
+            if (isset($competition['relegation_spots'])) {
+                $relegation = (int) $competition['relegation_spots'];
+            }
+        }
+        if (function_exists('competitionStructureFindEdition')) {
+            $edition = competitionStructureFindEdition($pdo, (int) $currentSeason['competition_id'], (int) $currentSeason['id']);
+            if (is_array($edition) && !empty($edition['is_active'])) {
+                $title = trim((string) ($edition['effective_name'] ?? '')) ?: $title;
+                if ($edition['promotion_spots'] !== null) {
+                    $promotion = (int) $edition['promotion_spots'];
+                }
+                if ($edition['relegation_spots'] !== null) {
+                    $relegation = (int) $edition['relegation_spots'];
+                }
+            }
+        }
+    }
+
+    return [
+        'rows' => $rows,
+        'updated' => is_file($cacheFile) ? (int) filemtime($cacheFile) : null,
+        'title' => $title,
+        'promotion' => $promotion,
+        'relegation' => $relegation,
+    ];
+}
+
+/**
  * Full one-paste import: {"season": "...", "league": "...", "table": [...]}
  * (also accepts "competition" for "league", and a bare "rows" in place of
  * "table"). Creates the seasons row and match_competitions row if they don't
@@ -202,27 +414,9 @@ function leagueTableHistoryImportFull(PDO $pdo, string $raw, string $badgeDir, a
     $parsed['rows'] = leagueTableHistoryAttachLogos($parsed['rows'], $badgeDir, $badgeOverrides);
 
     ensureSeasonSchema($pdo);
-    // Match on the computed start date first — the reliable key, since two
-    // imports of "1988-89" always compute the same 1988-07-01 regardless of
-    // how the name gets punctuated ("1988 / 1989" vs "1988-1989" etc, which
-    // is exactly how this DB ended up with two rows for the same season
-    // before this check existed). Exact name is the fallback for a season
-    // that was hand-entered without a start_date.
-    $stmt = $pdo->prepare('SELECT id FROM seasons WHERE start_date = ? LIMIT 1');
-    $stmt->execute([$seasonSpec['start']]);
-    $seasonId = (int) $stmt->fetchColumn();
-    if ($seasonId === 0) {
-        $stmt = $pdo->prepare('SELECT id FROM seasons WHERE name = ? LIMIT 1');
-        $stmt->execute([$seasonSpec['name']]);
-        $seasonId = (int) $stmt->fetchColumn();
-    }
-    $seasonCreated = false;
-    if ($seasonId === 0) {
-        $ins = $pdo->prepare('INSERT INTO seasons (name, start_date, end_date, is_current, is_locked) VALUES (?, ?, ?, 0, 1)');
-        $ins->execute([$seasonSpec['name'], $seasonSpec['start'], $seasonSpec['end']]);
-        $seasonId = (int) $pdo->lastInsertId();
-        $seasonCreated = true;
-    }
+    $season = leagueTableHistoryEnsureSeason($pdo, $seasonSpec);
+    $seasonId = $season['id'];
+    $seasonCreated = $season['created'];
 
     $current = getCurrentSeason($pdo);
     if ($current && (int) $current['id'] === $seasonId) {
@@ -230,20 +424,7 @@ function leagueTableHistoryImportFull(PDO $pdo, string $raw, string $badgeDir, a
     }
 
     $leagueName = trim((string) ($decoded['league'] ?? $decoded['competition'] ?? ''));
-    $competition = null;
-    if ($leagueName !== '') {
-        $stmt = $pdo->prepare('SELECT id FROM match_competitions WHERE name = ?');
-        $stmt->execute([$leagueName]);
-        $compId = (int) $stmt->fetchColumn();
-        $compCreated = false;
-        if ($compId === 0) {
-            $ins = $pdo->prepare("INSERT INTO match_competitions (name, competition_type, is_league) VALUES (?, 'league', 1)");
-            $ins->execute([$leagueName]);
-            $compId = (int) $pdo->lastInsertId();
-            $compCreated = true;
-        }
-        $competition = ['id' => $compId, 'name' => $leagueName, 'created' => $compCreated];
-    }
+    $competition = leagueTableHistoryEnsureCompetition($pdo, $leagueName);
 
     leagueTableHistorySave($pdo, $seasonId, $parsed['rows'], $leagueName, null, null, 'manual:json-import');
 

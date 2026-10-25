@@ -11,6 +11,7 @@ require_once __DIR__ . '/lib/functions.php';
 require_once __DIR__ . '/lib/match_sponsorship.php';
 require_once __DIR__ . '/lib/template_packs.php';
 require_once __DIR__ . '/lib/audit.php';
+require_once __DIR__ . '/lib/season_wizard.php';
 
 header('Content-Type: text/html; charset=utf-8');
 
@@ -33,12 +34,24 @@ $isLocked = isset($_POST['is_locked']) ? 1 : 0;
 $sponsorshipDeadline = trim((string) ($_POST['sponsorship_deadline'] ?? ''));
 $competitionId = (int)($_POST['competition_id'] ?? 0);
 $seasonTicketTerms = trim((string) ($_POST['season_ticket_terms'] ?? ''));
-$playerHomeAmount = (float)($_POST['player_home_amount'] ?? 50.00);
-$playerAwayAmount = (float)($_POST['player_away_amount'] ?? 30.00);
-$playerThirdAmount = (float)($_POST['player_third_amount'] ?? 20.00);
-$matchHomeAmount = (float)($_POST['match_home_amount'] ?? 50.00);
-$matchAwayAmount = (float)($_POST['match_away_amount'] ?? 20.00);
-$matchBallAmount = (float)($_POST['match_ball_amount'] ?? 25.00);
+// Money fields may arrive as "50", "50.00", "£1,250.00" — strip everything but digits and the point.
+$moneyField = static function (string $key, float $default): float {
+          if (!isset($_POST[$key])) {
+                    return $default;
+          }
+          $raw = trim((string) $_POST[$key]);
+          $clean = preg_replace('/[^0-9.]/', '', $raw) ?? '';
+          if ($clean === '' || str_contains($raw, '-')) {
+                    return 0.0; // blank, junk or negative
+          }
+          return round((float) $clean, 2);
+};
+$playerHomeAmount = $moneyField('player_home_amount', 50.00);
+$playerAwayAmount = $moneyField('player_away_amount', 30.00);
+$playerThirdAmount = $moneyField('player_third_amount', 20.00);
+$matchHomeAmount = $moneyField('match_home_amount', 50.00);
+$matchAwayAmount = $moneyField('match_away_amount', 20.00);
+$matchBallAmount = $moneyField('match_ball_amount', 25.00);
 $templatePackId = max(0, (int) ($_POST['template_pack_id'] ?? 0));
 
 if ($name === '') {
@@ -60,6 +73,7 @@ if ($seasonId <= 0 && !hub_auth_is_sponsorship_editor()) {
 
 template_packs_ensure_schema($pdo);
 ensureCompetitionStructureSchema($pdo);
+season_wizard_prepare($pdo); // creates tables, so it must run before the transaction starts
 
 $isNewSeason = $seasonId <= 0;
 $pdo->beginTransaction();
@@ -147,6 +161,9 @@ try {
                     }
           }
 
+          // Price changes apply to new sponsorships only. Existing ones are re-priced just when the
+          // "update existing sponsorships" switch is ticked (previously every save re-priced them all).
+          $repriceExisting = !$isNewSeason && !empty($_POST['reprice_existing']);
           saveSeasonPlayerPricing($pdo, $seasonId, $playerHomeAmount, $playerAwayAmount, $playerThirdAmount);
           saveMatchSeasonPricing($pdo, $seasonId, $matchHomeAmount, $matchAwayAmount, $matchBallAmount);
           if ($templatePackId > 0) {
@@ -161,15 +178,49 @@ try {
                     template_packs_clear_season_default($pdo, $seasonId);
           }
 
-          $sponsorshipsStmt = $pdo->prepare("
-                    SELECT DISTINCT player_id, sponsor_id
-                    FROM sponsorships
-                    WHERE season_id = :season_id
-                      AND ended_at IS NULL
-          ");
-          $sponsorshipsStmt->execute([':season_id' => $seasonId]);
-          foreach ($sponsorshipsStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-                    recalculateSponsorAmounts($pdo, (int)$row['player_id'], (int)$row['sponsor_id'], $seasonId);
+          if ($repriceExisting) {
+                    $sponsorshipsStmt = $pdo->prepare("
+                              SELECT DISTINCT player_id, sponsor_id
+                              FROM sponsorships
+                              WHERE season_id = :season_id
+                                AND ended_at IS NULL
+                    ");
+                    $sponsorshipsStmt->execute([':season_id' => $seasonId]);
+                    foreach ($sponsorshipsStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                              recalculateSponsorAmounts($pdo, (int)$row['player_id'], (int)$row['sponsor_id'], $seasonId);
+                    }
+                    // Match-day placements follow the new prices too (paid ones and season deals keep their amount).
+                    foreach (getMatchFixtures($pdo, $seasonId) as $fixtureRow) {
+                              recalculateMatchFixtureSponsorshipAmounts($pdo, (int)$fixtureRow['id']);
+                    }
+          }
+
+          // Add-season wizard extras: ticket types for the new season, and club-wide prices (hospitality, matchday
+          // tickets, sponsorship packages) kept as a plan that goes live when the season becomes current.
+          $wizardTypes = 0;
+          $wizardPlanned = false;
+          if ($isNewSeason && isset($_POST['wizard'])) {
+                    $canTickets = hub_auth_has_capability('tickets_ops');
+                    $canPackages = hub_auth_has_any_capability(['sponsorship', 'finance_view']);
+                    if ($canTickets && isset($_POST['tt']) && is_array($_POST['tt'])) {
+                              $wizardTypes = season_wizard_create_ticket_types($pdo, $seasonId, array_values($_POST['tt']));
+                    }
+                    $plan = season_wizard_build_plan($pdo, $_POST);
+                    if (!$canTickets) {
+                              $plan['hospitality'] = [];
+                              $plan['tickets'] = [];
+                    }
+                    if (!$canPackages) {
+                              $plan['packages'] = [];
+                    }
+                    if (!season_wizard_plan_is_empty($plan)) {
+                              season_wizard_store_plan($pdo, $seasonId, $plan);
+                              $wizardPlanned = true;
+                    }
+          }
+          $wizardApplied = 0;
+          if ($isCurrent === 1) {
+                    $wizardApplied = season_wizard_apply_plan($pdo, $seasonId);
           }
 
           if ($isCurrent === 1) {
@@ -178,7 +229,7 @@ try {
 
           $pdo->commit();
           auditLog($pdo, $isNewSeason ? 'season_created' : 'season_updated', ($isNewSeason ? 'Created' : 'Updated') . " season '{$name}'");
-          header('Location: season.php?id=' . $seasonId . '&saved=1');
+          header('Location: season.php?id=' . $seasonId . '&saved=1' . ($isNewSeason && isset($_POST['wizard']) ? '&wizard=1&types=' . $wizardTypes . '&planned=' . ($wizardPlanned ? 1 : 0) . '&applied=' . $wizardApplied : ''));
           exit;
 } catch (Throwable $e) {
           if ($pdo->inTransaction()) {

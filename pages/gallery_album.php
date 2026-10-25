@@ -57,7 +57,7 @@ seo_breadcrumbs([['Gallery', url('gallery')], [(string) $album['title'], url('ga
         <?php foreach ($photos as $i => $p): ?>
           <a class="album-grid__item" href="<?= e(uploads($p['file_path'])) ?>"
              data-full="<?= e(uploads($p['file_path'])) ?>" data-caption="" data-index="<?= $i ?>">
-            <img src="<?= e(uploads($p['thumb_path'] ?: $p['file_path'])) ?>" alt="<?= e(trim((string) ($album['title'] ?? 'Album')) . ' – photo ' . ($i + 1) . ' of ' . count($photos)) ?>" loading="lazy">
+            <img src="<?= e(uploads($p['thumb_path'] ?: $p['file_path'])) ?>" alt="<?= e(trim((string) ($album['title'] ?? 'Album')) . ' – photo ' . ($i + 1) . ' of ' . count($photos)) ?>" <?= $i < 4 ? '' : 'loading="lazy"' ?> data-sz="180">
           </a>
         <?php endforeach; ?>
       </div>

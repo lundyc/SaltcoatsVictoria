@@ -212,9 +212,28 @@ function season_ticket_render_basket(array $basket, array $typesById, string $cs
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Season Tickets - <?= h(APP_NAME) ?></title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css" rel="stylesheet">
+<?php
+    // Fan-facing page that Google indexes, so it needs a real title, description
+    // and canonical (APP_NAME is the generic back-office label "Hub").
+    require_once __DIR__ . '/lib/site_settings.php';
+    try {
+        $seoClub = site_setting($pdo, 'club_name', 'Saltcoats Victoria FC');
+        $seoGround = site_setting($pdo, 'ground_name', 'Campbell Park');
+    } catch (Throwable) {
+        $seoClub = 'Saltcoats Victoria FC';
+        $seoGround = 'Campbell Park';
+    }
+    $seoSeason = $currentSeason ? trim((string) $currentSeason['name']) : '';
+    if (preg_match('#^(\d{4})\s*[/-]\s*(?:\d{2})?(\d{2})$#', $seoSeason, $seoM)) {
+        $seoSeason = $seoM[1] . '/' . $seoM[2]; // "2026 / 2027" -> "2026/27"
+    }
+    $seoHost = preg_replace('~^www\.~i', '', strtolower((string) ($_SERVER['HTTP_HOST'] ?? '')));
+?>
+    <title><?= h('Season Tickets' . ($seoSeason !== '' ? ' ' . $seoSeason : '') . ' | ' . $seoClub) ?></title>
+    <meta name="description" content="<?= h('Buy ' . ($seoSeason !== '' ? $seoSeason . ' ' : '') . 'season tickets for ' . $seoClub . ' home matches at ' . $seoGround . ' online.') ?>">
+    <?php if ($seoHost !== ''): ?><link rel="canonical" href="<?= h('https://' . $seoHost . '/season-tickets') ?>"><?php endif; ?>
+    <link href="/admin/assets/vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
+    <link href="/admin/assets/vendor/fontawesome/css/all.min.css" rel="stylesheet">
     <link href="/admin/assets/css/style.css" rel="stylesheet">
     <style>
         :root { --st-maroon: #4b0818; --st-gold: #e0b42a; --st-cream: #f6ecde; }
@@ -258,7 +277,7 @@ function season_ticket_render_basket(array $basket, array $typesById, string $cs
     <img src="/admin/Saltcoats Victoria FC -White_Transparent.png" alt="Saltcoats Victoria FC" class="st-badge">
     <h1>Season Tickets<?= $currentSeason ? ' ' . h((string) $currentSeason['name']) : '' ?></h1>
     <p class="mb-0">Add season tickets to your basket, then enter the holder details.</p>
-    <p class="mt-2 mb-0"><a href="/members/matches.php" style="color:inherit;font-weight:700;">Fixtures &amp; results &rarr;</a></p>
+    <p class="mt-2 mb-0"><a href="/fixtures" style="color:inherit;font-weight:700;">Fixtures &amp; results &rarr;</a></p>
     <?php if ($sponsors): ?>
     <div class="st-sponsors">
         <div class="st-sponsors-label">This season's tickets are proudly sponsored by</div>

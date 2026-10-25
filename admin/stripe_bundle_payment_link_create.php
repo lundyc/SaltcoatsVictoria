@@ -64,7 +64,7 @@ try {
     $result = stripe_create_checkout_session_for_bundle(
         $pdo,
         $agreements,
-        $baseUrl . '&stripe=success&session_id={CHECKOUT_SESSION_ID}',
+        stripe_agreement_success_url(),
         $baseUrl . '&stripe=cancelled',
         (int) ($currentUser['id'] ?? 0) ?: null
     );

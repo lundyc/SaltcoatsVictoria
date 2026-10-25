@@ -55,10 +55,10 @@ $fixtureId = (int)($_POST['fixture_id'] ?? 0);
 $caption = trim((string)($_POST['caption'] ?? ''));
 $imageData = (string)($_POST['image_data'] ?? '');
 $postType = strtolower(trim((string)($_POST['post_type'] ?? 'next_match')));
-if (!in_array($postType, ['next_match', 'matchday'], true)) {
+if (!in_array($postType, ['next_match', 'next_match_2', 'matchday', 'starting_xi', 'half_time', 'full_time', 'substitution', 'goal', 'yellow_card', 'red_card', 'penalty', 'penalty_awarded', 'penalty_saved', 'penalty_missed', 'kickoff', 'second_half'], true)) {
           $postType = 'next_match';
 }
-$postTypeLabel = $postType === 'matchday' ? 'Matchday' : 'Next Match';
+$postTypeLabel = ['matchday' => 'Matchday', 'starting_xi' => 'Starting XI', 'half_time' => 'Half Time', 'full_time' => 'Full Time', 'substitution' => 'Substitution', 'goal' => 'Goal', 'yellow_card' => 'Yellow Card', 'red_card' => 'Red Card', 'penalty' => 'Penalty', 'penalty_awarded' => 'Penalty Awarded', 'penalty_saved' => 'Penalty Saved', 'penalty_missed' => 'Penalty Missed', 'kickoff' => 'Kick Off', 'second_half' => 'Second Half'][$postType] ?? 'Next Match';
 
 if (!in_array($target, ['facebook', 'instagram'], true)) {
           nextMatchPostRespond(false, 'Unsupported social platform.', 400);

@@ -27,7 +27,7 @@ if ($path === null) {
     exit('Report not found.');
 }
 
-$data = json_decode((string)file_get_contents($path), true);
+$data = hub_opposition_report_load($path);
 if (!is_array($data) || !isset($data['matches']) || !is_array($data['matches'])) {
     http_response_code(422);
     exit('That file is not a readable opponent report.');
@@ -177,6 +177,16 @@ if ($report['key_facts']) {
         $html .= '<li><strong>' . $h($lead) . ':</strong>' . $h($rest) . '</li>';
     }
     $html .= '</ul></div>';
+}
+
+if (!empty($report['cup_matches'])) {
+    $html .= '<h2 class="section" style="margin-top:14px">CUP MATCHES</h2><table class="card-table"><thead><tr><th>Date</th><th>Competition</th><th>Opponent</th><th class="tc">Result</th><th>Scorers</th></tr></thead><tbody>';
+    foreach ($report['cup_matches'] as $c) {
+        $comp = $c['competition'] . ($c['round'] !== '' ? ' (Round ' . $c['round'] . ')' : '');
+        $html .= '<tr><td>' . $h($c['date'] > 0 ? date('d/m/Y', (int)($c['date'] / 1000)) : '') . '</td><td>' . $h($comp) . '</td><td>' . $h($c['opponent']) . ' (' . ($c['home'] ? 'H' : 'A') . ')</td>'
+            . '<td class="tc"><span class="outcome-' . $h($c['outcome']) . '">' . $h($c['outcome']) . ' ' . $c['for'] . '-' . $c['against'] . '</span></td><td>' . $h($c['scorers'] !== '' ? $c['scorers'] : '-') . '</td></tr>';
+    }
+    $html .= '</tbody></table><div class="note">Cup matches are shown separately and are not included in the league figures above.</div>';
 }
 
 $html .= '<p class="note">Source: uploaded COMET export. Data reflects played matches only. Shirt numbers are the number most often recorded for that player across these matches, not a fixed squad number — grassroots sides commonly rotate numbers matchday to matchday, so treat "#9" etc. as a strong hint, not a guarantee. COMET\'s export only lists the starting XI by name and number, never the bench, so substitutes who never started show no number and their "Off"/"On" totals come from the separate match event log.</p>';

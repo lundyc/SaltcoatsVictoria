@@ -10,6 +10,7 @@ set_meta([
     'description' => club('club_name') . ' first-team management and coaching staff.',
 ]);
 ?>
+<?php seo_breadcrumbs([['First team', url('team')], ['Management team', url('staff')]]); ?>
 <?php partial('page_hero', ['eyebrow' => 'Team', 'title' => 'Management team']); ?>
 
 <div class="page">
@@ -33,6 +34,6 @@ set_meta([
       </div>
     <?php endif; ?>
 
-    <p class="fxnote"><a class="linkarrow" href="<?= e(url('club/history') . '#committee') ?>">Club committee &amp; officials</a></p>
+    <p class="fxnote"><a class="linkarrow" href="<?= e(url('club/officials') . '#committee') ?>">Club committee &amp; officials</a></p>
   </div>
 </div>

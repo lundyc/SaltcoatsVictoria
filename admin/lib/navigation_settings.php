@@ -24,6 +24,18 @@ function hub_navigation_definitions(): array
                     'default' => true,
                     'caps' => [],
                 ],
+                'league_table' => [
+                    'label' => 'League table',
+                    'href' => '/admin/league_table.php',
+                    'default' => true,
+                    'caps' => ['content_social'],
+                ],
+                'orders_inbox' => [
+                    'label' => 'Inbox',
+                    'href' => '/admin/inbox.php',
+                    'default' => true,
+                    'caps' => ['shop', 'tickets_ops', 'sponsorship', 'finance_view'],
+                ],
                 'club_reminders' => [
                     'label' => 'Reminders',
                     'href' => '/admin/club_reminders.php',
@@ -48,6 +60,18 @@ function hub_navigation_definitions(): array
                     'default' => true,
                     'caps' => ['matchday'],
                 ],
+                'match_reports' => [
+                    'label' => 'Match report import',
+                    'href' => '/admin/match_report_import.php',
+                    'default' => true,
+                    'caps' => ['matchday'],
+                ],
+                'score_predictor' => [
+                    'label' => 'Score predictor',
+                    'href' => '/admin/score_predictor.php',
+                    'default' => true,
+                    'caps' => ['matchday'],
+                ],
                 'scan_overview' => [
                     'label' => 'Scan',
                     'href' => '/admin/scan_overview.php',
@@ -59,12 +83,6 @@ function hub_navigation_definitions(): array
                     'href' => '/admin/pos_overview.php',
                     'default' => false,
                     'caps' => ['tickets_ops'],
-                ],
-                'matchday_finance' => [
-                    'label' => 'Matchday income',
-                    'href' => '/admin/matchday_finance.php',
-                    'default' => true,
-                    'caps' => ['finance_view', 'matchday'],
                 ],
                 'players' => [
                     'label' => 'Players',
@@ -90,6 +108,18 @@ function hub_navigation_definitions(): array
                     'default' => false,
                     'caps' => ['finance_view'],
                 ],
+                'sponsor_orders' => [
+                    'label' => 'Sponsor Orders',
+                    'href' => '/admin/sponsor_orders.php',
+                    'default' => true,
+                    'caps' => ['finance_view'],
+                ],
+                'board_renewals' => [
+                    'label' => 'Board renewals',
+                    'href' => '/admin/board_renewals.php',
+                    'default' => true,
+                    'caps' => ['finance_view'],
+                ],
                 'sponsorship_agreements' => [
                     'label' => 'Agreements',
                     'href' => '/admin/sponsorship_agreements.php',
@@ -99,6 +129,12 @@ function hub_navigation_definitions(): array
                 'sponsorship_bundles' => [
                     'label' => 'Bundles',
                     'href' => '/admin/sponsorship_bundles.php',
+                    'default' => true,
+                    'caps' => ['finance_view'],
+                ],
+                'match_deals' => [
+                    'label' => 'Season deals',
+                    'href' => '/admin/match_deals.php',
                     'default' => true,
                     'caps' => ['finance_view'],
                 ],
@@ -150,9 +186,9 @@ function hub_navigation_definitions(): array
                     'default' => true,
                     'caps' => ['shop'],
                 ],
-                'shop_settings' => [
-                    'label' => 'Shop settings',
-                    'href' => '/admin/shop_settings.php',
+                'shop_shipping' => [
+                    'label' => 'Shipping zones',
+                    'href' => '/admin/shop_shipping.php',
                     'default' => true,
                     'caps' => ['shop'],
                 ],
@@ -174,9 +210,39 @@ function hub_navigation_definitions(): array
                     'default' => true,
                     'caps' => ['tickets_ops'],
                 ],
+                'door_dashboard' => [
+                    'label' => 'Door Dashboard',
+                    'href' => '/admin/door_dashboard.php',
+                    'default' => true,
+                    'caps' => ['tickets_ops', 'events_view'],
+                ],
+                'events' => [
+                    'label' => 'Events',
+                    'href' => '/admin/events.php',
+                    'default' => true,
+                    'caps' => ['events_view'],
+                ],
+                'event_settings' => [
+                    'label' => 'Event Settings',
+                    'href' => '/admin/event_settings.php',
+                    'default' => true,
+                    'caps' => ['events_view'],
+                ],
+                'event_venues' => [
+                    'label' => 'Event Venues',
+                    'href' => '/admin/event_venues.php',
+                    'default' => true,
+                    'caps' => ['events_view'],
+                ],
                 'fixture_tickets' => [
                     'label' => 'Match Tickets',
                     'href' => '/admin/fixture_tickets.php',
+                    'default' => true,
+                    'caps' => ['tickets_ops'],
+                ],
+                'hospitality' => [
+                    'label' => 'Hospitality',
+                    'href' => '/admin/hospitality.php',
                     'default' => true,
                     'caps' => ['tickets_ops'],
                 ],
@@ -262,12 +328,6 @@ function hub_navigation_definitions(): array
                     'default' => true,
                     'caps' => ['website'],
                 ],
-                'settings_public' => [
-                    'label' => 'Website settings',
-                    'href' => '/admin/settings_public.php',
-                    'default' => true,
-                    'caps' => ['website'],
-                ],
                 'website' => [
                     'label' => 'View website',
                     'href' => '/',
@@ -295,6 +355,12 @@ function hub_navigation_definitions(): array
                 'stripe_dashboard' => [
                     'label' => 'Stripe Dashboard',
                     'href' => '/admin/stripe_dashboard.php',
+                    'default' => true,
+                    'caps' => ['finance_view'],
+                ],
+                'payout_reconciliation' => [
+                    'label' => 'Payout Reconciliation',
+                    'href' => '/admin/payout_reconciliation.php',
                     'default' => true,
                     'caps' => ['finance_view'],
                 ],
@@ -400,12 +466,6 @@ function hub_navigation_definitions(): array
             'label' => 'Publishing',
             'default' => true,
             'items' => [
-                'league_table' => [
-                    'label' => 'League table',
-                    'href' => '/admin/league_table.php',
-                    'default' => true,
-                    'caps' => ['content_social'],
-                ],
                 'template_packs' => [
                     'label' => 'Template packs',
                     'href' => '/admin/template_packs.php',
@@ -418,6 +478,20 @@ function hub_navigation_definitions(): array
             'label' => 'Admin',
             'default' => true,
             'items' => [
+                'mailboxes' => [
+                    'label' => 'Mailboxes',
+                    'href' => '/admin/mailboxes.php',
+                    'default' => true,
+                    'caps' => [],
+                    'developer_only' => true,
+                ],
+                'mailboxes' => [
+                    'label' => 'Mailboxes',
+                    'href' => '/admin/mailboxes.php',
+                    'default' => true,
+                    'caps' => [],
+                    'developer_only' => true,
+                ],
                 'match_photos' => [
                     'label' => 'Media Library',
                     'href' => '/admin/match_photos.php',
@@ -443,19 +517,19 @@ function hub_navigation_definitions(): array
                     'caps' => ['admin_settings'],
                 ],
                 'club_people' => [
-                    'label' => 'People & Users',
+                    'label' => 'Users',
                     'href' => '/admin/club_people.php',
                     'default' => true,
                     'caps' => ['admin_settings'],
                 ],
                 'positions' => [
-                    'label' => 'Club roles',
+                    'label' => 'Club positions',
                     'href' => '/admin/positions.php',
                     'default' => true,
                     'caps' => ['admin_settings'],
                 ],
                 'access_roles' => [
-                    'label' => 'Access templates',
+                    'label' => 'Roles',
                     'href' => '/admin/access_roles.php',
                     'default' => true,
                     'caps' => ['admin_settings'],

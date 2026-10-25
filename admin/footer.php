@@ -80,6 +80,38 @@ if ($showMobileNav):
     </div>
 </div>
 
+<?php
+require_once __DIR__ . '/lib/help_tours.php';
+$showTourPrompt = false;
+try {
+    $showTourPrompt = $currentScript === 'index.php' && isset($pdo) && help_should_prompt(help_state_all($pdo));
+} catch (Throwable $e) {
+    // Help is optional; never break a page over it.
+}
+?>
+<script>window.hubHelpConfig = { csrf: <?= json_encode(hub_auth_csrf_token()) ?> };</script>
+<?php if ($showTourPrompt): ?>
+<aside class="hub-tour-prompt" id="hubTourPrompt" role="region" aria-label="Welcome tour">
+    <div class="hub-tour-prompt__title">New to the Hub?</div>
+    <div class="small text-muted">Take a 2-minute tour of the menu and where to find help. It's optional.</div>
+    <div class="hub-tour-prompt__actions">
+        <button type="button" class="btn btn-brand btn-sm" data-hub-prompt="start">Take the tour</button>
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-hub-prompt="later">Not now</button>
+        <button type="button" class="btn btn-link btn-sm" data-hub-prompt="off">Don't show again</button>
+    </div>
+</aside>
+<?php endif; ?>
+<button class="hub-help-fab" type="button" data-bs-toggle="offcanvas" data-bs-target="#hubHelpPanel" aria-controls="hubHelpPanel" aria-label="Help for this page" title="Help for this page">
+    <i class="fa-solid fa-question" aria-hidden="true"></i>
+</button>
+<div class="offcanvas offcanvas-end" tabindex="-1" id="hubHelpPanel" data-page="<?= htmlspecialchars($currentScript, ENT_QUOTES, 'UTF-8') ?>" aria-labelledby="hubHelpPanelTitle">
+    <div class="offcanvas-header">
+        <h2 class="offcanvas-title h5" id="hubHelpPanelTitle">Help for this page</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close help"></button>
+    </div>
+    <div class="offcanvas-body" id="hubHelpPanelBody"><p class="text-muted">Loading…</p></div>
+</div>
+
 <div class="hub-toast-region" aria-live="polite" aria-atomic="true">
     <span class="visually-hidden" id="hubLiveStatus"></span>
 </div>

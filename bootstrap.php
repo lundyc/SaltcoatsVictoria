@@ -43,6 +43,7 @@ try {
 
 require __DIR__ . '/helpers.php';
 require __DIR__ . '/router.php';
+require_once __DIR__ . '/lib/page_cache.php';
 require __DIR__ . '/lib/seo.php';
 require __DIR__ . '/lib/imgopt.php';
 require __DIR__ . '/lib/legacy_redirects.php';
@@ -52,4 +53,6 @@ require __DIR__ . '/lib/fixtures.php';
 require __DIR__ . '/lib/partners.php';
 require __DIR__ . '/lib/table.php';
 require __DIR__ . '/lib/staff.php';
+require __DIR__ . '/lib/club_values.php';
 require __DIR__ . '/lib/history.php';
+require __DIR__ . '/lib/shortcodes.php';

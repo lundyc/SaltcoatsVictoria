@@ -9,7 +9,7 @@ declare(strict_types=1);
  * analytics.google.com or search.google.com/search-console directly.
  *
  * Credentials and config live outside the web root — see
- * /var/www/vhosts/myclubhub.co.uk/secrets/.
+ * /var/www/vhosts/saltcoatsvictoria.co.uk/secrets/.
  */
 
 function google_reporting_config(): array
@@ -213,20 +213,93 @@ function gsc_query(array $body): array
     });
 }
 
-/** GA4 date range string GA's API expects, from a day count. */
-function google_reporting_date_range(int $days): array
+/**
+ * Public base URL of the reported site, derived from the Search Console
+ * property ("sc-domain:example.com" or a URL-prefix property).
+ */
+function google_reporting_site_base(): string
 {
-    return ['startDate' => $days . 'daysAgo', 'endDate' => 'today'];
+    $site = (string) (google_reporting_config()['search_console_site_url'] ?? '');
+    if (str_starts_with($site, 'sc-domain:')) {
+        return 'https://' . substr($site, strlen('sc-domain:'));
+    }
+    return rtrim($site, '/');
+}
+
+/**
+ * Validate a custom ?from=YYYY-MM-DD&to=YYYY-MM-DD range (max 365 days,
+ * not in the future). Returns null when absent or invalid so callers fall
+ * back to the preset ?days= range.
+ *
+ * @return array{from: string, to: string, days: int}|null
+ */
+function google_reporting_custom_range(array $get): ?array
+{
+    $from = (string) ($get['from'] ?? '');
+    $to = (string) ($get['to'] ?? '');
+    foreach ([$from, $to] as $value) {
+        $d = DateTimeImmutable::createFromFormat('!Y-m-d', $value);
+        if ($d === false || $d->format('Y-m-d') !== $value) {
+            return null;
+        }
+    }
+    $today = date('Y-m-d');
+    if ($to > $today) {
+        $to = $today;
+    }
+    if ($from > $to) {
+        return null;
+    }
+    $span = (int) round((strtotime($to) - strtotime($from)) / 86400) + 1;
+    if ($span > 365) {
+        return null;
+    }
+    return ['from' => $from, 'to' => $to, 'days' => $span];
+}
+
+/**
+ * Normalise a range (day count, or ['from' => ..., 'to' => ...]) to explicit
+ * dates. $lagDays pulls the end date back for sources that lag (Search
+ * Console is ~2 days behind).
+ *
+ * @return array{from: string, to: string}
+ */
+function google_reporting_resolve_range(int|array $range, int $lagDays = 0): array
+{
+    $latest = date('Y-m-d', strtotime("-{$lagDays} days"));
+    if (is_int($range)) {
+        return ['from' => date('Y-m-d', strtotime("-{$range} days")), 'to' => $latest];
+    }
+    $to = min((string) $range['to'], $latest);
+    $from = min((string) $range['from'], $to);
+    return ['from' => $from, 'to' => $to];
+}
+
+/** The equal-length window immediately before $range. */
+function google_reporting_previous_range(int|array $range, int $lagDays = 0): array
+{
+    $r = google_reporting_resolve_range($range, $lagDays);
+    $length = (int) round((strtotime($r['to']) - strtotime($r['from'])) / 86400) + 1;
+    $prevTo = date('Y-m-d', strtotime($r['from'] . ' -1 day'));
+    $prevFrom = date('Y-m-d', strtotime($prevTo . ' -' . ($length - 1) . ' days'));
+    return ['from' => $prevFrom, 'to' => $prevTo];
+}
+
+/** GA4 date range structure the API expects. */
+function google_reporting_date_range(int|array $range): array
+{
+    $r = google_reporting_resolve_range($range);
+    return ['startDate' => $r['from'], 'endDate' => $r['to']];
 }
 
 // ---------------------------------------------------------------------
 // GA4 report builders
 // ---------------------------------------------------------------------
 
-function ga4_summary(int $days): array
+function ga4_summary(int|array $range): array
 {
     return ga4_run_report([
-        'dateRanges' => [google_reporting_date_range($days)],
+        'dateRanges' => [google_reporting_date_range($range)],
         'metrics' => [
             ['name' => 'screenPageViews'],
             ['name' => 'activeUsers'],
@@ -238,10 +311,10 @@ function ga4_summary(int $days): array
     ]);
 }
 
-function ga4_top_pages(int $days, int $limit = 15): array
+function ga4_top_pages(int|array $range, int $limit = 50): array
 {
     return ga4_run_report([
-        'dateRanges' => [google_reporting_date_range($days)],
+        'dateRanges' => [google_reporting_date_range($range)],
         'dimensions' => [['name' => 'pagePath'], ['name' => 'pageTitle']],
         'metrics' => [['name' => 'screenPageViews'], ['name' => 'activeUsers'], ['name' => 'averageSessionDuration']],
         'orderBys' => [['metric' => ['metricName' => 'screenPageViews'], 'desc' => true]],
@@ -249,30 +322,30 @@ function ga4_top_pages(int $days, int $limit = 15): array
     ]);
 }
 
-function ga4_traffic_sources(int $days): array
+function ga4_traffic_sources(int|array $range): array
 {
     return ga4_run_report([
-        'dateRanges' => [google_reporting_date_range($days)],
+        'dateRanges' => [google_reporting_date_range($range)],
         'dimensions' => [['name' => 'sessionDefaultChannelGroup']],
         'metrics' => [['name' => 'sessions'], ['name' => 'activeUsers']],
         'orderBys' => [['metric' => ['metricName' => 'sessions'], 'desc' => true]],
     ]);
 }
 
-function ga4_devices(int $days): array
+function ga4_devices(int|array $range): array
 {
     return ga4_run_report([
-        'dateRanges' => [google_reporting_date_range($days)],
+        'dateRanges' => [google_reporting_date_range($range)],
         'dimensions' => [['name' => 'deviceCategory']],
         'metrics' => [['name' => 'sessions'], ['name' => 'activeUsers']],
         'orderBys' => [['metric' => ['metricName' => 'sessions'], 'desc' => true]],
     ]);
 }
 
-function ga4_daily_trend(int $days): array
+function ga4_daily_trend(int|array $range): array
 {
     return ga4_run_report([
-        'dateRanges' => [google_reporting_date_range($days)],
+        'dateRanges' => [google_reporting_date_range($range)],
         'dimensions' => [['name' => 'date']],
         'metrics' => [['name' => 'screenPageViews'], ['name' => 'activeUsers']],
         'orderBys' => [['dimension' => ['dimensionName' => 'date']]],
@@ -283,48 +356,38 @@ function ga4_daily_trend(int $days): array
 // Search Console report builders
 // ---------------------------------------------------------------------
 
-function gsc_date_range(int $days): array
+const GSC_LAG_DAYS = 2; // GSC data lags ~2 days
+
+function gsc_date_range(int|array $range): array
 {
-    return [
-        'startDate' => date('Y-m-d', strtotime("-{$days} days")),
-        'endDate' => date('Y-m-d', strtotime('-2 days')), // GSC data lags ~2 days
-    ];
+    $r = google_reporting_resolve_range($range, GSC_LAG_DAYS);
+    return ['startDate' => $r['from'], 'endDate' => $r['to']];
 }
 
-function gsc_summary(int $days): array
+function gsc_summary(int|array $range): array
 {
-    $range = gsc_date_range($days);
-    return gsc_query(['startDate' => $range['startDate'], 'endDate' => $range['endDate']]);
+    return gsc_query(gsc_date_range($range));
 }
 
-function gsc_top_queries(int $days, int $limit = 15): array
+function gsc_top_queries(int|array $range, int $limit = 50): array
 {
-    $range = gsc_date_range($days);
-    return gsc_query([
-        'startDate' => $range['startDate'],
-        'endDate' => $range['endDate'],
+    return gsc_query(gsc_date_range($range) + [
         'dimensions' => ['query'],
         'rowLimit' => $limit,
     ]);
 }
 
-function gsc_top_pages(int $days, int $limit = 15): array
+function gsc_top_pages(int|array $range, int $limit = 50): array
 {
-    $range = gsc_date_range($days);
-    return gsc_query([
-        'startDate' => $range['startDate'],
-        'endDate' => $range['endDate'],
+    return gsc_query(gsc_date_range($range) + [
         'dimensions' => ['page'],
         'rowLimit' => $limit,
     ]);
 }
 
-function gsc_daily_trend(int $days): array
+function gsc_daily_trend(int|array $range): array
 {
-    $range = gsc_date_range($days);
-    return gsc_query([
-        'startDate' => $range['startDate'],
-        'endDate' => $range['endDate'],
+    return gsc_query(gsc_date_range($range) + [
         'dimensions' => ['date'],
     ]);
 }

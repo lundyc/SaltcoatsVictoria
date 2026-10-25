@@ -9,7 +9,7 @@
 declare(strict_types=1);
 
 /** Allowed output widths; a request is snapped up to the nearest. */
-const IMGOPT_WIDTHS = [400, 800, 1200, 1600];
+const IMGOPT_WIDTHS = [96, 160, 240, 400, 800, 1200, 1600];
 /** Files at or under this size that are already narrow are left alone. */
 const IMGOPT_MIN_BYTES = 60000;
 
@@ -140,6 +140,15 @@ function imgopt_filter_html(string $html): string
 {
     $out = preg_replace_callback('#<img\b[^>]*>#i', static function (array $m): string {
         $tag = $m[0];
+        // Templates can say how wide an image is shown on a phone (data-sz="148"). That becomes a
+        // `sizes` hint that only applies up to 720px wide; above that it stays "100vw", which is
+        // what the browser assumes anyway, so tablets and desktops pick exactly the same file as before.
+        if (preg_match('#\sdata-sz="(\d{2,4})"#', $tag, $sz)) {
+            $tag = str_replace($sz[0], '', $tag);
+            if (!preg_match('#\ssizes=#i', $tag)) {
+                $tag = preg_replace('#\s*/?>$#', ' sizes="(max-width: 720px) ' . $sz[1] . 'px, 100vw">', $tag, 1) ?? $tag;
+            }
+        }
         if (!preg_match('#\ssrc="(/(?:uploads|badges)/[^"?]+\.(?:png|jpe?g))(\?[^"]*)?"#i', $tag, $s)) {
             return $tag;
         }
@@ -153,6 +162,23 @@ function imgopt_filter_html(string $html): string
             return $tag;
         }
         [$w, $h] = $size;
+        // Small display size (a 36px badge, a 42px crest): the template says how big it is shown through
+        // its width attribute, so serve a copy about 2x and 3x that wide instead of the full-size file.
+        if (preg_match('#\swidth="(\d{1,3})"#i', $tag, $dm)) {
+            $disp = (int) $dm[1];
+            if ($disp >= 16 && $disp <= 200 && $w > $disp * 3 && (int) filesize($file) > 15000 && !preg_match('#\ssrcset=#i', $tag)) {
+                $enc = implode('/', array_map('rawurlencode', explode('/', ltrim($rel, '/')))) . '?v=' . filemtime($file);
+                $s2 = imgopt_snap($disp * 2);
+                $s3 = imgopt_snap($disp * 3);
+                $set = '/img/' . $s2 . '/' . $enc . ' ' . $s2 . 'w' . ($s3 !== $s2 ? ', /img/' . $s3 . '/' . $enc . ' ' . $s3 . 'w' : '');
+                $tag = str_replace($s[0], ' src="' . htmlspecialchars('/img/' . $s3 . '/' . $enc, ENT_QUOTES) . '"', $tag);
+                $tag = preg_replace('#\s*/?>$#', ' srcset="' . htmlspecialchars($set, ENT_QUOTES) . '" sizes="' . $disp . 'px">', $tag, 1) ?? $tag;
+                if (!preg_match('#\sdecoding=#i', $tag)) {
+                    $tag = preg_replace('#\s*/?>$#', ' decoding="async">', $tag, 1) ?? $tag;
+                }
+                return $tag;
+            }
+        }
         $variant = imgopt_url($rel);
         if ($variant !== null) {
             $vw = (int) explode('/', $variant)[2];
@@ -161,6 +187,29 @@ function imgopt_filter_html(string $html): string
                 $w = $vw;
             }
             $tag = str_replace($s[0], ' src="' . htmlspecialchars($variant, ENT_QUOTES) . '"', $tag);
+            // Smaller copies for small screens. With no `sizes` the browser assumes the image is
+            // as wide as the screen, so a 390px phone asks for the 800w copy while a desktop
+            // (wider than the largest copy) still picks exactly the same file as before.
+            if (!preg_match('#\ssrcset=#i', $tag)) {
+                $set = [];
+                foreach ([400, 800] as $smaller) {
+                    if ($smaller < $vw && $smaller < $size[0]) {
+                        $set[] = htmlspecialchars(str_replace('/img/' . $vw . '/', '/img/' . $smaller . '/', $variant), ENT_QUOTES) . ' ' . $smaller . 'w';
+                    }
+                }
+                if ($set !== []) {
+                    $set[] = htmlspecialchars($variant, ENT_QUOTES) . ' ' . $vw . 'w';
+                    $tag = preg_replace('#\s*/?>$#', ' srcset="' . implode(', ', $set) . '">', $tag, 1) ?? $tag;
+                }
+            }
+        }
+        // Narrow but heavy images (the club crest is a 135 KB PNG shown at about 60px): keep the
+        // original as the desktop source, and give small screens a 400px WebP copy instead.
+        if ($variant === null && $w > 400 && $w <= 480 && (int) filesize($file) > IMGOPT_MIN_BYTES * 2
+            && !preg_match('#\ssrcset=#i', $tag) && preg_match('#\.(png|jpe?g)$#i', $rel)) {
+            $small = '/img/400/' . implode('/', array_map('rawurlencode', explode('/', ltrim($rel, '/')))) . '?v=' . filemtime($file);
+            $tag = preg_replace('#\s*/?>$#', ' srcset="' . htmlspecialchars($small, ENT_QUOTES) . ' 400w, ' . htmlspecialchars($s[1] . ($s[2] ?? ''), ENT_QUOTES) . ' ' . $w . 'w"'
+                . ' sizes="(max-width: 720px) 64px, ' . $w . 'px">', $tag, 1) ?? $tag;
         }
         if (!preg_match('#\swidth=#i', $tag) && !preg_match('#\sheight=#i', $tag)) {
             $tag = preg_replace('#\s*/?>$#', ' width="' . $w . '" height="' . $h . '">', $tag, 1) ?? $tag;

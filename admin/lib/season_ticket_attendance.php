@@ -1,11 +1,22 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/schema_guard.php';
+
 require_once __DIR__ . '/season_tickets.php';
 require_once __DIR__ . '/season_passes.php';
 require_once __DIR__ . '/admissions.php';
 
 function ensureSeasonTicketAttendanceSchema(PDO $pdo): void
+{
+    if (schema_guard_done('ensureSeasonTicketAttendanceSchema')) {
+        return;
+    }
+    ensureSeasonTicketAttendanceSchema_run($pdo);
+    schema_guard_mark('ensureSeasonTicketAttendanceSchema');
+}
+
+function ensureSeasonTicketAttendanceSchema_run(PDO $pdo): void
 {
     ensureSeasonTicketSchema($pdo);
     $pdo->exec("CREATE TABLE IF NOT EXISTS season_ticket_attendance (
@@ -130,7 +141,7 @@ function season_ticket_check_and_mark_attendance(PDO $pdo, int $fixtureId, strin
     $token = season_ticket_extract_token($scanInput);
     $manualCode = season_ticket_normalize_manual_code($scanInput);
     if ($token === '' && $manualCode === '') {
-        $message = 'That QR code or code is not a valid season ticket.';
+        $message = 'That QR code or code is not a valid ticket.';
         $log = season_ticket_scan_log($pdo, $fixtureId, null, 'invalid_token', $message, false, $scannedByUserId);
         return ['valid' => false, 'status' => 'invalid_token', 'message' => $message, 'scan_log' => $log];
     }

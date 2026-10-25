@@ -1,0 +1,14 @@
+{
+  "name": "Saltcoats Victoria Hub",
+  "short_name": "SVFC Hub",
+  "description": "Saltcoats Victoria FC club admin: fixtures, tickets, shop, members and more.",
+  "start_url": "/admin/",
+  "scope": "/admin/",
+  "display": "standalone",
+  "background_color": "#4b0818",
+  "theme_color": "#4b0818",
+  "icons": [
+    { "src": "/admin/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/admin/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

@@ -53,7 +53,11 @@ $formName = (string)($venue['name'] ?? '');
 $formAddressLine1 = (string)($venue['address_line1'] ?? '');
 $formTown = (string)($venue['town'] ?? '');
 $formPostcode = (string)($venue['postcode'] ?? '');
+$formLatitude = (string)($venue['latitude'] ?? '');
+$formLongitude = (string)($venue['longitude'] ?? '');
 $formNotes = (string)($venue['notes'] ?? '');
+// Details stay hidden for a new venue until a Quick find result is picked or "Enter manually" is used.
+$showDetails = $action === 'edit' || $_SERVER['REQUEST_METHOD'] === 'POST';
 
 $clubOptionsByKey = [];
 foreach ($pdo->query("
@@ -81,6 +85,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $formAddressLine1 = trim((string)($_POST['address_line1'] ?? ''));
     $formTown = trim((string)($_POST['town'] ?? ''));
     $formPostcode = strtoupper(trim((string)($_POST['postcode'] ?? '')));
+    $formLatitude = trim((string)($_POST['latitude'] ?? ''));
+    $formLongitude = trim((string)($_POST['longitude'] ?? ''));
     $formNotes = trim((string)($_POST['notes'] ?? ''));
     $submittedVenueId = $action === 'edit' ? (int)($venue['id'] ?? $id) : (int)($_POST['venue_id'] ?? 0);
 
@@ -98,7 +104,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $formAddressLine1 !== '' ? $formAddressLine1 : null,
                 $formTown !== '' ? $formTown : null,
                 $formPostcode !== '' ? $formPostcode : null,
-                $formNotes !== '' ? $formNotes : null
+                $formNotes !== '' ? $formNotes : null,
+                is_numeric($formLatitude) ? (float)$formLatitude : null,
+                is_numeric($formLongitude) ? (float)$formLongitude : null
             );
             auditLog($pdo, $submittedVenueId > 0 ? 'venue_updated' : 'venue_created', ($submittedVenueId > 0 ? 'Updated' : 'Created') . " venue '{$formName}'");
             header('Location: venues.php?saved=1');
@@ -162,6 +170,31 @@ $recordDate = (string)($venue['updated_at'] ?: ($venue['created_at'] ?? ''));
                 <?php endif; ?>
             </div>
 
+            <section class="venue-editor-section venue-find" aria-labelledby="venueFindHeading">
+                <div class="venue-editor-section__heading">
+                    <span><i class="fa-solid fa-magnifying-glass-location" aria-hidden="true"></i></span>
+                    <div>
+                        <h3 id="venueFindHeading">Quick find</h3>
+                        <p>Search for the ground to fill in the name, address and map pin.</p>
+                    </div>
+                </div>
+                <div class="venue-editor-fields">
+                    <div class="venue-editor-field venue-editor-field--full">
+                        <input type="search"
+                               class="form-control"
+                               id="venueLookup"
+                               placeholder="Type the ground name and town, e.g. Campbell Park Saltcoats"
+                               autocomplete="off">
+                        <div id="venueLookupResults" class="venue-lookup__results" aria-live="polite"></div>
+                        <p id="venueLookupStatus" class="venue-lookup__status"></p>
+                    </div>
+                    <div class="venue-editor-field venue-editor-field--full" id="venueManualWrap"<?= $showDetails ? ' hidden' : '' ?>>
+                        <button type="button" class="btn btn-outline-secondary" id="venueManualBtn">Enter manually</button>
+                    </div>
+                </div>
+            </section>
+
+            <div id="venueDetails"<?= $showDetails ? '' : ' hidden' ?>>
             <section class="venue-editor-section" aria-labelledby="venueIdentityHeading">
                 <div class="venue-editor-section__heading">
                     <span><i class="fa-solid fa-landmark" aria-hidden="true"></i></span>
@@ -178,8 +211,7 @@ $recordDate = (string)($venue['updated_at'] ?: ($venue['created_at'] ?? ''));
                                id="venueName"
                                name="name"
                                value="<?= h($formName) ?>"
-                               placeholder="e.g. Campbell Park"
-                               required>
+                               placeholder="e.g. Campbell Park">
                     </div>
                     <div class="venue-editor-field venue-editor-field--full">
                         <label for="venueClubName" class="form-label">Club name</label>
@@ -232,6 +264,27 @@ $recordDate = (string)($venue['updated_at'] ?: ($venue['created_at'] ?? ''));
                                placeholder="e.g. KA21 5JQ"
                                autocomplete="postal-code">
                     </div>
+                    <div class="venue-editor-field venue-editor-field--full">
+                        <input type="hidden" name="latitude" id="venueLatitude" value="<?= h($formLatitude) ?>">
+                        <input type="hidden" name="longitude" id="venueLongitude" value="<?= h($formLongitude) ?>">
+                        <p id="venuePinStatus" class="venue-lookup__status"><?= $formLatitude !== '' && $formLongitude !== '' ? 'Map pin set: ' . h($formLatitude) . ', ' . h($formLongitude) : 'No map pin set yet.' ?></p>
+                        <iframe id="venueMapPreview"
+                                class="venue-lookup__map"
+                                title="Map preview"
+                                loading="lazy"
+                                <?php if ($formLatitude !== '' && $formLongitude !== ''): ?>
+                                src="https://maps.google.com/maps?q=<?= h($formLatitude . ',' . $formLongitude) ?>&amp;z=16&amp;output=embed"
+                                <?php else: ?>
+                                hidden
+                                <?php endif; ?>></iframe>
+                    </div>
+                    <style>
+                        .venue-lookup__results { display: grid; gap: .35rem; margin-top: .5rem; }
+                        .venue-lookup__item { text-align: left; padding: .5rem .7rem; border: 1px solid #d6d6d6; border-radius: 8px; background: #fff; }
+                        .venue-lookup__item:hover, .venue-lookup__item:focus { border-color: #7a1730; outline: none; }
+                        .venue-lookup__status { margin: .4rem 0 0; font-size: .85rem; color: #6c757d; }
+                        .venue-lookup__map { display: block; width: 100%; height: 240px; border: 0; border-radius: 8px; margin-top: .6rem; }
+                    </style>
                 </div>
             </section>
 
@@ -269,6 +322,7 @@ $recordDate = (string)($venue['updated_at'] ?: ($venue['created_at'] ?? ''));
                     <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i>
                     <?= $action === 'new' ? 'Create Venue' : 'Save Changes' ?>
                 </button>
+            </div>
             </div>
         </div>
 
@@ -318,5 +372,91 @@ $recordDate = (string)($venue['updated_at'] ?: ($venue['created_at'] ?? ''));
         </aside>
     </form>
 </div>
+
+<script>
+(function () {
+    var input = document.getElementById('venueLookup');
+    if (!input) return;
+    var results = document.getElementById('venueLookupResults');
+    var status = document.getElementById('venueLookupStatus');
+    var latField = document.getElementById('venueLatitude');
+    var lonField = document.getElementById('venueLongitude');
+    var pinStatus = document.getElementById('venuePinStatus');
+    var preview = document.getElementById('venueMapPreview');
+    var timer = null;
+    var seq = 0;
+
+    function setPin(lat, lon) {
+        latField.value = lat;
+        lonField.value = lon;
+        pinStatus.textContent = 'Map pin set: ' + lat + ', ' + lon;
+        preview.src = 'https://maps.google.com/maps?q=' + lat + ',' + lon + '&z=16&output=embed';
+        preview.hidden = false;
+    }
+
+    function showDetails() {
+        document.getElementById('venueDetails').hidden = false;
+        document.getElementById('venueManualWrap').hidden = true;
+    }
+
+    document.getElementById('venueManualBtn').addEventListener('click', function () {
+        showDetails();
+        document.getElementById('venueName').focus();
+    });
+
+    function pick(r) {
+        document.getElementById('venueName').value = r.name || r.label;
+        document.getElementById('venueAddress').value = r.address_line1 || '';
+        document.getElementById('venueTown').value = r.town || '';
+        document.getElementById('venuePostcode').value = r.postcode || '';
+        showDetails();
+        setPin(r.latitude, r.longitude);
+        results.innerHTML = '';
+        status.textContent = 'Address and pin filled in. Check the map, then save.';
+    }
+
+    function render(list) {
+        results.innerHTML = '';
+        list.forEach(function (r) {
+            var b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'venue-lookup__item';
+            b.textContent = (r.name ? r.name + ' - ' : '') + r.label;
+            b.addEventListener('click', function () { pick(r); });
+            results.appendChild(b);
+        });
+    }
+
+    input.addEventListener('input', function () {
+        clearTimeout(timer);
+        var q = input.value.trim();
+        if (q.length < 3) {
+            results.innerHTML = '';
+            status.textContent = '';
+            return;
+        }
+        timer = setTimeout(function () {
+            var mine = ++seq;
+            status.textContent = 'Searching...';
+            fetch('venue_lookup.php?q=' + encodeURIComponent(q), { credentials: 'same-origin' })
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
+                    if (mine !== seq) return;
+                    if (d.error) { status.textContent = d.error; return; }
+                    if (!d.results.length) {
+                        results.innerHTML = '';
+                        status.textContent = 'No matches. Try the ground name with the town.';
+                        return;
+                    }
+                    status.textContent = 'Pick the right one:';
+                    render(d.results);
+                })
+                .catch(function () {
+                    status.textContent = 'The map search failed. Enter the details by hand.';
+                });
+        }, 400);
+    });
+})();
+</script>
 
 <?php require __DIR__ . '/footer.php'; ?>

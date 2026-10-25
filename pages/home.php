@@ -5,7 +5,7 @@ declare(strict_types=1);
 
 $seasonLabel = seo_season_label();
 set_meta([
-    'title' => club('club_name') . ' (' . club('club_short_name', club('club_name')) . ') | Official Club Website',
+    'title' => club('club_name') . ' (' . club('club_short_name', club('club_name')) . ') | Official Website',
     'title_full' => '1',
     'description' => 'Official website of ' . club('club_name') . '. The latest fixtures, results, news, squad information, tickets and club information'
         . (club('ground_name') !== '' ? ' from ' . club('ground_name') : '') . '.',
@@ -23,6 +23,7 @@ pub_jsonld([
 $featured = news_featured(db(), 4);
 $next = pub_next_fixture();
 $results = pub_recent_results(4);
+$upcoming = pub_upcoming_fixtures(4);
 $latestNews = news_published(db(), ['limit' => 6]);
 $ourRow = pub_league_our_row();
 ?>
@@ -75,10 +76,23 @@ $ourRow = pub_league_our_row();
   </div>
 </section>
 
-<?php if ($results !== []): ?>
+<?php if ($upcoming !== [] || $results !== []): ?>
 <section class="band">
   <div class="container">
+    <?php if ($upcoming !== []): ?>
     <div class="band__head">
+      <div><span class="eyebrow">Coming up</span><h2>Fixtures</h2></div>
+      <a class="linkarrow" href="<?= e(url('fixtures')) ?>">All fixtures</a>
+    </div>
+    <div class="results-rail">
+      <?php foreach ($upcoming as $fixture): ?>
+        <?php partial('match_card', ['fixture' => $fixture]); ?>
+      <?php endforeach; ?>
+    </div>
+    <?php endif; ?>
+
+    <?php if ($results !== []): ?>
+    <div class="band__head<?= $upcoming !== [] ? ' band__head--next' : '' ?>">
       <div><span class="eyebrow">Match day</span><h2>Recent results</h2></div>
       <a class="linkarrow" href="<?= e(url('results')) ?>">All results</a>
     </div>
@@ -87,9 +101,12 @@ $ourRow = pub_league_our_row();
         <?php partial('match_card', ['fixture' => $fixture]); ?>
       <?php endforeach; ?>
     </div>
+    <?php endif; ?>
   </div>
 </section>
 <?php endif; ?>
+
+<?php partial('boards_cta'); ?>
 
 <section class="band band--surface">
   <div class="container">
@@ -100,11 +117,24 @@ $ourRow = pub_league_our_row();
     <?php if ($latestNews === []): ?>
       <div class="emptystate"><p>The club news feed is being set up and will appear here shortly.</p></div>
     <?php else: ?>
-      <div class="news-grid">
-        <?php foreach ($latestNews as $article): ?>
-          <?php partial('news_card', ['article' => $article]); ?>
+      <div class="news-grid news-grid--featured">
+        <?php foreach ($latestNews as $i => $article): ?>
+          <?php partial('news_card', ['article' => $article, 'cardClass' => $i === 0 ? 'newscard--lead' : '']); ?>
         <?php endforeach; ?>
       </div>
     <?php endif; ?>
   </div>
 </section>
+
+<section class="sponsorband">
+  <div class="sponsorband__sweep" aria-hidden="true"></div>
+  <div class="container sponsorband__inner">
+    <div class="sponsorband__text">
+      <span class="sponsorband__eyebrow">Back the lads</span>
+      <h2>Your name on our shirts</h2>
+      <p>Sponsor a Saltcoats Victoria player&rsquo;s home or away kit for the season. Pick your player and send a request, and once the club approves it you can pay securely online. Your support goes straight back into the club.</p>
+    </div>
+    <a class="sponsorband__btn" href="<?= e(url('playersponsors')) ?>">Sponsor a player <span aria-hidden="true">&rarr;</span></a>
+  </div>
+</section>
+

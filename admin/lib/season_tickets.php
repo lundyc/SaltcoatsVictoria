@@ -2,9 +2,20 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/schema_guard.php';
+
 require_once __DIR__ . '/mailer.php';
 
 function ensureSeasonTicketSchema(PDO $pdo): void
+{
+    if (schema_guard_done('ensureSeasonTicketSchema')) {
+        return;
+    }
+    ensureSeasonTicketSchema_run($pdo);
+    schema_guard_mark('ensureSeasonTicketSchema');
+}
+
+function ensureSeasonTicketSchema_run(PDO $pdo): void
 {
     static $done = false;
     if ($done) {
@@ -710,7 +721,34 @@ function getSeasonTicketOrders(PDO $pdo, array $filters = []): array
         . ' ORDER BY o.order_date DESC, o.id DESC';
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
-    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // Passes issued since the move to shared orders (season_passes) have no row
+    // in the retired season_ticket_orders table, so add them here in the same
+    // shape. Migrated passes already appear above via their legacy order.
+    if (!empty($filters['holder_id'])) {
+        if (!function_exists('getSeasonPassesForPerson')) {
+            require_once __DIR__ . '/season_passes.php';
+        }
+        $personId = personIdFromLegacyHolderId($pdo, (int) $filters['holder_id']) ?? 0;
+        if ($personId > 0) {
+            foreach (getSeasonPassesForPerson($pdo, $personId) as $pass) {
+                if (!empty($pass['legacy_order_id']) || !empty($pass['legacy_season_ticket_order_id'])) {
+                    continue;
+                }
+                $shape = seasonPassLegacyOrderShape($pass);
+                $shape['holder_id'] = (int) $filters['holder_id'];
+                $shape['season_pass_id'] = (int) $pass['id'];
+                $shape['payment_method'] = 'shared_order';
+                if (!empty($filters['season_id']) && (int) $shape['season_id'] !== (int) $filters['season_id']) { continue; }
+                if (!empty($filters['ticket_type_id']) && (int) $shape['ticket_type_id'] !== (int) $filters['ticket_type_id']) { continue; }
+                if (!empty($filters['status']) && (string) $shape['status'] !== (string) $filters['status']) { continue; }
+                $rows[] = $shape;
+            }
+            usort($rows, static fn(array $a, array $b): int => strcmp((string) ($b['order_date'] ?? ''), (string) ($a['order_date'] ?? '')));
+        }
+    }
+    return $rows;
 }
 
 function getSeasonTicketOrder(PDO $pdo, int $id): ?array

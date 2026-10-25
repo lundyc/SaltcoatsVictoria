@@ -45,10 +45,7 @@ $pageHero = [
     'eyebrow' => 'Shop',
     'title' => 'Products',
     'subtitle' => 'Everything on sale in the storefront.',
-    'actions' => [
-        ['label' => 'Back to shop', 'href' => '/shop_overview.php', 'class' => 'btn btn-outline-light btn-sm'],
-        ['label' => 'Add product', 'href' => '/shop_product.php', 'class' => 'btn btn-light btn-sm'],
-    ],
+    'actions' => [],
 ];
 require_once __DIR__ . '/header.php';
 
@@ -58,6 +55,10 @@ $now = new DateTimeImmutable('now');
 ?>
 <div class="shop-admin-page">
     <nav class="hub-breadcrumb" aria-label="Breadcrumb"><a href="/admin/shop_overview.php">Shop</a> <i class="fa-solid fa-chevron-right" aria-hidden="true"></i> <span aria-current="page">Products</span></nav>
+    <?php shop_render_toolbar([
+        ['label' => 'Add product', 'href' => '/admin/shop_product.php', 'icon' => 'fa-plus', 'primary' => true],
+        ['label' => 'View storefront', 'href' => '/shop/', 'icon' => 'fa-arrow-up-right-from-square', 'attrs' => ['target' => '_blank', 'rel' => 'noopener']],
+    ]); ?>
 
     <?php if (isset($_GET['m'])): ?><div class="alert alert-success"><?= h((string) $_GET['m']) ?></div><?php endif; ?>
     <?php if (isset($_GET['e'])): ?><div class="alert alert-warning"><?= h((string) $_GET['e']) ?></div><?php endif; ?>
@@ -85,11 +86,12 @@ $now = new DateTimeImmutable('now');
                     <td data-label="Product" class="fw-bold"><a class="text-decoration-none" href="/admin/shop_product.php?id=<?= (int) $p['id'] ?>"><?= h((string) $p['name']) ?></a>
                         <div class="small text-muted">/shop/p/<?= h((string) $p['slug']) ?></div></td>
                     <td data-label="Category"><?= h((string) $p['category_name']) ?></td>
-                    <td data-label="Price" class="text-end"><?= gbp((float) $p['price']) ?></td>
-                    <td data-label="Stock" class="text-end"><?= $p['stock_qty'] === null ? '<span class="text-muted">∞</span>' : (int) $p['stock_qty'] ?></td>
+                    <td data-label="Price" class="text-end"><?php if (shop_product_on_sale($p)): ?><s class="text-muted small"><?= gbp((float) $p['price']) ?></s> <?= gbp(shop_product_price($p)) ?><?php else: ?><?= gbp((float) $p['price']) ?><?php endif; ?></td>
+                    <td data-label="Stock" class="text-end"><?= $p['stock_qty'] === null ? ((string) ($p['stock_status'] ?? '') === 'outofstock' ? '<span class="badge text-bg-danger">Out</span>' : '<span class="text-muted">∞</span>') : (int) $p['stock_qty'] ?></td>
                     <td data-label="Flags" class="small">
                         <?php if ((int) $p['is_preorder'] === 1): ?><span class="badge text-bg-warning">Pre-order<?= $closed ? ' (closed)' : '' ?></span><?php endif; ?>
                         <?php if ((int) $p['is_featured'] === 1): ?><span class="badge text-bg-info">Featured</span><?php endif; ?>
+                        <?php if ((int) $p['is_vsn'] === 1): ?><span class="badge text-bg-secondary">VSN</span><?php endif; ?>
                     </td>
                     <td data-label="Status">
                         <form method="post" class="d-inline">

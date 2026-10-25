@@ -53,6 +53,20 @@ function ensurePlayerSponsorshipShopSchema(PDO $pdo): void
         CONSTRAINT fk_player_sponsorship_orders_sponsor FOREIGN KEY (sponsor_id) REFERENCES sponsors (id) ON DELETE SET NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
+    // Contact consent captured at checkout (used to gather the sponsor's logo/details and keep in touch).
+    $orderColumns = [];
+    foreach ($pdo->query('SHOW COLUMNS FROM player_sponsorship_orders') as $row) {
+        $orderColumns[(string) $row['Field']] = true;
+    }
+    foreach (['consent_email', 'consent_sms', 'consent_whatsapp'] as $col) {
+        if (!isset($orderColumns[$col])) {
+            $pdo->exec("ALTER TABLE player_sponsorship_orders ADD COLUMN {$col} TINYINT(1) NOT NULL DEFAULT 0");
+        }
+    }
+    if (!isset($orderColumns['consent_at'])) {
+        $pdo->exec('ALTER TABLE player_sponsorship_orders ADD COLUMN consent_at DATETIME NULL');
+    }
+
     $pdo->exec("CREATE TABLE IF NOT EXISTS player_sponsorship_order_items (
         id INT UNSIGNED NOT NULL AUTO_INCREMENT,
         order_id INT UNSIGNED NOT NULL,
@@ -132,13 +146,26 @@ function player_sponsorship_shop_players_with_availability(PDO $pdo, int $season
     $pricing = getSeasonPlayerPricing($pdo, $seasonId);
 
     $takenByPackage = [];
+    $sponsorNames = [];
     foreach ($packages as $package) {
-        $stmt = $pdo->prepare("SELECT player_id FROM sponsorship_agreements WHERE package_id = :package AND season_id = :season AND status IN ('active','scheduled')");
+        $stmt = $pdo->prepare("SELECT a.player_id, s.name AS sponsor_name
+            FROM sponsorship_agreements a LEFT JOIN sponsors s ON s.id = a.sponsor_id
+            WHERE a.package_id = :package AND a.season_id = :season AND a.status IN ('active','scheduled')");
         $stmt->execute([':package' => $package['id'], ':season' => $seasonId]);
-        $takenByPackage[(int) $package['id']] = array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+        $takenByPackage[(int) $package['id']] = [];
+        $sponsorNames[(int) $package['id']] = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $takenByPackage[(int) $package['id']][] = (int) $row['player_id'];
+            $sponsorNames[(int) $package['id']][(int) $row['player_id']] = trim((string) ($row['sponsor_name'] ?? ''));
+        }
     }
 
-    $players = $pdo->query("SELECT id, name, avatar FROM players WHERE status = 'current' AND active = 1 ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
+    $players = $pdo->query("SELECT id, name, avatar, position FROM players WHERE status = 'current' AND active = 1 ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
+    require_once __DIR__ . '/squad_public.php';
+    $groupOrder = squad_group_order();
+    usort($players, static fn(array $a, array $b): int =>
+        [$groupOrder[squad_position_group(explode('/', (string) ($a['position'] ?? ''))[0])], strtolower((string) $a['name'])]
+        <=> [$groupOrder[squad_position_group(explode('/', (string) ($b['position'] ?? ''))[0])], strtolower((string) $b['name'])]);
 
     $out = [];
     foreach ($players as $player) {
@@ -151,12 +178,14 @@ function player_sponsorship_shop_players_with_availability(PDO $pdo, int $season
                 'package_name' => (string) $package['name'],
                 'price' => player_sponsorship_shop_package_price($package, $pricing),
                 'available' => !in_array($playerId, $takenByPackage[(int) $package['id']], true),
+                'sponsor_name' => $sponsorNames[(int) $package['id']][$playerId] ?? '',
             ];
         }
         $out[] = [
             'id' => $playerId,
             'name' => (string) $player['name'],
             'avatar_url' => player_sponsorship_shop_avatar_url($player['avatar'] ?? null),
+            'position' => squad_position_label($player['position'] ?? null),
             'packages' => $packageStates,
         ];
     }
@@ -177,7 +206,7 @@ function player_sponsorship_shop_players_with_availability(PDO $pdo, int $season
  * @param list<array{player_id: int, package_code: string}> $basketItems
  * @return array{order_id: int, dropped: list<array<string, mixed>>}
  */
-function player_sponsorship_shop_create_order(PDO $pdo, array $buyer, int $seasonId, array $basketItems): array
+function player_sponsorship_shop_create_order(PDO $pdo, array $buyer, int $seasonId, array $basketItems, string $status = 'pending_payment'): array
 {
     ensurePlayerSponsorshipShopSchema($pdo);
     if (!$basketItems) {
@@ -228,8 +257,10 @@ function player_sponsorship_shop_create_order(PDO $pdo, array $buyer, int $seaso
     $pdo->beginTransaction();
     try {
         $stmt = $pdo->prepare('INSERT INTO player_sponsorship_orders
-            (season_id, buyer_name, buyer_email, buyer_phone, buyer_is_business, buyer_address, buyer_website_url, total_amount, status, access_token)
-            VALUES (:season_id, :name, :email, :phone, :is_business, :address, :website, :total, :status, :token)');
+            (season_id, buyer_name, buyer_email, buyer_phone, buyer_is_business, buyer_address, buyer_website_url, total_amount, status, access_token,
+             consent_email, consent_sms, consent_whatsapp, consent_at)
+            VALUES (:season_id, :name, :email, :phone, :is_business, :address, :website, :total, :status, :token,
+             :c_email, :c_sms, :c_whatsapp, :c_at)');
         $stmt->execute([
             ':season_id' => $seasonId,
             ':name' => $buyer['name'],
@@ -239,8 +270,12 @@ function player_sponsorship_shop_create_order(PDO $pdo, array $buyer, int $seaso
             ':address' => $buyer['address'] !== '' ? $buyer['address'] : null,
             ':website' => $buyer['website_url'] !== '' ? $buyer['website_url'] : null,
             ':total' => round($total, 2),
-            ':status' => 'pending_payment',
+            ':status' => $status,
             ':token' => $accessToken,
+            ':c_email' => !empty($buyer['consent_email']) ? 1 : 0,
+            ':c_sms' => !empty($buyer['consent_sms']) ? 1 : 0,
+            ':c_whatsapp' => !empty($buyer['consent_whatsapp']) ? 1 : 0,
+            ':c_at' => (!empty($buyer['consent_email']) || !empty($buyer['consent_sms']) || !empty($buyer['consent_whatsapp'])) ? date('Y-m-d H:i:s') : null,
         ]);
         $orderId = (int) $pdo->lastInsertId();
 
@@ -371,7 +406,7 @@ function player_sponsorship_shop_find_or_create_sponsor(PDO $pdo, array $order):
         }
     }
 
-    $name = trim((string) $order['buyer_name']);
+    $name = trim((string) ($order['sponsor_display_name'] ?? '')) !== '' ? trim((string) $order['sponsor_display_name']) : trim((string) $order['buyer_name']);
     $insert = $pdo->prepare('INSERT INTO sponsors (name, contact_email, contact_phone, is_business, address, website_url, is_active)
         VALUES (:name, :email, :phone, :is_business, :address, :website, 1)');
     $params = [

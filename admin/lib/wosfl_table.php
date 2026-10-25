@@ -99,12 +99,7 @@ function wosfl_resolve_badge(string $clubName, string $logoUrl, string $badgeDir
         }
     }
 
-    if ($logoUrl !== '' && !file_exists($defaultPath)) {
-        $img = @file_get_contents($logoUrl);
-        if ($img) {
-            file_put_contents($defaultPath, $img);
-        }
-    }
+    // Badges are never downloaded from WOSFL: only the club's own uploads in badges/ are used.
 
     if (is_file($defaultPath)) {
         return [$defaultRelative, $defaultPath];

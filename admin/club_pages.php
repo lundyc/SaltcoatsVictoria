@@ -104,7 +104,7 @@ $form = array_merge([
     <?php if (!$showForm): ?>
       <div class="card hub-section"><div class="card-body text-muted">Select a page to edit, or create a new one.</div></div>
     <?php else: ?>
-      <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/easymde@2.18.0/dist/easymde.min.css">
+      <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/easymde@2.21.0/dist/easymde.min.css">
       <form method="post" class="card hub-section">
         <div class="card-body">
           <?= csrf_field() ?>
@@ -155,7 +155,7 @@ $form = array_merge([
           </div>
         </div>
       </form>
-      <script src="https://cdn.jsdelivr.net/npm/easymde@2.18.0/dist/easymde.min.js"></script>
+      <script src="https://cdn.jsdelivr.net/npm/easymde@2.21.0/dist/easymde.min.js"></script>
       <script>new EasyMDE({ element: document.getElementById('body'), spellChecker: false, status: ['lines', 'words'], minHeight: '320px',
         toolbar: ['bold','italic','heading','|','quote','unordered-list','ordered-list','|','link','table','|','preview','guide'] });</script>
     <?php endif; ?>

@@ -75,7 +75,7 @@ $pageHero = [
     'eyebrow' => 'Shop',
     'title' => 'Orders',
     'subtitle' => 'Online and manually recorded shop orders.',
-    'actions' => [['label' => 'Back to shop', 'href' => '/shop_overview.php', 'class' => 'btn btn-outline-light btn-sm']],
+    'actions' => [],
 ];
 require_once __DIR__ . '/header.php';
 
@@ -94,6 +94,10 @@ function shop_status_badge(string $status): string
 ?>
 <div class="shop-admin-page">
     <nav class="hub-breadcrumb" aria-label="Breadcrumb"><a href="/admin/shop_overview.php">Shop</a> <i class="fa-solid fa-chevron-right" aria-hidden="true"></i> <span aria-current="page">Orders</span></nav>
+    <?php shop_render_toolbar([
+        ['label' => 'Add manual order', 'href' => '/admin/shop_order_new.php', 'icon' => 'fa-plus', 'primary' => true],
+        hub_auth_is_admin() ? ['label' => 'Export CSV', 'href' => '/admin/shop_orders.php?' . http_build_query(array_merge($_GET, ['export' => 'csv'])), 'icon' => 'fa-download'] : null,
+    ]); ?>
 
     <?php if (isset($_GET['vsn_marked'])): ?>
         <div class="alert alert-success"><?= (int) $_GET['vsn_marked'] ?> order(s) flagged as sent to VSN.</div>
@@ -104,8 +108,8 @@ function shop_status_badge(string $status): string
     <?php if ($pendingVsnOrders !== []): ?>
         <div class="card hub-panel p-3 mb-3 d-flex flex-row flex-wrap justify-content-between align-items-center gap-3">
             <div>
-                <strong><?= count($pendingVsnOrders) ?> pre-order<?= count($pendingVsnOrders) === 1 ? '' : 's' ?> not yet sent to VSN</strong>
-                <div class="small text-muted">Download the combined order form for VSN — product, size and customer details for every order below.</div>
+                <strong><?= count($pendingVsnOrders) ?> order<?= count($pendingVsnOrders) === 1 ? '' : 's' ?> with VSN items not yet sent</strong>
+                <div class="small text-muted">The combined order form lists only VSN-manufactured items, with size and customer details.</div>
             </div>
             <div class="d-flex gap-2">
                 <a class="btn btn-brand" href="/admin/shop_vsn_order_form_pdf.php?download=1"><i class="fa-solid fa-file-pdf me-1" aria-hidden="true"></i>Download VSN order form (PDF)</a>
@@ -118,10 +122,6 @@ function shop_status_badge(string $status): string
         </div>
     <?php endif; ?>
 
-    <div class="d-flex gap-2 mb-3">
-        <a class="btn btn-dark" href="/admin/shop_order_new.php">Add manual order</a>
-        <a class="btn btn-outline-secondary" href="/admin/shop_discount_codes.php">Discount codes</a>
-    </div>
     <form class="card hub-panel p-3 mb-3" method="get">
         <div class="row g-2 align-items-end">
             <div class="col-md-3"><label class="form-label">Status</label>
@@ -139,25 +139,21 @@ function shop_status_badge(string $status): string
                 <button class="btn btn-dark" type="submit">Filter</button>
             </div>
         </div>
-        <div class="mt-2">
-            <a class="btn btn-sm btn-outline-secondary" href="/admin/shop_orders.php?<?= h($exportQuery) ?>"><i class="fa-solid fa-download me-1"></i>Export CSV</a>
-            <span class="text-muted small ms-2"><?= count($orders) ?> order<?= count($orders) === 1 ? '' : 's' ?></span>
-        </div>
+        <div class="mt-2 text-muted small"><?= count($orders) ?> order<?= count($orders) === 1 ? '' : 's' ?></div>
     </form>
 
-    <?php $showScheduleCol = shop_scheduling_enabled($pdo); ?>
     <section class="card hub-panel">
         <table class="table align-middle mb-0 hub-data-table hub-data-table--responsive">
-            <thead><tr><th>Ref</th><th>Placed</th><th>Customer</th><?php if ($showScheduleCol): ?><th>Requested date</th><?php endif; ?><th class="text-end">Items</th><th class="text-end">Total</th><th>Status</th><th></th></tr></thead>
+            <thead><tr><th>Ref</th><th>Placed</th><th>Customer</th><th class="text-end">Items</th><th class="text-end">Total</th><th>Status</th><th></th></tr></thead>
             <tbody>
-            <?php if (!$orders): ?><tr><td colspan="<?= $showScheduleCol ? 8 : 7 ?>" class="text-muted text-center py-4">No orders match.</td></tr><?php endif; ?>
+            <?php if (!$orders): ?><tr><td colspan="7" class="text-muted text-center py-4">No orders match.</td></tr><?php endif; ?>
             <?php foreach ($orders as $o): ?>
                 <tr>
                     <td data-label="Ref" class="fw-bold"><a class="text-decoration-none" href="/admin/shop_order.php?id=<?= (int) $o['id'] ?>"><?= h((string) $o['order_ref']) ?></a>
-                        <?php if ((int) $o['is_preorder'] === 1): ?><span class="badge text-bg-warning ms-1">Pre-order</span><?php endif; ?></td>
+                        <?php if ((int) $o['is_preorder'] === 1): ?><span class="badge text-bg-warning ms-1">Pre-order</span><?php endif; ?>
+                        <?php if ((int) ($o['has_vsn'] ?? 0) === 1): ?><span class="badge text-bg-secondary ms-1"><?= !empty($o['vsn_ordered_at']) ? 'VSN · sent' : 'VSN' ?></span><?php endif; ?></td>
                     <td data-label="Placed" class="small text-muted"><?= h((new DateTimeImmutable((string) $o['created_at']))->format('d/m/Y H:i')) ?></td>
                     <td data-label="Customer"><?= h((string) $o['customer_name']) ?><div class="small text-muted"><?= h((string) $o['customer_email']) ?></div></td>
-                    <?php if ($showScheduleCol): ?><td data-label="Requested date" class="small"><?= !empty($o['requested_date']) ? h((new DateTimeImmutable((string) $o['requested_date']))->format('d/m/Y')) : '—' ?></td><?php endif; ?>
                     <td data-label="Items" class="text-end"><?= (int) $o['item_count'] ?></td>
                     <td data-label="Total" class="text-end fw-bold"><?= gbp((float) $o['total']) ?><?php if ((float) $o['amount_refunded'] > 0): ?><div class="small text-warning">−<?= gbp((float) $o['amount_refunded']) ?></div><?php endif; ?></td>
                     <td data-label="Status"><?= shop_status_badge((string) $o['status']) ?></td>

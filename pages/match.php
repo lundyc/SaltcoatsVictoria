@@ -63,7 +63,9 @@ if ($record) {
         ],
     ];
     $timeline = $record['events'];
+    $shootout = $record['shootout'] ?? ['us' => [], 'opp' => []];
 } else {
+    $shootout = ['us' => [], 'opp' => []];
     $xi = [
         'us' => [
             'starters' => $mkPlayers($legacyLineup['starters'], $legacyLineup['captain']),
@@ -86,7 +88,6 @@ $related = news_for_fixture(db(), (int) $fixture['id']);
 $report   = $related[0] ?? null;           // newest linked article == match report
 $moreNews = array_slice($related, 1);
 $archiveReport = $played ? pub_fixture_history_report((int) $fixture['id']) : null;   // old written report, migrated from the results archive
-$veo = trim((string) ($fixture['veo_url'] ?? ''));
 
 /* --- upcoming-fixture preview extras (weather / H2H / league / form) ----- */
 $preview = null;
@@ -121,7 +122,7 @@ $renderName = static function (string $name, bool $ours) use ($findPlayer): stri
     }
     $p = $ours ? $findPlayer($name) : null;
     return $p
-        ? '<a class="mc-plink" href="' . e(url('team/' . $p['slug'])) . '">' . e($name) . '</a>'
+        ? '<a class="mc-plink" href="' . e(url('team/' . $p['slug'])) . '">' . e((string) $p['name']) . '</a>'
         : e($name);
 };
 
@@ -198,7 +199,7 @@ $lineupRow = static function (array $p, string $who, bool $anyNums, bool $subLis
             <span class="match-lineups__event"><span class="match-lineups__event-minute"><?= e($goal['minute'] !== '' ? $goal['minute'] . "'" : '') ?></span><?= mc_glyph(strcasecmp($goal['label'], 'Own goal') === 0 ? 'own_goal' : 'goal') ?><span class="sr-only"><?= e($goal['label']) ?></span></span>
           <?php endforeach; ?>
           <?php foreach ($cards as $c): $cm = stripos($c['label'], 'red') !== false ? 'red' : 'yellow'; ?>
-            <span class="match-lineups__event"><span class="match-lineups__event-minute"><?= e($c['minute'] !== '' ? $c['minute'] . "'" : '') ?></span><span class="mc-card mc-card--<?= $cm ?>" aria-label="<?= e($c['label']) ?>"></span></span>
+            <span class="match-lineups__event"><span class="match-lineups__event-minute"><?= e($c['minute'] !== '' ? $c['minute'] . "'" : '') ?></span><span class="mc-card mc-card--<?= $cm ?>" role="img" aria-label="<?= e($c['label']) ?>"></span></span>
           <?php endforeach; ?>
           <?php if (!$subList && $off !== null): ?>
             <span class="match-lineups__event"><span class="match-lineups__event-minute"><?= e($off !== '' ? $off . "'" : '') ?></span><?= mc_arrow('off') ?><span class="sr-only">Substituted off</span></span>
@@ -285,11 +286,13 @@ $ftAway ??= null;
 $compLabel = (string) ($fixture['competition'] ?: 'Fixture');
 $dateLong = format_date($fixture['match_date'], 'j M Y');
 if ($played && $ftHome !== null && $ftAway !== null) {
-    $matchTitle = $teams['home'] . ' ' . (int) $ftHome . '–' . (int) $ftAway . ' ' . $teams['away'] . ' | Match Report, ' . $dateLong;
+    $matchLine = $teams['home'] . ' ' . (int) $ftHome . '–' . (int) $ftAway . ' ' . $teams['away'];
+    $matchTitle = seo_fit_title([$matchLine . ' | Match Report, ' . $dateLong, $matchLine . ' | ' . $dateLong, $matchLine . ' | ' . format_date($fixture['match_date'], 'j M y'), $matchLine . ' | Match Report', $matchLine]);
     $matchDesc = 'Match report: ' . $teams['home'] . ' ' . (int) $ftHome . '–' . (int) $ftAway . ' ' . $teams['away']
         . ' in the ' . $compLabel . ' on ' . $dateLong . ($venue !== '' ? ' at ' . $venue : '') . '. Full-time result, line-ups and match events.';
 } else {
-    $matchTitle = $teams['home'] . ' v ' . $teams['away'] . ' | ' . $compLabel . ', ' . $dateLong;
+    $matchLine = $teams['home'] . ' v ' . $teams['away'];
+    $matchTitle = seo_fit_title([$matchLine . ' | ' . $compLabel . ', ' . $dateLong, $matchLine . ' | ' . $dateLong, $matchLine . ' | ' . format_date($fixture['match_date'], 'j M y'), $matchLine . ' | ' . $compLabel, $matchLine]);
     $matchDesc = $compLabel . ': ' . $teams['home'] . ' v ' . $teams['away'] . ' on ' . format_date($fixture['match_date'], 'l j F Y')
         . ($ko !== '' ? ', kick-off ' . $ko : '') . ($venue !== '' ? ' at ' . $venue : '') . '.';
 }
@@ -375,7 +378,9 @@ pub_jsonld([
         <p><?= e($usShort) ?> <?= $fixture['is_home'] ? 'host ' . e($oppLabel) : 'travel to ' . e($oppLabel) ?>
            in the <?= e($fixture['competition'] ?: 'league') ?>
            on <?= e(format_date($fixture['match_date'], 'l j F')) ?><?= $ko ? ', ' . e($ko) . ' kick-off' : '' ?><?= $venue ? ' at ' . e($venue) : '' ?>.</p>
-        <p><a class="btn btn--sm" href="/tickets">Match tickets</a></p>
+        <?php if (($ticketsHref = pub_fixture_tickets_url($fixture)) !== ''): ?>
+        <p><a class="btn btn--sm" href="<?= e($ticketsHref) ?>">Match tickets</a></p>
+        <?php endif; ?>
       </div>
 
       <?php if ($preview['showLeagueTable']):
@@ -471,7 +476,7 @@ pub_jsonld([
                 <<?= $tag ?> class="mc-h2h__link"<?= $href ?>>
                   <div class="mc-h2h__when">
                     <span class="mc-h2h__date"><?= e(format_date($m['date'], 'j M Y')) ?></span>
-                    <span class="mc-h2h__comp"><?= e($m['competition'] ?: 'Match') ?></span>
+                    <span class="mc-h2h__comp" title="<?= e($m['competition'] ?: 'Match') ?>"><?= e(pub_competition_short((string) ($m['competition'] ?: 'Match'))) ?></span>
                   </div>
                   <div class="mc-h2h__row">
                     <div class="mc-h2h__side mc-h2h__side--home">
@@ -591,6 +596,37 @@ pub_jsonld([
       </div>
     <?php endif; ?>
 
+    <?php if ($shootout['us'] || $shootout['opp']): ?>
+      <?php
+      $soCols = ['home' => $fixture['is_home'] ? 'us' : 'opp', 'away' => $fixture['is_home'] ? 'opp' : 'us'];
+      $soScored = static fn (array $kicks): int => count(array_filter($kicks, static fn (array $k): bool => $k['scored']));
+      ?>
+      <div class="mc-panel mc-shootout">
+        <h2>Penalty shootout</h2>
+        <p class="mc-shootout__score">
+          <span><?= e($teams['home']) ?></span>
+          <strong><?= $soScored($shootout[$soCols['home']]) ?> &ndash; <?= $soScored($shootout[$soCols['away']]) ?></strong>
+          <span><?= e($teams['away']) ?></span>
+        </p>
+        <div class="mc-shootout__grid">
+          <?php foreach ($soCols as $sideName => $who): ?>
+            <div class="mc-shootout__team">
+              <div class="mc-shootout__head"><?= e($who === 'us' ? club('club_short_name', 'Saltcoats Vics') : $teams[$sideName]) ?></div>
+              <ol class="mc-shootout__list">
+                <?php foreach ($shootout[$who] as $k): ?>
+                  <li class="mc-shootout__kick mc-shootout__kick--<?= $k['scored'] ? 'scored' : 'missed' ?>">
+                    <span class="mc-shootout__shirt"><?= $k['number'] !== null ? (int) $k['number'] : '' ?></span>
+                    <span class="mc-shootout__name"><?= $renderName($k['name'], $who === 'us') ?></span>
+                    <span class="mc-shootout__result" title="<?= $k['scored'] ? 'Scored' : 'Missed' ?>"><span aria-hidden="true"><?= $k['scored'] ? '&#10003;' : '&#10005;' ?></span><span class="sr-only"><?= $k['scored'] ? 'Scored' : 'Missed' ?></span></span>
+                  </li>
+                <?php endforeach; ?>
+              </ol>
+            </div>
+          <?php endforeach; ?>
+        </div>
+      </div>
+    <?php endif; ?>
+
     <?php if ($xi['us']['starters'] || $haveOppXI):
         // Column order follows the hero: home team left, away team right.
         $cols = [
@@ -694,7 +730,7 @@ pub_jsonld([
         <?php if ($arHtml !== ''): ?>
           <div class="prose">
             <?php if ($archiveReport['report_by'] !== ''): ?><p class="mc-report__by">Report by <?= e($archiveReport['report_by']) ?></p><?php endif; ?>
-            <?= $arHtml /* sanitised at import by tools/import_svfc_history.php */ ?>
+            <?= seo_normalize_headings($arHtml, 3) /* sanitised at import by tools/import_svfc_history.php */ ?>
           </div>
         <?php endif; ?>
         <p class="mc-report__note">From the club’s results archive.</p>
@@ -721,9 +757,6 @@ pub_jsonld([
       </div>
     <?php endif; ?>
 
-    <?php if ($veo !== ''): ?>
-      <p><a class="btn btn--ghost btn--sm" href="<?= e($veo) ?>" target="_blank" rel="noopener">Watch highlights on Veo</a></p>
-    <?php endif; ?>
   </div>
 
   <aside class="mc-side">
@@ -766,24 +799,23 @@ pub_jsonld([
       </div>
     <?php endif; ?>
 
-    <?php $links = pub_fixture_links($fixture); ?>
-    <?php if ($links['prev'] || $links['next']): ?>
-      <div class="mc-panel">
-        <h2>Previous &amp; next match</h2>
-        <ul class="mc-related">
-          <?php if ($links['prev']): ?><li><a href="<?= e(url('match/' . (int) $links['prev']['id'])) ?>" rel="prev">&larr; <?= e(pub_fixture_link_label($links['prev'])) ?></a></li><?php endif; ?>
-          <?php if ($links['next']): ?><li><a href="<?= e(url('match/' . (int) $links['next']['id'])) ?>" rel="next"><?= e(pub_fixture_link_label($links['next'])) ?> &rarr;</a></li><?php endif; ?>
-        </ul>
-      </div>
-    <?php endif; ?>
-    <?php if ($links['meetings']): ?>
-      <div class="mc-panel">
-        <h2>Other games v <?= e($fixture['opponent_name'] ?: $fixture['opponent']) ?></h2>
-        <ul class="mc-related">
-          <?php foreach ($links['meetings'] as $mt): ?>
-            <li><a href="<?= e(url('match/' . (int) $mt['id'])) ?>"><?= e(pub_fixture_link_label($mt)) ?></a></li>
-          <?php endforeach; ?>
-        </ul>
+    <?php $mapPoint = pub_venue_coords($fixture); $mapName = $venue !== '' ? $venue : (string) ($fixture['opponent_name'] ?: $fixture['opponent']); ?>
+    <?php if ($mapPoint): ?>
+      <div class="mc-panel mc-map">
+        <h2>Venue map</h2>
+        <?php $coords = $mapPoint['lat'] . ',' . $mapPoint['lon']; ?>
+        <iframe class="mc-map__frame" title="Map of <?= e($mapName) ?>" loading="lazy" referrerpolicy="no-referrer-when-downgrade"
+                src="https://maps.google.com/maps?q=<?= e($coords) ?>&amp;z=16&amp;output=embed"></iframe>
+        <div class="mc-venue">
+          <p class="mc-venue__name"><?= e($mapName) ?></p>
+          <?php if ($fixture['is_home']): ?>
+            <?php if (club('ground_address', '') !== ''): ?><p class="mc-venue__address"><?= e(club('ground_address')) ?></p><?php endif; ?>
+          <?php else: ?>
+            <p class="mc-venue__address"><?= e($mapPoint['label'] !== '' ? $mapPoint['label'] : 'Away ground') ?></p>
+            <p class="mc-map__note">Approximate location of the away ground.</p>
+          <?php endif; ?>
+        </div>
+        <a class="btn btn--sm mc-venue__cta" href="https://www.google.com/maps/search/?api=1&amp;query=<?= e($coords) ?>" target="_blank" rel="noopener">Open in Google Maps</a>
       </div>
     <?php endif; ?>
 

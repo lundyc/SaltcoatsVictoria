@@ -56,11 +56,36 @@ function hub_opposition_report_resolve(string $file): ?string
     return is_file($path) ? $path : null;
 }
 
+/**
+ * Load a report's JSON and attach the team's cup matches from the sibling
+ * "<Team>-Cup.json" (kept apart so the league refresh never overwrites them).
+ * Cup matches are only ever shown in their own section, never in league stats.
+ */
+function hub_opposition_report_load(string $path): ?array
+{
+    $data = json_decode((string)file_get_contents($path), true);
+    if (!is_array($data)) {
+        return null;
+    }
+    $cupPath = preg_replace('/\.json$/', '', $path) . '-Cup.json';
+    if (is_file($cupPath)) {
+        $cup = json_decode((string)file_get_contents($cupPath), true);
+        if (is_array($cup) && is_array($cup['matches'] ?? null)) {
+            $data['cup_matches'] = $cup['matches'];
+        }
+    }
+    return $data;
+}
+
 /** Every uploaded report, newest first, with just enough decoded to list it. */
 function hub_opposition_report_list(): array
 {
     $out = [];
     foreach (glob(hub_opposition_report_dir() . '/*.json') ?: [] as $path) {
+        // "<Team>-Cup.json" holds cup matches that are shown inside the team's own report.
+        if (str_ends_with($path, '-Cup.json')) {
+            continue;
+        }
         $raw = file_get_contents($path);
         $data = is_string($raw) ? json_decode($raw, true) : null;
         $out[] = [
@@ -285,6 +310,43 @@ function hub_opposition_report_build(array $data): array
         }
     }
 
+    $cupMatches = [];
+    $cupRaw = array_values(array_filter(is_array($data['cup_matches'] ?? null) ? $data['cup_matches'] : [], static function ($m) {
+        return is_array($m) && strtoupper((string)($m['status'] ?? '')) === 'PLAYED' && is_array($m['score'] ?? null);
+    }));
+    usort($cupRaw, static fn(array $a, array $b): int => ($b['dateTimeUTC'] ?? 0) <=> ($a['dateTimeUTC'] ?? 0));
+    foreach ($cupRaw as $m) {
+        $isHome = hub_opposition_team_is_target((string)($m['homeTeam'] ?? ''), $target);
+        $for = (int)($isHome ? ($m['score']['home'] ?? 0) : ($m['score']['away'] ?? 0));
+        $against = (int)($isHome ? ($m['score']['away'] ?? 0) : ($m['score']['home'] ?? 0));
+        $scorers = [];
+        foreach (is_array($m['events'] ?? null) ? $m['events'] : [] as $e) {
+            $mySide = $isHome ? 'home' : 'away';
+            if (in_array($e['type'] ?? '', ['goal', 'penalty'], true) && (($e['side'] ?? '') === $mySide) && (string)($e['player'] ?? '') !== '') {
+                $name = hub_opposition_format_name((string)$e['player']);
+                $scorers[$name] = ($scorers[$name] ?? 0) + 1;
+            } elseif (($e['type'] ?? '') === 'own_goal' && (($e['side'] ?? '') !== $mySide) && (string)($e['player'] ?? '') !== '') {
+                $name = hub_opposition_format_name((string)$e['player']) . ' (og)';
+                $scorers[$name] = ($scorers[$name] ?? 0) + 1;
+            }
+        }
+        $scorerText = [];
+        foreach ($scorers as $name => $n) {
+            $scorerText[] = $n > 1 ? $name . ' (' . $n . ')' : $name;
+        }
+        $cupMatches[] = [
+            'date'        => isset($m['dateTimeUTC']) ? (int)$m['dateTimeUTC'] : 0,
+            'competition' => (string)($m['competition'] ?? ''),
+            'round'       => (string)($m['round'] ?? ''),
+            'opponent'    => $isHome ? (string)($m['awayTeam'] ?? '') : (string)($m['homeTeam'] ?? ''),
+            'home'        => $isHome,
+            'for'         => $for,
+            'against'     => $against,
+            'outcome'     => $for > $against ? 'W' : ($for < $against ? 'L' : 'D'),
+            'scorers'     => implode(', ', $scorerText),
+        ];
+    }
+
     $keyFacts = hub_opposition_report_key_facts($results, $goalThreats, $usageRows, $discRows, $subMinutes, $totalMatches);
 
     return [
@@ -301,6 +363,7 @@ function hub_opposition_report_build(array $data): array
         'captain'       => $captain,
         'goalkeeper'    => $goalkeeper,
         'key_facts'     => $keyFacts,
+        'cup_matches'   => $cupMatches,
     ];
 }
 

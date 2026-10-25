@@ -1179,7 +1179,8 @@
     .rpt-filter-card,
     .rpt-table-card__actions,
     .hub-mobile-nav,
-    #hubSideNavigation {
+    #hubSideNavigation,
+    .hub-sidebar-rail {
         display: none !important;
     }
 

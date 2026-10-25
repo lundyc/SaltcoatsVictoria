@@ -130,7 +130,7 @@ require_once __DIR__ . '/lib/functions.php';
 ?>
 <style>
     <?php if ($embedded): ?>
-    body > nav, body > footer, .hub-desktop-nav-toggle { display: none !important; }
+    body > nav, body > footer, .hub-sidebar-rail, .hub-desktop-nav-toggle { display: none !important; }
     body { min-height: 0; background: #fff; }
     body > main > .container-fluid { width: 100% !important; max-width: none !important; margin: 0 !important; padding: 0 !important; }
     .ml-page { padding: 1rem 1.15rem 2rem; }
@@ -212,33 +212,6 @@ require_once __DIR__ . '/lib/functions.php';
                         <span class="small text-secondary"><?= $side === 'svfc' ? 'Pick from the squad' : 'Type the names' ?></span>
                     </div>
                     <div class="card-body">
-                        <form method="post" action="match_formation_save.php" class="ml-pitch-form mb-3" id="pitch-<?= h($side) ?>">
-                            <?= csrf_field() ?>
-                            <input type="hidden" name="fixture_id" value="<?= $fixtureId ?>">
-                            <input type="hidden" name="season_id" value="<?= $seasonId ?>">
-                            <input type="hidden" name="side" value="<?= h($side) ?>">
-                            <?php if ($embedded): ?><input type="hidden" name="embedded" value="1"><?php endif; ?>
-                            <input type="hidden" name="layout_json" value="">
-                            <div class="d-flex align-items-end gap-2 mb-2" style="max-width:20rem">
-                                <div class="flex-grow-1">
-                                    <label class="form-label small fw-bold mb-1">Formation</label>
-                                    <select name="formation_key" class="form-select form-select-sm" data-formation-select<?= $seasonLocked ? ' disabled' : '' ?>>
-                                        <?php foreach ($formations as $f): ?>
-                                            <option value="<?= h($f) ?>"<?= $f === $formation ? ' selected' : '' ?>><?= $f === '' ? '—' : h($f) ?></option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                </div>
-                                <?php if (!$seasonLocked): ?>
-                                    <button type="submit" class="btn btn-outline-secondary btn-sm">Save shape</button>
-                                <?php endif; ?>
-                            </div>
-                            <div class="ml-pitch" data-pitch data-side="<?= h($side) ?>"
-                                 data-layout='<?= h(json_encode($layout ?? new stdClass(), JSON_UNESCAPED_SLASHES)) ?>'
-                                 data-chips='<?= h(json_encode($chipLabels, JSON_UNESCAPED_SLASHES)) ?>'
-                                 data-locked="<?= $seasonLocked ? '1' : '0' ?>"></div>
-                            <p class="small text-secondary mb-0">Drag the shirts to fine-tune, then Save shape. Changing the formation re-lays them out.</p>
-                        </form>
-
                         <form method="post" action="match_lineup_save.php" class="ml-lineup-form">
                             <?= csrf_field() ?>
                             <input type="hidden" name="fixture_id" value="<?= $fixtureId ?>">
@@ -338,79 +311,6 @@ require_once __DIR__ . '/lib/functions.php';
                                 <button type="submit" class="btn btn-primary btn-sm ms-auto"<?= $seasonLocked ? ' disabled' : '' ?>><i class="fa-solid fa-floppy-disk me-1"></i>Save <?= h($meta['label']) ?> line-up</button>
                             </div>
                         </form>
-
-                        <hr>
-                        <div class="fw-bold small text-secondary text-uppercase mb-2">Substitutions</div>
-                        <?php if ($sideSubs === []): ?>
-                            <p class="text-secondary small mb-2">No substitutions recorded.</p>
-                        <?php else: ?>
-                            <ul class="list-group list-group-flush mb-2">
-                                <?php foreach ($sideSubs as $s): ?>
-                                    <li class="list-group-item d-flex align-items-center justify-content-between px-0 py-1 small">
-                                        <span>
-                                            <span class="badge bg-light text-dark border"><?= h(matchday_record_minute_label((int) $s['minute'], (int) $s['minute_extra'], $s['minute'] === null)) ?: '?' ?>'</span>
-                                            <i class="fa-solid fa-arrow-right-arrow-left mx-1 text-secondary"></i>
-                                            <span class="text-danger"><?= h((string) $s['player_off_name']) ?></span>
-                                            <i class="fa-solid fa-arrow-right mx-1 text-secondary"></i>
-                                            <span class="text-success"><?= h((string) $s['player_on_name']) ?></span>
-                                            <?php if ((string) $s['reason'] !== ''): ?><span class="text-secondary">· <?= h((string) $s['reason']) ?></span><?php endif; ?>
-                                        </span>
-                                        <form method="post" action="match_sub_save.php" data-confirm="Remove this substitution?" data-confirm-action="Remove">
-                                            <?= csrf_field() ?>
-                                            <input type="hidden" name="fixture_id" value="<?= $fixtureId ?>">
-                                            <input type="hidden" name="season_id" value="<?= $seasonId ?>">
-                                            <input type="hidden" name="action" value="delete">
-                                            <input type="hidden" name="sub_id" value="<?= (int) $s['id'] ?>">
-                                            <?php if ($embedded): ?><input type="hidden" name="embedded" value="1"><?php endif; ?>
-                                            <button type="submit" class="btn btn-link btn-sm text-danger p-0"<?= $seasonLocked ? ' disabled' : '' ?>><i class="fa-solid fa-xmark"></i></button>
-                                        </form>
-                                    </li>
-                                <?php endforeach; ?>
-                            </ul>
-                        <?php endif; ?>
-
-                        <?php
-                        $benchNames = [];
-                        foreach (($record['lineups'][$side] ?? []) as $r) {
-                            if ((string) $r['player_name'] !== '') {
-                                $benchNames[] = (string) $r['player_name'];
-                            }
-                        }
-                        $benchNames = array_values(array_unique($benchNames));
-                        ?>
-                        <?php if (!$seasonLocked): ?>
-                        <form method="post" action="match_sub_save.php" class="row g-2 align-items-end">
-                            <?= csrf_field() ?>
-                            <input type="hidden" name="fixture_id" value="<?= $fixtureId ?>">
-                            <input type="hidden" name="season_id" value="<?= $seasonId ?>">
-                            <input type="hidden" name="side" value="<?= h($side) ?>">
-                            <input type="hidden" name="action" value="add">
-                            <?php if ($embedded): ?><input type="hidden" name="embedded" value="1"><?php endif; ?>
-                            <div class="col-12 col-sm">
-                                <label class="form-label small mb-0">Off</label>
-                                <input type="text" name="player_off_name" class="form-control form-control-sm" list="benchList_<?= h($side) ?>" required>
-                            </div>
-                            <div class="col-12 col-sm">
-                                <label class="form-label small mb-0">On</label>
-                                <input type="text" name="player_on_name" class="form-control form-control-sm" list="benchList_<?= h($side) ?>" required>
-                            </div>
-                            <div class="col-6 col-sm-2">
-                                <label class="form-label small mb-0">Min</label>
-                                <input type="number" name="minute" class="form-control form-control-sm" min="0" max="130">
-                            </div>
-                            <div class="col-6 col-sm-2">
-                                <label class="form-label small mb-0">+</label>
-                                <input type="number" name="minute_extra" class="form-control form-control-sm" min="0" max="20" value="0">
-                            </div>
-                            <div class="col-12 col-sm-auto">
-                                <button type="submit" class="btn btn-outline-primary btn-sm w-100"><i class="fa-solid fa-plus me-1"></i>Add sub</button>
-                            </div>
-                            <datalist id="benchList_<?= h($side) ?>">
-                                <?php foreach ($benchNames as $bn): ?><option value="<?= h($bn) ?>"></option><?php endforeach; ?>
-                                <?php if ($side === 'svfc'): foreach ($squad as $p): ?><option value="<?= h((string) $p['name']) ?>"></option><?php endforeach; endif; ?>
-                            </datalist>
-                        </form>
-                        <?php endif; ?>
                     </div>
                 </div>
             </div>

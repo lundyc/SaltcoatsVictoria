@@ -9,6 +9,7 @@ require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/lib/functions.php';
 require_once __DIR__ . '/lib/season.php';
 require_once __DIR__ . '/lib/navigation_settings.php';
+require_once __DIR__ . '/lib/navigation_menu.php';
 require_once __DIR__ . '/lib/ui.php';
 
 $currentScript = basename($_SERVER['PHP_SELF'] ?? '');
@@ -41,7 +42,7 @@ if (in_array($currentRole, ['volunteer', 'staff'], true) && !hub_auth_is_admin()
         echo '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>No access yet</title></head>'
             . '<body style="font-family:system-ui,sans-serif;max-width:32rem;margin:4rem auto;padding:0 1.5rem;color:#2d2b2c;">'
             . '<h1 style="font-size:1.3rem;">No areas assigned yet</h1>'
-            . '<p>Your account doesn\'t have access to any Hub pages yet. Ask an admin to assign you an access template under Admin access on your profile.</p>'
+            . '<p>Your account doesn\'t have access to any Hub pages yet. Ask an admin to give you a role on your profile.</p>'
             . '<p><a href="/admin/logout.php">Log out</a></p>'
             . '</body></html>';
         exit;
@@ -54,6 +55,25 @@ if (hub_auth_is_authenticated() && isset($pdo)) {
         $seasonContext = getSeasonContext($pdo);
     } catch (Throwable $exception) {
         // The shell must remain usable while season data is unavailable.
+    }
+}
+
+// "New order" menu notifications (see lib/order_alerts.php). Opening an orders page marks its
+// section as read for this admin; anything already dealt with stops counting for everyone.
+require_once __DIR__ . '/lib/order_alerts.php';
+$hubOrderAlerts = array_fill_keys(ORDER_ALERT_SECTIONS, 0);
+$hubOrderPrevSeen = [];
+if (hub_auth_is_authenticated() && isset($pdo)) {
+    try {
+        $alertAccountId = (int) (hub_auth_current_user()['account_id'] ?? 0);
+        $alertSection = ORDER_ALERT_PAGES[basename($_SERVER['PHP_SELF'] ?? '')] ?? null;
+        if ($alertSection !== null && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
+            $hubOrderPrevSeen = order_alerts_seen_map($pdo, $alertAccountId);
+            order_alerts_mark_seen($pdo, $alertAccountId, $alertSection);
+        }
+        $hubOrderAlerts = order_alerts_counts($pdo, $alertAccountId);
+    } catch (Throwable $exception) {
+        // The menu must keep working if the alert tables are unavailable.
     }
 }
 
@@ -170,26 +190,26 @@ function hub_default_page_hero(string $script): array
         ],
         'admin_users.php' => [
             'eyebrow' => 'Administration',
-            'title' => 'People & Users',
-            'subtitle' => 'Legacy users URL. Manage account access from People & Users.',
+            'title' => 'Users',
+            'subtitle' => 'Legacy users URL. Manage account access from Users.',
             'actions' => [
-                ['label' => 'People & Users', 'href' => '/club_people.php', 'class' => 'btn btn-outline-light btn-sm'],
+                ['label' => 'Users', 'href' => '/club_people.php', 'class' => 'btn btn-outline-light btn-sm'],
             ],
         ],
         'club_people.php' => [
             'eyebrow' => 'Administration',
-            'title' => 'People & Users',
+            'title' => 'Users',
             'subtitle' => 'One record per person: supporters, staff, volunteers and committee. Login access, positions and season tickets attach to the person.',
             'actions' => [
-                ['label' => 'Club roles', 'href' => '/positions.php', 'class' => 'btn btn-outline-light btn-sm'],
+                ['label' => 'Club positions', 'href' => '/positions.php', 'class' => 'btn btn-outline-light btn-sm'],
             ],
         ],
         'club_person.php' => [
             'eyebrow' => 'Administration',
-            'title' => 'Person & User',
+            'title' => 'User',
             'subtitle' => 'Manage one person, their login account, club positions, dependants and ticket history.',
             'actions' => [
-                ['label' => 'People & Users', 'href' => '/club_people.php', 'class' => 'btn btn-outline-light btn-sm'],
+                ['label' => 'Users', 'href' => '/club_people.php', 'class' => 'btn btn-outline-light btn-sm'],
             ],
         ],
         'media.php' => [
@@ -226,6 +246,7 @@ function hub_default_page_hero(string $script): array
  *   title?: string,
  *   subtitle?: string,
  *   class?: string,
+ *   breadcrumbs?: list<array{label: string, href?: string}>,
  *   actions?: list<array{label?: string, icon?: string, href?: string, class?: string, variant?: 'primary'|'secondary', tag?: 'a'|'button', attrs?: array<string, scalar>}>
  * } $hero
  */
@@ -346,6 +367,18 @@ function hub_render_page_hero(array $hero): void
             <?php endif; ?>
         </div>
     </header>
+    <?php if (!empty($hero['breadcrumbs']) && is_array($hero['breadcrumbs'])): ?>
+        <nav class="hub-breadcrumb" aria-label="Breadcrumb">
+            <?php foreach (array_values($hero['breadcrumbs']) as $breadcrumbIndex => $breadcrumb): ?>
+                <?php if ($breadcrumbIndex > 0): ?><i class="fa-solid fa-chevron-right" aria-hidden="true"></i><?php endif; ?>
+                <?php if (!empty($breadcrumb['href'])): ?>
+                    <a href="<?= htmlspecialchars((string) $breadcrumb['href'], ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars((string) ($breadcrumb['label'] ?? ''), ENT_QUOTES, 'UTF-8') ?></a>
+                <?php else: ?>
+                    <span aria-current="page"><?= htmlspecialchars((string) ($breadcrumb['label'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span>
+                <?php endif; ?>
+            <?php endforeach; ?>
+        </nav>
+    <?php endif; ?>
     <?php
 }
 
@@ -399,7 +432,7 @@ if ($currentScript === 'sponsor_wall.php' && !isset($pageHero)) {
 } elseif (!isset($pageHero) || !is_array($pageHero)) {
     $pageHero = hub_default_page_hero($currentScript);
 }
-$documentTitle = trim((string) ($pageHero['title'] ?? ''));
+$documentTitle = trim((string) ($pageDocumentTitle ?? ($pageHero['title'] ?? '')));
 $documentTitle = $documentTitle !== '' ? $documentTitle . ' – ' . APP_NAME : APP_NAME;
 
 ?>
@@ -411,11 +444,16 @@ $documentTitle = $documentTitle !== '' ? $documentTitle . ' – ' . APP_NAME : A
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="color-scheme" content="light">
     <meta name="theme-color" content="#4b0818">
+    <link rel="manifest" href="/admin/manifest.webmanifest">
+    <link rel="apple-touch-icon" href="/admin/icon-192.png">
+    <script>if ('serviceWorker' in navigator) { window.addEventListener('load', function () { navigator.serviceWorker.register('/admin/sw.js', { scope: '/admin/', updateViaCache: 'none' }).catch(function () {}); }); }</script>
     <title><?= htmlspecialchars($documentTitle, ENT_QUOTES, 'UTF-8') ?></title>
 
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css" rel="stylesheet">
+    <link rel="preload" href="/admin/assets/vendor/fonts/inter-UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7.woff2" as="font" type="font/woff2" crossorigin>
+
+    <link href="/admin/assets/vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
+    <link href="/admin/assets/vendor/fonts/inter.css" rel="stylesheet">
+    <link href="/admin/assets/vendor/fontawesome/css/all.min.css" rel="stylesheet">
     <link href="/admin/assets/css/style.css?v=<?= (int)(@filemtime(__DIR__ . '/assets/css/style.css') ?: time()) ?>" rel="stylesheet">
     <?php foreach (($pageStyles ?? []) as $pageStyle): ?>
         <?php
@@ -427,24 +465,75 @@ $documentTitle = $documentTitle !== '' ? $documentTitle . ' – ' . APP_NAME : A
         ?>
         <link href="/admin/assets/css/<?= htmlspecialchars($pageStyle, ENT_QUOTES, 'UTF-8') ?>?v=<?= (int)(@filemtime($pageStylePath) ?: time()) ?>" rel="stylesheet">
     <?php endforeach; ?>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" defer></script>
+    <script src="/admin/assets/vendor/jquery/jquery.min.js"></script>
+    <script src="/admin/assets/vendor/bootstrap/bootstrap.bundle.min.js" defer></script>
+    <link href="/admin/assets/css/help-global.css?v=<?= (int)(@filemtime(__DIR__ . '/assets/css/help-global.css') ?: time()) ?>" rel="stylesheet">
+    <script src="/admin/assets/js/help-tour.js?v=<?= (int)(@filemtime(__DIR__ . '/assets/js/help-tour.js') ?: time()) ?>" defer></script>
+    <script src="/admin/assets/js/help.js?v=<?= (int)(@filemtime(__DIR__ . '/assets/js/help.js') ?: time()) ?>" defer></script>
     <script src="/admin/assets/js/app.js?v=<?= (int)(@filemtime(__DIR__ . '/assets/js/app.js') ?: time()) ?>" defer></script>
 </head>
 
 <body class="hub-shell">
-    <a class="hub-skip-link" href="#hubMainContent">Skip to main content</a>
     <nav class="navbar navbar-expand-lg border-bottom shadow-sm navbar-dark" id="hubSideNavigation">
         <div class="container-fluid">
             <a class="navbar-brand fw-bold text-brand" href="index.php">
                 <img
-                    src="Saltcoats Victoria FC -White_Transparent.png"
+                    src="club-logo-white-120.png"
                     alt="Saltcoats Victoria FC"
                     class="navbar-brand__logo"
                     loading="eager"
                 >
                 <span class="navbar-brand__text"><?= htmlspecialchars(APP_NAME, ENT_QUOTES, 'UTF-8') ?></span>
             </a>
+
+            <div class="hub-sidebar-tools d-flex" id="hubSidebarTools">
+                <?php if (($seasonContext['seasons'] ?? []) !== []): ?>
+                    <button type="button" class="hub-sidebar-tool" id="hubSeasonToolButton" aria-expanded="false" aria-controls="hubSeasonPopover" aria-label="Working season" title="Working season: <?= htmlspecialchars((string) ($seasonContext['season']['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" data-bs-placement="bottom" data-bs-custom-class="hub-rail-tooltip">
+                        <i class="fa-solid fa-calendar-days" aria-hidden="true"></i>
+                    </button>
+                <?php endif; ?>
+                <button type="button" class="hub-sidebar-tool" data-hub-palette-open aria-haspopup="dialog" aria-controls="hubPalette" aria-label="Find a page" title="Find a page (Ctrl K)" data-bs-placement="bottom" data-bs-custom-class="hub-rail-tooltip">
+                    <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                </button>
+                <button class="hub-desktop-nav-hide d-none d-xl-inline-flex" id="hubDesktopNavHide" type="button" aria-controls="hubSideNavigation" aria-expanded="true" aria-label="Hide sidebar" title="Hide sidebar" data-bs-placement="bottom" data-bs-custom-class="hub-rail-tooltip">
+                    <i class="fa-solid fa-table-columns" aria-hidden="true"></i>
+                </button>
+                <?php if (($seasonContext['seasons'] ?? []) !== []): ?>
+                    <div class="hub-sidebar-tool-popover" id="hubSeasonPopover" hidden>
+                        <form class="hub-season-switcher" method="get" action="<?= htmlspecialchars($currentScript, ENT_QUOTES, 'UTF-8') ?>" id="hubSeasonSwitcherFormDesktop">
+                            <label for="hubSeasonSelectDesktop">Working season</label>
+                            <div class="hub-season-switcher__control">
+                                <i class="fa-solid fa-calendar-days" aria-hidden="true"></i>
+                                <select id="hubSeasonSelectDesktop" name="season_id" data-season-select aria-describedby="hubSeasonHelpDesktop">
+                                    <?php foreach ($seasonContext['seasons'] as $navSeason): ?>
+                                        <option value="<?= (int) $navSeason['id'] ?>" <?= (int) $seasonContext['season_id'] === (int) $navSeason['id'] ? 'selected' : '' ?>><?= htmlspecialchars((string) $navSeason['name'], ENT_QUOTES, 'UTF-8') ?><?= !empty($navSeason['is_current']) ? ' · Current' : '' ?><?= !empty($navSeason['is_locked']) ? ' · Locked' : '' ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <span id="hubSeasonHelpDesktop" class="visually-hidden">Changing this updates season-based information across the Hub.</span>
+                        </form>
+                        <script>
+                            // Keep whatever report/filters/tab the user is on when they just switch season,
+                            // instead of the plain season_id-only submit resetting the page to its defaults.
+                            (function () {
+                                var form = document.getElementById('hubSeasonSwitcherFormDesktop');
+                                if (!form) return;
+                                form.addEventListener('submit', function () {
+                                    var params = new URLSearchParams(window.location.search);
+                                    params.delete('season_id');
+                                    params.forEach(function (value, key) {
+                                        var input = document.createElement('input');
+                                        input.type = 'hidden';
+                                        input.name = key;
+                                        input.value = value;
+                                        form.appendChild(input);
+                                    });
+                                });
+                            })();
+                        </script>
+                    </div>
+                <?php endif; ?>
+            </div>
 
             <button class="navbar-toggler collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain"
                     aria-controls="navbarMain" aria-expanded="false" aria-label="Toggle navigation">
@@ -458,14 +547,25 @@ $documentTitle = $documentTitle !== '' ? $documentTitle . ' – ' . APP_NAME : A
             <div class="collapse navbar-collapse justify-content-center" id="navbarMain">
                 <?php
                 $isAdmin = (string) $currentRole === 'admin';
+                // The signed-in person's profile picture, when one is set and the file is there.
+                $accountPhotoUrl = '';
+                if (!empty($currentUser['person_id'])) {
+                    $accountPhotoStmt = $pdo->prepare('SELECT profile_image_path FROM people WHERE id = :id');
+                    $accountPhotoStmt->execute([':id' => (int) $currentUser['person_id']]);
+                    $accountPhotoPath = trim((string) $accountPhotoStmt->fetchColumn());
+                    if (str_starts_with($accountPhotoPath, 'uploads/member_profiles/') && is_file(__DIR__ . '/../' . $accountPhotoPath)) {
+                        $accountPhotoUrl = '/' . $accountPhotoPath;
+                    }
+                }
                 ?>
                 <div class="nav-sections d-flex flex-column w-100">
                     <?php if (($seasonContext['seasons'] ?? []) !== []): ?>
+                    <div class="d-none">
                         <form class="hub-season-switcher" method="get" action="<?= htmlspecialchars($currentScript, ENT_QUOTES, 'UTF-8') ?>" id="hubSeasonSwitcherForm">
                             <label for="hubSeasonSelect">Working season</label>
                             <div class="hub-season-switcher__control">
                                 <i class="fa-solid fa-calendar-days" aria-hidden="true"></i>
-                                <select id="hubSeasonSelect" name="season_id" aria-describedby="hubSeasonHelp">
+                                <select id="hubSeasonSelect" name="season_id" data-season-select aria-describedby="hubSeasonHelp">
                                     <?php foreach ($seasonContext['seasons'] as $navSeason): ?>
                                         <option value="<?= (int) $navSeason['id'] ?>" <?= (int) $seasonContext['season_id'] === (int) $navSeason['id'] ? 'selected' : '' ?>><?= htmlspecialchars((string) $navSeason['name'], ENT_QUOTES, 'UTF-8') ?><?= !empty($navSeason['is_current']) ? ' · Current' : '' ?><?= !empty($navSeason['is_locked']) ? ' · Locked' : '' ?></option>
                                     <?php endforeach; ?>
@@ -492,247 +592,54 @@ $documentTitle = $documentTitle !== '' ? $documentTitle . ' – ' . APP_NAME : A
                                 });
                             })();
                         </script>
+                    </div>
                     <?php endif; ?>
-                    <?php if (hub_navigation_group_available('overview')): ?>
-<section class="nav-section">
-                        <div class="nav-section-label">Overview</div>
+                    <?php
+                    $hubMenu = hub_navigation_resolve();
+                    $hubMostUsed = []; // "Most used" shortcuts switched off for now; hub_navigation_most_used() is kept in lib/navigation_menu.php
+                    $hubRenderLink = static function (array $link) use ($hubOrderAlerts): void {
+                        $external = !empty($link['external']);
+                        $badge = order_alert_badge(hub_navigation_badge_total($hubOrderAlerts, $link['badge'] ?? []));
+                        $tabs = count($link['tabs']) > 1 ? $link['tabs'] : [];
+                        ?>
+                        <li class="wp-item<?= $tabs !== [] ? ' wp-has-sub' : '' ?><?= $link['active'] ? ' wp-current' : '' ?>">
+                            <a class="wp-top<?= $link['active'] ? ' active' : '' ?>"<?= $link['active'] ? ' aria-current="page"' : '' ?> href="<?= htmlspecialchars((string) $link['href'], ENT_QUOTES, 'UTF-8') ?>"<?= $external ? ' target="_blank" rel="noopener"' : '' ?>><i class="fa-solid <?= htmlspecialchars((string) $link['icon'], ENT_QUOTES, 'UTF-8') ?>" aria-hidden="true"></i><span class="wp-label"><?= htmlspecialchars((string) $link['label'], ENT_QUOTES, 'UTF-8') ?></span><?= $badge ?></a>
+                            <?php if ($tabs !== []): ?>
+                                <ul class="wp-submenu">
+                                    <li class="wp-submenu-head"><?= htmlspecialchars((string) $link['label'], ENT_QUOTES, 'UTF-8') ?></li>
+                                    <?php foreach ($tabs as $tab): ?>
+                                        <li><a class="<?= !empty($tab['current']) ? 'current' : '' ?>"<?= !empty($tab['current']) ? ' aria-current="page"' : '' ?> href="<?= htmlspecialchars((string) $tab['href'], ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars((string) $tab['label'], ENT_QUOTES, 'UTF-8') ?><?= order_alert_badge(hub_navigation_badge_total($hubOrderAlerts, $tab['badge'] ?? [])) ?></a></li>
+                                    <?php endforeach; ?>
+                                </ul>
+                            <?php endif; ?>
+                        </li>
+                        <?php
+                    };
+                    ?>
+                    <button type="button" class="hub-nav-search d-none" data-hub-palette-open aria-haspopup="dialog" aria-controls="hubPalette">
+                        <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><span>Find a page…</span><kbd>Ctrl K</kbd>
+                    </button>
+                    <ul class="hub-wp-menu" id="hubNavSections">
+                    <?php foreach ($hubMenu as $hubSection): ?>
+                        <?php if ($hubSection['key'] !== 'home'): ?>
+                            <li class="wp-separator" role="presentation" aria-hidden="true"></li>
+                        <?php endif; ?>
+                        <li class="hub-nav-anchor" id="hubNavSection-<?= htmlspecialchars((string) $hubSection['key'], ENT_QUOTES, 'UTF-8') ?>" aria-hidden="true"></li>
+                        <?php foreach ($hubSection['links'] as $hubLink): $hubRenderLink($hubLink); endforeach; ?>
+                    <?php endforeach; ?>
+                    </ul>
+
+                    <section class="nav-section nav-account" id="hubNavSection-account">
+                        <div class="nav-account__identity"><?php if ($accountPhotoUrl !== ''): ?><img class="nav-account__photo" src="<?= htmlspecialchars($accountPhotoUrl, ENT_QUOTES, 'UTF-8') ?>" alt=""><?php else: ?><i class="fa-solid fa-circle-user" aria-hidden="true"></i><?php endif; ?><span><strong><?= htmlspecialchars((string) ($currentUser['display_name'] ?? $currentUser['username'] ?? $currentUser['email'] ?? 'Hub user'), ENT_QUOTES, 'UTF-8') ?></strong><small><?= htmlspecialchars(ucfirst((string) $currentRole), ENT_QUOTES, 'UTF-8') ?></small></span></div>
                         <ul class="navbar-nav nav-main mb-0">
                             <?php if (hub_auth_is_developer()): ?>
-                                <?php if (hub_navigation_item_visible('overview.developer_analytics')): ?><li class="nav-item"><a class="nav-link <?= activePage('developer_analytics.php') ?>"<?= hub_nav_current(['developer_analytics.php']) ?> href="/admin/developer_analytics.php"><i class="fa-solid fa-chart-line me-1" aria-hidden="true"></i>Product analytics</a></li><?php endif; ?>
+                            <li class="nav-item">
+                                <a class="nav-link <?= activeGroup(['developer.php', 'developer_analytics.php', 'developer_audit.php', 'developer_db.php', 'developer_errors.php', 'developer_roles.php', 'developer_sponsorships.php']) ?>" href="/admin/developer.php"><i class="fa-solid fa-code me-1" aria-hidden="true"></i>Developer</a>
+                            </li>
                             <?php endif; ?>
-                            <?php if (hub_navigation_item_visible('overview.index')): ?><li class="nav-item"><a class="nav-link <?= activePage('index.php') ?>"<?= hub_nav_current(['index.php']) ?> href="/admin/index.php"><i class="fa-solid fa-house me-1" aria-hidden="true"></i>Club overview</a></li><?php endif; ?>
-                            <?php if (hub_auth_has_any_capability(['finance_view', 'matchday', 'club_setup', 'tickets_ops', 'secretary_ops'])): ?>
-                                <?php if (hub_navigation_item_visible('overview.club_reminders')): ?><li class="nav-item"><a class="nav-link <?= activePage('club_reminders.php') ?>"<?= hub_nav_current(['club_reminders.php']) ?> href="/admin/club_reminders.php"><i class="fa-solid fa-bell me-1" aria-hidden="true"></i>Reminders</a></li><?php endif; ?>
-                            <?php endif; ?>
-                        </ul>
-                    </section>
-                    <?php endif; ?>
-
-                    <?php if (hub_auth_has_any_capability(['matchday', 'tickets_ops', 'finance_view'])): ?>
-                    <?php if (hub_navigation_group_available('matchday')): ?>
-<section class="nav-section">
-                        <?php
-                        $matchdayPages = ['stats.php', 'matches.php', 'match.php', 'match_starting_11.php', 'match_starting_11_graphic.php', 'match_next_match.php', 'match_graphics.php', 'match_poster.php', 'match_events.php', 'monthly_fixtures.php', 'match_fixtures_poster.php', 'match_media.php', 'players.php', 'player_add.php', 'player_edit.php', 'player_view.php', 'scan_overview.php', 'pos_overview.php', 'matchday_finance.php', 'matchday_finance_edit.php'];
-                        $matchdayReqUri = (string) ($_SERVER['REQUEST_URI'] ?? '');
-                        $matchdayActive = (activeGroup($matchdayPages) === 'active' || str_starts_with($matchdayReqUri, '/scan') || str_starts_with($matchdayReqUri, '/pos')) ? 'active' : '';
-                        // Match Day is the daily driver — open on first visit; the
-                        // stored per-browser preference can still collapse it.
-                        $matchdayOpen = true;
-                        ?>
-                        <button class="nav-section-toggle <?= $matchdayActive ?>" type="button" data-bs-toggle="collapse" data-bs-target="#hubMatchdayNavigation" data-nav-section="matchday" aria-expanded="<?= $matchdayOpen ? 'true' : 'false' ?>" aria-controls="hubMatchdayNavigation">
-                            <span>Match Day</span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
-                        </button>
-                        <ul class="navbar-nav nav-main nav-submenu collapse <?= $matchdayOpen ? 'show' : '' ?> mb-0" id="hubMatchdayNavigation">
-                            <?php if (hub_auth_has_capability('matchday')): ?>
-                            <?php if (hub_navigation_item_visible('matchday.matches')): ?><li class="nav-item"><a class="nav-link <?= activeGroup(['matches.php', 'match.php', 'match_lineups.php', 'match_record_events.php', 'match_starting_11.php', 'match_starting_11_graphic.php', 'match_next_match.php', 'match_graphics.php', 'match_poster.php', 'match_events.php', 'monthly_fixtures.php', 'match_fixtures_poster.php', 'match_media.php']) ?>"<?= hub_nav_current(['matches.php', 'match.php', 'match_lineups.php', 'match_record_events.php', 'match_starting_11.php', 'match_starting_11_graphic.php', 'match_next_match.php', 'match_graphics.php', 'match_poster.php', 'match_events.php', 'monthly_fixtures.php', 'match_fixtures_poster.php']) ?> href="/admin/matches.php"><i class="fa-solid fa-futbol me-1" aria-hidden="true"></i>Fixtures &amp; results</a></li><?php endif; ?>
-                            <?php if (hub_navigation_item_visible('matchday.stats')): ?><li class="nav-item"><a class="nav-link <?= activeGroup(['stats.php', 'matchday_stats.php']) ?>"<?= hub_nav_current(['stats.php', 'matchday_stats.php']) ?> href="/admin/stats.php"><i class="fa-solid fa-chart-simple me-1" aria-hidden="true"></i>Stats</a></li><?php endif; ?>
-                            <?php endif; ?>
-                            <?php if (hub_auth_has_capability('tickets_ops')): ?>
-                            <?php if (hub_navigation_item_visible('matchday.scan_overview')): ?><li class="nav-item"><a class="nav-link <?= str_starts_with((string)($_SERVER['REQUEST_URI'] ?? ''), '/scan') ? 'active' : '' ?>"<?= str_starts_with((string)($_SERVER['REQUEST_URI'] ?? ''), '/scan') ? ' aria-current="page"' : '' ?> href="/admin/scan_overview.php"><i class="fa-solid fa-qrcode me-1" aria-hidden="true"></i>Scan</a></li><?php endif; ?>
-                            <?php if (hub_navigation_item_visible('matchday.pos_overview')): ?><li class="nav-item"><a class="nav-link <?= str_starts_with((string)($_SERVER['REQUEST_URI'] ?? ''), '/pos') ? 'active' : '' ?>"<?= str_starts_with((string)($_SERVER['REQUEST_URI'] ?? ''), '/pos') ? ' aria-current="page"' : '' ?> href="/admin/pos_overview.php"><i class="fa-solid fa-cash-register me-1" aria-hidden="true"></i>POS</a></li><?php endif; ?>
-                            <?php endif; ?>
-                            <?php if (hub_auth_has_any_capability(['finance_view', 'matchday'])): ?>
-                            <?php if (hub_navigation_item_visible('matchday.matchday_finance')): ?><li class="nav-item"><a class="nav-link <?= activeGroup(['matchday_finance.php', 'matchday_finance_edit.php']) ?>"<?= hub_nav_current(['matchday_finance.php', 'matchday_finance_edit.php']) ?> href="/admin/matchday_finance.php"><i class="fa-solid fa-sterling-sign me-1" aria-hidden="true"></i>Matchday income</a></li><?php endif; ?>
-                            <?php endif; ?>
-                            <?php if (hub_auth_has_capability('matchday')): ?>
-                            <?php if (hub_navigation_item_visible('matchday.players')): ?><li class="nav-item"><a class="nav-link <?= activeGroup(['players.php', 'player_add.php', 'player_edit.php', 'player_view.php']) ?>"<?= hub_nav_current(['players.php', 'player_add.php', 'player_edit.php', 'player_view.php']) ?> href="/admin/players.php"><i class="fa-solid fa-users me-1" aria-hidden="true"></i>Players</a></li><?php endif; ?>
-                            <?php endif; ?>
-                        </ul>
-                    </section>
-                    <?php endif; ?>
-                    <?php endif; ?>
-
-                    <?php if (hub_auth_has_capability('finance_view')): ?>
-                    <?php if (hub_navigation_group_available('sponsorship')): ?>
-<section class="nav-section">
-                        <?php $sponsorshipActive = activeGroup(['sponsors.php', 'sponsor.php', 'sponsor_followups.php', 'sponsorship_agreements.php', 'sponsorship_agreement.php', 'sponsorship_bundles.php', 'sponsorship_bundle.php', 'sponsorship_packages.php', 'sponsorship_package.php', 'sponsorship_types.php', 'sponsorship_type.php']); ?>
-                        <button class="nav-section-toggle <?= $sponsorshipActive ?>" type="button" data-bs-toggle="collapse" data-bs-target="#hubSponsorshipNavigation" data-nav-section="sponsorship" aria-expanded="<?= $sponsorshipActive === 'active' ? 'true' : 'false' ?>" aria-controls="hubSponsorshipNavigation">
-                            <span>Sponsorship</span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
-                        </button>
-                        <ul class="navbar-nav nav-main nav-submenu collapse <?= $sponsorshipActive === 'active' ? 'show' : '' ?> mb-0" id="hubSponsorshipNavigation">
-                            <?php if (hub_navigation_item_visible('sponsorship.sponsors')): ?><li class="nav-item"><a class="nav-link <?= activeGroup(['sponsors.php','sponsor.php']) ?>"<?= hub_nav_current(['sponsors.php', 'sponsor.php']) ?> href="/admin/sponsors.php"><i class="fa-solid fa-handshake me-1" aria-hidden="true"></i>Sponsors</a></li><?php endif; ?>
-                            <?php if (hub_navigation_item_visible('sponsorship.sponsor_followups')): ?><li class="nav-item"><a class="nav-link <?= activePage('sponsor_followups.php') ?>"<?= hub_nav_current(['sponsor_followups.php']) ?> href="/admin/sponsor_followups.php"><i class="fa-solid fa-phone-volume me-1" aria-hidden="true"></i>Follow-ups</a></li><?php endif; ?>
-                            <?php if (hub_navigation_item_visible('sponsorship.sponsorship_agreements')): ?><li class="nav-item"><a class="nav-link <?= activeGroup(['sponsorship_agreements.php','sponsorship_agreement.php']) ?>"<?= hub_nav_current(['sponsorship_agreements.php', 'sponsorship_agreement.php']) ?> href="/admin/sponsorship_agreements.php"><i class="fa-solid fa-file-signature me-1" aria-hidden="true"></i>Agreements</a></li><?php endif; ?>
-                            <?php if (hub_navigation_item_visible('sponsorship.sponsorship_bundles')): ?><li class="nav-item"><a class="nav-link <?= activeGroup(['sponsorship_bundles.php','sponsorship_bundle.php']) ?>"<?= hub_nav_current(['sponsorship_bundles.php', 'sponsorship_bundle.php']) ?> href="/admin/sponsorship_bundles.php"><i class="fa-solid fa-boxes-stacked me-1" aria-hidden="true"></i>Bundles</a></li><?php endif; ?>
-                            <?php if (hub_navigation_item_visible('sponsorship.sponsorship_packages')): ?><li class="nav-item"><a class="nav-link <?= activeGroup(['sponsorship_packages.php','sponsorship_package.php', 'sponsorship_types.php', 'sponsorship_type.php']) ?>"<?= hub_nav_current(['sponsorship_packages.php', 'sponsorship_package.php']) ?> href="/admin/sponsorship_packages.php"><i class="fa-solid fa-box-open me-1" aria-hidden="true"></i>Packages</a></li><?php endif; ?>
-                        </ul>
-                    </section>
-                    <?php endif; ?>
-                    <?php endif; ?>
-
-
-                    <?php if (hub_auth_has_capability('shop')): ?>
-                    <?php if (hub_navigation_group_available('shop')): ?>
-<section class="nav-section">
-                        <?php $shopActive = activeGroup(['shop_overview.php', 'shop_products.php', 'shop_product.php', 'shop_categories.php', 'shop_modifiers.php', 'shop_orders.php', 'shop_order.php', 'shop_settings.php', 'shop_discount_codes.php']); ?>
-                        <button class="nav-section-toggle <?= $shopActive ?>" type="button" data-bs-toggle="collapse" data-bs-target="#hubShopNavigation" data-nav-section="shop" aria-expanded="<?= $shopActive === 'active' ? 'true' : 'false' ?>" aria-controls="hubShopNavigation">
-                            <span>Shop</span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
-                        </button>
-                        <ul class="navbar-nav nav-main nav-submenu collapse <?= $shopActive === 'active' ? 'show' : '' ?> mb-0" id="hubShopNavigation">
-                            <?php if (hub_navigation_item_visible('shop.shop_overview')): ?><li class="nav-item"><a class="nav-link <?= activePage('shop_overview.php') ?>"<?= hub_nav_current(['shop_overview.php']) ?> href="/admin/shop_overview.php"><i class="fa-solid fa-bag-shopping me-1" aria-hidden="true"></i>Overview</a></li><?php endif; ?>
-                            <?php if (hub_navigation_item_visible('shop.shop_orders')): ?><li class="nav-item"><a class="nav-link <?= activeGroup(['shop_orders.php', 'shop_order.php']) ?>"<?= hub_nav_current(['shop_orders.php', 'shop_order.php']) ?> href="/admin/shop_orders.php"><i class="fa-solid fa-receipt me-1" aria-hidden="true"></i>Orders</a></li><?php endif; ?>
-                            <?php if (hub_navigation_item_visible('shop.shop_products')): ?><li class="nav-item"><a class="nav-link <?= activeGroup(['shop_products.php', 'shop_product.php']) ?>"<?= hub_nav_current(['shop_products.php', 'shop_product.php']) ?> href="/admin/shop_products.php"><i class="fa-solid fa-shirt me-1" aria-hidden="true"></i>Products</a></li><?php endif; ?>
-                            <?php if (hub_navigation_item_visible('shop.shop_categories')): ?><li class="nav-item"><a class="nav-link <?= activePage('shop_categories.php') ?>"<?= hub_nav_current(['shop_categories.php']) ?> href="/admin/shop_categories.php"><i class="fa-solid fa-layer-group me-1" aria-hidden="true"></i>Categories</a></li><?php endif; ?>
-                            <?php if (hub_navigation_item_visible('shop.shop_modifiers')): ?><li class="nav-item"><a class="nav-link <?= activePage('shop_modifiers.php') ?>"<?= hub_nav_current(['shop_modifiers.php']) ?> href="/admin/shop_modifiers.php"><i class="fa-solid fa-sliders me-1" aria-hidden="true"></i>Modifiers</a></li><?php endif; ?>
-                            <?php if (hub_navigation_item_visible('shop.shop_discount_codes')): ?><li class="nav-item"><a class="nav-link <?= activePage('shop_discount_codes.php') ?>"<?= hub_nav_current(['shop_discount_codes.php']) ?> href="/admin/shop_discount_codes.php"><i class="fa-solid fa-tag me-1" aria-hidden="true"></i>Discount codes</a></li><?php endif; ?>
-                            <?php if (hub_navigation_item_visible('shop.shop_settings')): ?><li class="nav-item"><a class="nav-link <?= activePage('shop_settings.php') ?>"<?= hub_nav_current(['shop_settings.php']) ?> href="/admin/shop_settings.php"><i class="fa-solid fa-gear me-1" aria-hidden="true"></i>Shop settings</a></li><?php endif; ?>
-                            <?php if (hub_navigation_item_visible('shop.storefront')): ?><li class="nav-item"><a class="nav-link" href="/shop/" target="_blank" rel="noopener"><i class="fa-solid fa-arrow-up-right-from-square me-1" aria-hidden="true"></i>View storefront</a></li><?php endif; ?>
-                        </ul>
-                    </section>
-                    <?php endif; ?>
-                    <?php endif; ?>
-
-                    <?php if (hub_auth_has_capability('tickets_ops')): ?>
-                    <?php if (hub_navigation_group_available('ticketing')): ?>
-<section class="nav-section">
-                        <?php $ticketingActive = activeGroup(['season_ticket_orders.php', 'season_ticket_order.php', 'fixture_tickets.php', 'ticket_orders.php', 'ticket_packages.php', 'season_ticket_renewals.php', 'season_ticket_free_codes.php', 'season_ticket_types.php', 'season_ticket_type.php']); ?>
-                        <button class="nav-section-toggle <?= $ticketingActive ?>" type="button" data-bs-toggle="collapse" data-bs-target="#hubTicketingNavigation" data-nav-section="ticketing" aria-expanded="<?= $ticketingActive === 'active' ? 'true' : 'false' ?>" aria-controls="hubTicketingNavigation">
-                            <span>Ticketing</span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
-                        </button>
-                        <ul class="navbar-nav nav-main nav-submenu collapse <?= $ticketingActive === 'active' ? 'show' : '' ?> mb-0" id="hubTicketingNavigation">
-                            <?php if (hub_navigation_item_visible('ticketing.season_ticket_orders')): ?><li class="nav-item"><a class="nav-link <?= activeGroup(['season_ticket_orders.php', 'season_ticket_order.php']) ?>"<?= hub_nav_current(['season_ticket_orders.php', 'season_ticket_order.php']) ?> href="/admin/season_ticket_orders.php"><i class="fa-solid fa-id-card me-1" aria-hidden="true"></i>Season Ticket Orders</a></li><?php endif; ?>
-                            <?php if (hub_navigation_item_visible('ticketing.fixture_tickets')): ?><li class="nav-item"><a class="nav-link <?= activePage('fixture_tickets.php') ?>"<?= hub_nav_current(['fixture_tickets.php']) ?> href="/admin/fixture_tickets.php"><i class="fa-solid fa-cash-register me-1" aria-hidden="true"></i>Match Tickets</a></li><?php endif; ?>
-                            <?php if (hub_navigation_item_visible('ticketing.ticket_orders')): ?><li class="nav-item"><a class="nav-link <?= activePage('ticket_orders.php') ?>"<?= hub_nav_current(['ticket_orders.php']) ?> href="/admin/ticket_orders.php"><i class="fa-solid fa-list-check me-1" aria-hidden="true"></i>Ticket Orders</a></li><?php endif; ?>
-                            <?php if (hub_navigation_item_visible('ticketing.ticket_packages')): ?><li class="nav-item"><a class="nav-link <?= activePage('ticket_packages.php') ?>"<?= hub_nav_current(['ticket_packages.php']) ?> href="/admin/ticket_packages.php"><i class="fa-solid fa-box-open me-1" aria-hidden="true"></i>Ticket Packages</a></li><?php endif; ?>
-                            <?php if (hub_navigation_item_visible('ticketing.season_ticket_renewals')): ?><li class="nav-item"><a class="nav-link <?= activePage('season_ticket_renewals.php') ?>"<?= hub_nav_current(['season_ticket_renewals.php']) ?> href="/admin/season_ticket_renewals.php"><i class="fa-solid fa-arrows-rotate me-1" aria-hidden="true"></i>Renewals</a></li><?php endif; ?>
-                            <?php if (hub_navigation_item_visible('ticketing.season_ticket_free_codes')): ?><li class="nav-item"><a class="nav-link <?= activePage('season_ticket_free_codes.php') ?>"<?= hub_nav_current(['season_ticket_free_codes.php']) ?> href="/admin/season_ticket_free_codes.php"><i class="fa-solid fa-key me-1" aria-hidden="true"></i>Free Signup Codes</a></li><?php endif; ?>
-                            <?php if (hub_navigation_item_visible('ticketing.season_ticket_types')): ?><li class="nav-item"><a class="nav-link <?= activeGroup(['season_ticket_types.php', 'season_ticket_type.php']) ?>"<?= hub_nav_current(['season_ticket_types.php', 'season_ticket_type.php']) ?> href="/admin/season_ticket_types.php"><i class="fa-solid fa-tags me-1" aria-hidden="true"></i>Types &amp; Pricing</a></li><?php endif; ?>
-                        </ul>
-                    </section>
-                    <?php endif; ?>
-                    <?php endif; ?>
-
-                    <?php if ($isAdmin): ?>
-                    <?php if (hub_navigation_group_available('supporter')): ?>
-<section class="nav-section">
-                        <?php $membersActive = activeGroup(['announcements.php', 'announcement.php', 'feedback.php', 'feedback_item.php', 'venue_reviews.php', 'motm.php']); ?>
-                        <button class="nav-section-toggle <?= $membersActive ?>" type="button" data-bs-toggle="collapse" data-bs-target="#hubMembersNavigation" data-nav-section="supporter" aria-expanded="<?= $membersActive === 'active' ? 'true' : 'false' ?>" aria-controls="hubMembersNavigation">
-                            <span>Supporter content</span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
-                        </button>
-                        <ul class="navbar-nav nav-main nav-submenu collapse <?= $membersActive === 'active' ? 'show' : '' ?> mb-0" id="hubMembersNavigation">
-                            <?php if (hub_navigation_item_visible('supporter.announcements')): ?><li class="nav-item"><a class="nav-link <?= activeGroup(['announcements.php', 'announcement.php']) ?>"<?= hub_nav_current(['announcements.php', 'announcement.php']) ?> href="/admin/announcements.php"><i class="fa-solid fa-bullhorn me-1" aria-hidden="true"></i>Announcements</a></li><?php endif; ?>
-                            <?php if (hub_navigation_item_visible('supporter.feedback')): ?><li class="nav-item"><a class="nav-link <?= activeGroup(['feedback.php', 'feedback_item.php']) ?>"<?= hub_nav_current(['feedback.php', 'feedback_item.php']) ?> href="/admin/feedback.php"><i class="fa-solid fa-comment-dots me-1" aria-hidden="true"></i>Feedback</a></li><?php endif; ?>
-                            <?php if (hub_navigation_item_visible('supporter.venue_reviews')): ?><li class="nav-item"><a class="nav-link <?= activePage('venue_reviews.php') ?>"<?= hub_nav_current(['venue_reviews.php']) ?> href="/admin/venue_reviews.php"><i class="fa-solid fa-star me-1" aria-hidden="true"></i>Venue Reviews</a></li><?php endif; ?>
-                            <?php if (hub_navigation_item_visible('supporter.motm')): ?><li class="nav-item"><a class="nav-link <?= activePage('motm.php') ?>"<?= hub_nav_current(['motm.php']) ?> href="/admin/motm.php"><i class="fa-solid fa-trophy me-1" aria-hidden="true"></i>Player of the Match</a></li><?php endif; ?>
-                        </ul>
-                    </section>
-                    <?php endif; ?>
-                    <?php endif; ?>
-
-                    <?php if (hub_auth_has_capability('website')): ?>
-                    <?php if (hub_navigation_group_available('website')): ?>
-<section class="nav-section">
-                        <?php $websiteActive = activeGroup(['news.php', 'news_edit.php', 'club_pages.php', 'settings_public.php', 'player_website.php']); ?>
-                        <button class="nav-section-toggle <?= $websiteActive ?>" type="button" data-bs-toggle="collapse" data-bs-target="#hubWebsiteNavigation" data-nav-section="website" aria-expanded="<?= $websiteActive === 'active' ? 'true' : 'false' ?>" aria-controls="hubWebsiteNavigation">
-                            <span>Public website</span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
-                        </button>
-                        <ul class="navbar-nav nav-main nav-submenu collapse <?= $websiteActive === 'active' ? 'show' : '' ?> mb-0" id="hubWebsiteNavigation">
-                            <?php if (hub_navigation_item_visible('website.news')): ?><li class="nav-item"><a class="nav-link <?= activeGroup(['news.php', 'news_edit.php']) ?>"<?= hub_nav_current(['news.php', 'news_edit.php']) ?> href="/admin/news.php"><i class="fa-solid fa-newspaper me-1" aria-hidden="true"></i>News</a></li><?php endif; ?>
-                            <?php if (hub_navigation_item_visible('website.club_pages')): ?><li class="nav-item"><a class="nav-link <?= activePage('club_pages.php') ?>"<?= hub_nav_current(['club_pages.php']) ?> href="/admin/club_pages.php"><i class="fa-solid fa-file-lines me-1" aria-hidden="true"></i>Club pages</a></li><?php endif; ?>
-                            <?php if (hub_navigation_item_visible('website.settings_public')): ?><li class="nav-item"><a class="nav-link <?= activePage('settings_public.php') ?>"<?= hub_nav_current(['settings_public.php']) ?> href="/admin/settings_public.php"><i class="fa-solid fa-gear me-1" aria-hidden="true"></i>Website settings</a></li><?php endif; ?>
-                            <?php if (hub_navigation_item_visible('website.website')): ?><li class="nav-item"><a class="nav-link" href="/" target="_blank" rel="noopener"><i class="fa-solid fa-arrow-up-right-from-square me-1" aria-hidden="true"></i>View website</a></li><?php endif; ?>
-                        </ul>
-                    </section>
-                    <?php endif; ?>
-                    <?php endif; ?>
-
-                    <?php if (hub_auth_has_any_capability(['finance_view', 'matchday'])): ?>
-                    <?php if (hub_navigation_group_available('finance')): ?>
-<section class="nav-section">
-                        <?php $financeActive = activeGroup(['reports.php', 'stripe_dashboard.php', 'matchday_finance.php', 'matchday_finance_edit.php']); ?>
-                        <button class="nav-section-toggle <?= $financeActive ?>" type="button" data-bs-toggle="collapse" data-bs-target="#hubFinanceNavigation" data-nav-section="finance" aria-expanded="<?= $financeActive === 'active' ? 'true' : 'false' ?>" aria-controls="hubFinanceNavigation">
-                            <span>Finance</span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
-                        </button>
-                        <ul class="navbar-nav nav-main nav-submenu collapse <?= $financeActive === 'active' ? 'show' : '' ?> mb-0" id="hubFinanceNavigation">
-                            <?php if (hub_navigation_item_visible('finance.reports')): ?><li class="nav-item"><a class="nav-link <?= activePage('reports.php') ?>"<?= hub_nav_current(['reports.php']) ?> href="/admin/reports.php"><i class="fa-solid fa-chart-column me-1" aria-hidden="true"></i>Reports</a></li><?php endif; ?>
-                            <?php if (hub_navigation_item_visible('finance.matchday_finance')): ?><li class="nav-item"><a class="nav-link <?= activeGroup(['matchday_finance.php', 'matchday_finance_edit.php']) ?>"<?= hub_nav_current(['matchday_finance.php', 'matchday_finance_edit.php']) ?> href="/admin/matchday_finance.php"><i class="fa-solid fa-sterling-sign me-1" aria-hidden="true"></i>Matchday income</a></li><?php endif; ?>
-                            <?php if (hub_auth_has_capability('finance_view')): ?>
-                            <?php if (hub_navigation_item_visible('finance.stripe_dashboard')): ?><li class="nav-item"><a class="nav-link <?= activePage('stripe_dashboard.php') ?>"<?= hub_nav_current(['stripe_dashboard.php']) ?> href="/admin/stripe_dashboard.php"><i class="fa-brands fa-stripe-s me-1" aria-hidden="true"></i>Stripe Dashboard</a></li><?php endif; ?>
-                            <?php endif; ?>
-                        </ul>
-                    </section>
-                    <?php endif; ?>
-                    <?php endif; ?>
-
-                    <?php if (hub_auth_has_capability('secretary_ops')): ?>
-                    <?php if (hub_navigation_group_available('secretary')): ?>
-<section class="nav-section">
-                        <?php $secretaryActive = activeGroup(['secretary_dashboard.php', 'discipline_register.php', 'discipline_incident.php', 'discipline_incident_delete.php', 'player_registrations.php', 'player_registration_edit.php', 'secretary_tasks.php', 'secretary_task_edit.php', 'secretary_correspondence.php', 'secretary_correspondence_edit.php', 'fixture_change_requests.php', 'fixture_change_request_edit.php', 'committee_meetings.php', 'committee_meeting_edit.php', 'committee_meeting_delete.php', 'secretary_documents.php', 'secretary_document_delete.php', 'secretary_guide.php']); ?>
-                        <button class="nav-section-toggle <?= $secretaryActive ?>" type="button" data-bs-toggle="collapse" data-bs-target="#hubSecretaryNavigation" data-nav-section="secretary" aria-expanded="<?= $secretaryActive === 'active' ? 'true' : 'false' ?>" aria-controls="hubSecretaryNavigation">
-                            <span>Secretary</span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
-                        </button>
-                        <ul class="navbar-nav nav-main nav-submenu collapse <?= $secretaryActive === 'active' ? 'show' : '' ?> mb-0" id="hubSecretaryNavigation">
-                            <?php if (hub_navigation_item_visible('secretary.secretary_dashboard')): ?><li class="nav-item"><a class="nav-link <?= activePage('secretary_dashboard.php') ?>"<?= hub_nav_current(['secretary_dashboard.php']) ?> href="/admin/secretary_dashboard.php"><i class="fa-solid fa-user-tie me-1" aria-hidden="true"></i>Dashboard</a></li><?php endif; ?>
-                            <?php if (hub_navigation_item_visible('secretary.discipline_register')): ?><li class="nav-item"><a class="nav-link <?= activeGroup(['discipline_register.php', 'discipline_incident.php', 'discipline_incident_delete.php']) ?>"<?= hub_nav_current(['discipline_register.php', 'discipline_incident.php', 'discipline_incident_delete.php']) ?> href="/admin/discipline_register.php"><i class="fa-solid fa-square-exclamation me-1" aria-hidden="true"></i>Discipline register</a></li><?php endif; ?>
-                            <?php if (hub_navigation_item_visible('secretary.player_registrations')): ?><li class="nav-item"><a class="nav-link <?= activeGroup(['player_registrations.php', 'player_registration_edit.php']) ?>"<?= hub_nav_current(['player_registrations.php', 'player_registration_edit.php']) ?> href="/admin/player_registrations.php"><i class="fa-solid fa-id-card-clip me-1" aria-hidden="true"></i>Player registrations</a></li><?php endif; ?>
-                            <?php if (hub_navigation_item_visible('secretary.secretary_tasks')): ?><li class="nav-item"><a class="nav-link <?= activeGroup(['secretary_tasks.php', 'secretary_task_edit.php']) ?>"<?= hub_nav_current(['secretary_tasks.php', 'secretary_task_edit.php']) ?> href="/admin/secretary_tasks.php"><i class="fa-solid fa-list-check me-1" aria-hidden="true"></i>Tasks &amp; planner</a></li><?php endif; ?>
-                            <?php if (hub_navigation_item_visible('secretary.secretary_correspondence')): ?><li class="nav-item"><a class="nav-link <?= activeGroup(['secretary_correspondence.php', 'secretary_correspondence_edit.php']) ?>"<?= hub_nav_current(['secretary_correspondence.php', 'secretary_correspondence_edit.php']) ?> href="/admin/secretary_correspondence.php"><i class="fa-solid fa-envelope me-1" aria-hidden="true"></i>Correspondence</a></li><?php endif; ?>
-                            <?php if (hub_navigation_item_visible('secretary.fixture_change_requests')): ?><li class="nav-item"><a class="nav-link <?= activeGroup(['fixture_change_requests.php', 'fixture_change_request_edit.php']) ?>"<?= hub_nav_current(['fixture_change_requests.php', 'fixture_change_request_edit.php']) ?> href="/admin/fixture_change_requests.php"><i class="fa-solid fa-calendar-days me-1" aria-hidden="true"></i>Fixture changes</a></li><?php endif; ?>
-                            <?php if (hub_navigation_item_visible('secretary.committee_meetings')): ?><li class="nav-item"><a class="nav-link <?= activeGroup(['committee_meetings.php', 'committee_meeting_edit.php', 'committee_meeting_delete.php']) ?>"<?= hub_nav_current(['committee_meetings.php', 'committee_meeting_edit.php', 'committee_meeting_delete.php']) ?> href="/admin/committee_meetings.php"><i class="fa-solid fa-people-group me-1" aria-hidden="true"></i>Committee &amp; AGM</a></li><?php endif; ?>
-                            <?php if (hub_navigation_item_visible('secretary.secretary_documents')): ?><li class="nav-item"><a class="nav-link <?= activeGroup(['secretary_documents.php', 'secretary_document_delete.php']) ?>"<?= hub_nav_current(['secretary_documents.php', 'secretary_document_delete.php']) ?> href="/admin/secretary_documents.php"><i class="fa-solid fa-folder-tree me-1" aria-hidden="true"></i>Documents</a></li><?php endif; ?>
-                            <?php if (hub_navigation_item_visible('secretary.secretary_guide')): ?><li class="nav-item"><a class="nav-link <?= activePage('secretary_guide.php') ?>"<?= hub_nav_current(['secretary_guide.php']) ?> href="/admin/secretary_guide.php"><i class="fa-solid fa-circle-question me-1" aria-hidden="true"></i>Emergency guide</a></li><?php endif; ?>
-                        </ul>
-                    </section>
-                    <?php endif; ?>
-                    <?php endif; ?>
-
-                    <?php if (hub_auth_has_capability('club_setup')): ?>
-                    <?php if (hub_navigation_group_available('clubsetup')): ?>
-<section class="nav-section">
-                        <?php $setupActive = activeGroup(['seasons.php', 'season.php', 'opponents.php', 'opponent.php', 'competitions.php', 'competition.php', 'venues.php', 'venue.php', 'facilities.php']); ?>
-                        <button class="nav-section-toggle <?= $setupActive ?>" type="button" data-bs-toggle="collapse" data-bs-target="#hubSetupNavigation" data-nav-section="clubsetup" aria-expanded="<?= $setupActive === 'active' ? 'true' : 'false' ?>" aria-controls="hubSetupNavigation">
-                            <span>Club setup</span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
-                        </button>
-                        <ul class="navbar-nav nav-main nav-submenu collapse <?= $setupActive === 'active' ? 'show' : '' ?> mb-0" id="hubSetupNavigation">
-                            <?php if (hub_navigation_item_visible('clubsetup.seasons')): ?><li class="nav-item"><a class="nav-link <?= activeGroup(['seasons.php', 'season.php']) ?>" href="/admin/seasons.php"><i class="fa-solid fa-calendar-days me-1" aria-hidden="true"></i>Seasons</a></li><?php endif; ?>
-                            <?php if (hub_navigation_item_visible('clubsetup.opponents')): ?><li class="nav-item"><a class="nav-link <?= activeGroup(['opponents.php', 'opponent.php']) ?>" href="/admin/opponents.php"><i class="fa-solid fa-people-arrows me-1" aria-hidden="true"></i>Opponents</a></li><?php endif; ?>
-                            <?php if (hub_navigation_item_visible('clubsetup.competitions')): ?><li class="nav-item"><a class="nav-link <?= activeGroup(['competitions.php', 'competition.php']) ?>" href="/admin/competitions.php"><i class="fa-solid fa-trophy me-1" aria-hidden="true"></i>Competitions</a></li><?php endif; ?>
-                            <?php if (hub_navigation_item_visible('clubsetup.venues')): ?><li class="nav-item"><a class="nav-link <?= activeGroup(['venues.php', 'venue.php']) ?>" href="/admin/venues.php"><i class="fa-solid fa-map-location-dot me-1" aria-hidden="true"></i>Venues</a></li><?php endif; ?>
-                            <?php if (hub_navigation_item_visible('clubsetup.facilities')): ?><li class="nav-item"><a class="nav-link <?= activePage('facilities.php') ?>"<?= hub_nav_current(['facilities.php']) ?> href="/admin/facilities.php"><i class="fa-solid fa-screwdriver-wrench me-1" aria-hidden="true"></i>Facilities</a></li><?php endif; ?>
-                        </ul>
-                    </section>
-                    <?php endif; ?>
-                    <?php endif; ?>
-
-                    <?php if (hub_auth_has_capability('content_social')): ?>
-                    <?php if (hub_navigation_group_available('publishing')): ?>
-<section class="nav-section">
-                        <?php $publishingActive = activeGroup(['league_table.php', 'template_packs.php', 'template_pack.php', 'templates.php']); ?>
-                        <button class="nav-section-toggle <?= $publishingActive ?>" type="button" data-bs-toggle="collapse" data-bs-target="#hubPublishingNavigation" data-nav-section="publishing" aria-expanded="<?= $publishingActive === 'active' ? 'true' : 'false' ?>" aria-controls="hubPublishingNavigation">
-                            <span>Publishing</span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
-                        </button>
-                        <ul class="navbar-nav nav-main nav-submenu collapse <?= $publishingActive === 'active' ? 'show' : '' ?> mb-0" id="hubPublishingNavigation">
-                            <?php if (hub_navigation_item_visible('publishing.league_table')): ?><li class="nav-item"><a class="nav-link <?= activePage('league_table.php') ?>"<?= hub_nav_current(['league_table.php']) ?> href="/admin/league_table.php"><i class="fa-solid fa-table me-1" aria-hidden="true"></i>League table</a></li><?php endif; ?>
-                            <?php if (hub_navigation_item_visible('publishing.template_packs')): ?><li class="nav-item"><a class="nav-link <?= activeGroup(['template_packs.php', 'template_pack.php', 'templates.php']) ?>" href="/admin/template_packs.php"><i class="fa-solid fa-layer-group me-1" aria-hidden="true"></i>Template packs</a></li><?php endif; ?>
-                        </ul>
-                    </section>
-                    <?php endif; ?>
-                    <?php endif; ?>
-
-                    <?php if (hub_auth_has_capability('admin_settings')): ?>
-                        <?php if (hub_navigation_group_available('admin')): ?>
-<section class="nav-section">
-                            <?php $adminActive = activeGroup(['match_photos.php', 'media.php', 'facebook_photo_import.php', 'people.php', 'photo_albums.php', 'photo_album.php', 'settings.php', 'social_post_settings.php', 'club_people.php', 'club_person.php', 'positions.php', 'access_roles.php', 'access_role_edit.php', 'access_review.php']); ?>
-                            <button class="nav-section-toggle <?= $adminActive ?>" type="button" data-bs-toggle="collapse" data-bs-target="#hubAdminNavigation" data-nav-section="admin" aria-expanded="<?= $adminActive === 'active' ? 'true' : 'false' ?>" aria-controls="hubAdminNavigation">
-                                <span>Admin</span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
-                            </button>
-                            <ul class="navbar-nav nav-main nav-submenu collapse <?= $adminActive === 'active' ? 'show' : '' ?> mb-0" id="hubAdminNavigation">
-                                <?php if (hub_navigation_item_visible('admin.match_photos')): ?><li class="nav-item"><a class="nav-link <?= activeGroup(['match_photos.php', 'media.php', 'facebook_photo_import.php']) ?>"<?= hub_nav_current(['match_photos.php', 'media.php', 'facebook_photo_import.php']) ?> href="/admin/match_photos.php"><i class="fa-solid fa-photo-film me-1" aria-hidden="true"></i>Media Library</a></li><?php endif; ?>
-                                <?php if (hub_navigation_item_visible('admin.people')): ?><li class="nav-item"><a class="nav-link <?= activePage('people.php') ?>"<?= hub_nav_current(['people.php']) ?> href="/admin/people.php"><i class="fa-solid fa-user-tag me-1" aria-hidden="true"></i>Photo tags</a></li><?php endif; ?>
-                                <?php if (hub_navigation_item_visible('admin.photo_albums')): ?><li class="nav-item"><a class="nav-link <?= activeGroup(['photo_albums.php', 'photo_album.php']) ?>"<?= hub_nav_current(['photo_albums.php', 'photo_album.php']) ?> href="/admin/photo_albums.php"><i class="fa-solid fa-images me-1" aria-hidden="true"></i>Photo albums</a></li><?php endif; ?>
-                                <?php if (hub_navigation_item_visible('admin.settings')): ?><li class="nav-item"><a class="nav-link <?= activeGroup(['settings.php', 'social_post_settings.php']) ?>"<?= hub_nav_current(['settings.php', 'social_post_settings.php']) ?> href="/admin/settings.php"><i class="fa-solid fa-gear me-1" aria-hidden="true"></i>Settings</a></li><?php endif; ?>
-                                <?php if (hub_navigation_item_visible('admin.club_people')): ?><li class="nav-item"><a class="nav-link <?= activeGroup(['club_people.php', 'club_person.php']) ?>"<?= hub_nav_current(['club_people.php', 'club_person.php']) ?> href="/admin/club_people.php"><i class="fa-solid fa-address-book me-1" aria-hidden="true"></i>People &amp; Users</a></li><?php endif; ?>
-                                <?php if (hub_navigation_item_visible('admin.positions')): ?><li class="nav-item"><a class="nav-link <?= activePage('positions.php') ?>"<?= hub_nav_current(['positions.php']) ?> href="/admin/positions.php"><i class="fa-solid fa-sitemap me-1" aria-hidden="true"></i>Club roles</a></li><?php endif; ?>
-                                <?php if (hub_navigation_item_visible('admin.access_roles')): ?><li class="nav-item"><a class="nav-link <?= activeGroup(['access_roles.php', 'access_role_edit.php']) ?>"<?= hub_nav_current(['access_roles.php', 'access_role_edit.php']) ?> href="/admin/access_roles.php"><i class="fa-solid fa-table-cells me-1" aria-hidden="true"></i>Access templates</a></li><?php endif; ?>
-                                <?php if (hub_navigation_item_visible('admin.access_review')): ?><li class="nav-item"><a class="nav-link <?= activeGroup(['access_review.php']) ?>"<?= hub_nav_current(['access_review.php']) ?> href="/admin/access_review.php"><i class="fa-solid fa-clipboard-check me-1" aria-hidden="true"></i>Access review</a></li><?php endif; ?>
-                            </ul>
-                        </section>
-                    <?php endif; ?>
-                    <?php endif; ?>
-
-                    <section class="nav-section nav-account">
-                        <div class="nav-account__identity"><i class="fa-solid fa-circle-user" aria-hidden="true"></i><span><strong><?= htmlspecialchars((string) ($currentUser['display_name'] ?? $currentUser['username'] ?? $currentUser['email'] ?? 'Hub user'), ENT_QUOTES, 'UTF-8') ?></strong><small><?= htmlspecialchars(ucfirst((string) $currentRole), ENT_QUOTES, 'UTF-8') ?></small></span></div>
-                        <ul class="navbar-nav nav-main mb-0">
+                            <li class="nav-item">
+                                <a class="nav-link <?= activeGroup(['help.php', 'help_edit.php']) ?>" href="/admin/help.php"><i class="fa-solid fa-circle-question me-1" aria-hidden="true"></i>Help</a>
+                            </li>
                             <li class="nav-item">
                                 <a class="nav-link" href="/admin/profile.php"><i class="fa-solid fa-user-pen me-1" aria-hidden="true"></i>Edit profile</a>
                             </li>
@@ -748,14 +655,159 @@ $documentTitle = $documentTitle !== '' ? $documentTitle . ' – ' . APP_NAME : A
         </div>
     </nav>
 
-    <button class="hub-desktop-nav-toggle d-none d-xl-inline-flex" id="hubDesktopNavToggle" type="button" aria-controls="hubSideNavigation" aria-expanded="true" aria-label="Hide side navigation" title="Hide side navigation">
-        <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
-    </button>
+
+    <div class="hub-palette" id="hubPalette" role="dialog" aria-modal="true" aria-label="Find a page" hidden>
+        <div class="hub-palette__panel">
+            <div class="hub-palette__field">
+                <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                <input type="text" id="hubPaletteInput" placeholder="Where do you want to go? e.g. orders, sponsors, roles" autocomplete="off" spellcheck="false" aria-controls="hubPaletteList" aria-label="Find a page">
+                <kbd>Esc</kbd>
+            </div>
+            <ul class="hub-palette__list" id="hubPaletteList" role="listbox"></ul>
+        </div>
+    </div>
+    <script>
+        (function () {
+            var items = <?= json_encode(hub_navigation_search_index(), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE) ?>;
+            var root = document.getElementById('hubPalette');
+            var input = document.getElementById('hubPaletteInput');
+            var list = document.getElementById('hubPaletteList');
+            if (!root || !input || !list) return;
+            var shown = [];
+            var active = 0;
+            var opener = null;
+
+            function score(item, words) {
+                var hay = (item.label + ' ' + item.where).toLowerCase();
+                var label = item.label.toLowerCase();
+                var total = 0;
+                for (var i = 0; i < words.length; i++) {
+                    var at = hay.indexOf(words[i]);
+                    if (at < 0) return -1;
+                    total += label.indexOf(words[i]) === 0 ? 3 : (label.indexOf(words[i]) > 0 ? 2 : 1);
+                }
+                return total;
+            }
+            function render() {
+                var words = input.value.toLowerCase().split(/\s+/).filter(Boolean);
+                var ranked = [];
+                items.forEach(function (item) {
+                    var s = words.length ? score(item, words) : 0;
+                    if (s >= 0) ranked.push({ item: item, s: s });
+                });
+                if (words.length) ranked.sort(function (a, b) { return b.s - a.s; });
+                shown = ranked.slice(0, 9).map(function (r) { return r.item; });
+                active = 0;
+                list.innerHTML = '';
+                if (!shown.length) {
+                    var empty = document.createElement('li');
+                    empty.className = 'hub-palette__empty';
+                    empty.textContent = 'Nothing matches. Try the Help Centre.';
+                    list.appendChild(empty);
+                }
+                shown.forEach(function (item, index) {
+                    var li = document.createElement('li');
+                    li.setAttribute('role', 'option');
+                    li.className = 'hub-palette__item' + (index === 0 ? ' is-active' : '');
+                    var a = document.createElement('a');
+                    a.href = item.href;
+                    if (item.external) { a.target = '_blank'; a.rel = 'noopener'; }
+                    var name = document.createElement('span');
+                    name.textContent = item.label;
+                    var where = document.createElement('small');
+                    where.textContent = item.where;
+                    a.appendChild(name);
+                    a.appendChild(where);
+                    li.appendChild(a);
+                    list.appendChild(li);
+                });
+            }
+            function mark() {
+                var rows = list.querySelectorAll('.hub-palette__item');
+                rows.forEach(function (row, i) {
+                    row.classList.toggle('is-active', i === active);
+                    if (i === active) row.scrollIntoView({ block: 'nearest' });
+                });
+            }
+            function open() {
+                opener = document.activeElement;
+                root.hidden = false;
+                document.body.classList.add('hub-palette-open');
+                input.value = '';
+                render();
+                input.focus();
+            }
+            function close() {
+                root.hidden = true;
+                document.body.classList.remove('hub-palette-open');
+                if (opener && opener.focus) opener.focus();
+            }
+            document.addEventListener('click', function (event) {
+                if (event.target.closest('[data-hub-palette-open]')) { event.preventDefault(); open(); return; }
+                if (!root.hidden && event.target === root) close();
+            });
+            document.addEventListener('keydown', function (event) {
+                var typing = /^(input|textarea|select)$/i.test((event.target.tagName || '')) || event.target.isContentEditable;
+                if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+                    event.preventDefault();
+                    root.hidden ? open() : close();
+                    return;
+                }
+                if (root.hidden) return;
+                if (event.key === 'Escape') { event.preventDefault(); close(); }
+                else if (event.key === 'ArrowDown') { event.preventDefault(); active = Math.min(active + 1, shown.length - 1); mark(); }
+                else if (event.key === 'ArrowUp') { event.preventDefault(); active = Math.max(active - 1, 0); mark(); }
+                else if (event.key === 'Enter' && shown[active]) {
+                    event.preventDefault();
+                    if (shown[active].external) { window.open(shown[active].href, '_blank', 'noopener'); close(); }
+                    else { window.location.href = shown[active].href; }
+                }
+            });
+            input.addEventListener('input', render);
+        })();
+    </script>
+
+    <?php
+    // Collapsed-sidebar rail: one icon per menu section, plus the account avatar at the bottom.
+    $railName = trim((string) ($currentUser['display_name'] ?? $currentUser['username'] ?? $currentUser['email'] ?? 'Hub user'));
+    $railInitials = '';
+    foreach (array_slice(preg_split('/\s+/', $railName) ?: [], 0, 2) as $railWord) {
+        $railInitials .= mb_strtoupper(mb_substr($railWord, 0, 1));
+    }
+    $railInitials = $railInitials !== '' ? $railInitials : 'HU';
+    ?>
+    <nav class="hub-sidebar-rail" id="hubSidebarRail" aria-label="Sidebar sections">
+        <button class="hub-desktop-nav-toggle hub-sidebar-rail__logo" id="hubDesktopNavToggle" type="button" aria-controls="hubSideNavigation" aria-expanded="false" aria-label="Show sidebar" title="Show sidebar" data-bs-placement="right" data-bs-custom-class="hub-rail-tooltip">
+            <img class="hub-sidebar-rail__club" src="club-logo-white-120.png" alt="" width="30" height="30" loading="eager">
+            <i class="fa-solid fa-table-columns hub-sidebar-rail__show" aria-hidden="true"></i>
+        </button>
+        <ul class="hub-sidebar-rail__list">
+            <?php foreach ($hubMenu as $railSection): ?>
+                <?php $railLabel = $railSection['label'] !== '' ? (string) $railSection['label'] : 'Home'; ?>
+                <li>
+                    <button type="button" class="hub-sidebar-rail__item<?= $railSection['active'] ? ' is-active' : '' ?>" data-nav-target="hubNavSection-<?= htmlspecialchars((string) $railSection['key'], ENT_QUOTES, 'UTF-8') ?>" title="<?= htmlspecialchars($railLabel, ENT_QUOTES, 'UTF-8') ?>" aria-label="<?= htmlspecialchars($railLabel, ENT_QUOTES, 'UTF-8') ?>"<?= $railSection['active'] ? ' aria-current="true"' : '' ?> data-bs-placement="right" data-bs-custom-class="hub-rail-tooltip">
+                        <i class="fa-solid <?= htmlspecialchars((string) $railSection['icon'], ENT_QUOTES, 'UTF-8') ?>" aria-hidden="true"></i>
+                    </button>
+                </li>
+            <?php endforeach; ?>
+        </ul>
+        <button type="button" class="hub-sidebar-rail__avatar" data-nav-target="hubNavSection-account" title="<?= htmlspecialchars($railName, ENT_QUOTES, 'UTF-8') ?>" aria-label="Account: <?= htmlspecialchars($railName, ENT_QUOTES, 'UTF-8') ?>" data-bs-placement="right" data-bs-custom-class="hub-rail-tooltip"><?php if ($accountPhotoUrl !== ''): ?><img class="hub-sidebar-rail__photo" src="<?= htmlspecialchars($accountPhotoUrl, ENT_QUOTES, 'UTF-8') ?>" alt="" loading="lazy"><?php else: ?><?= htmlspecialchars($railInitials, ENT_QUOTES, 'UTF-8') ?><?php endif; ?></button>
+    </nav>
 
     <main class="hub-main" id="hubMainContent" tabindex="-1">
         <div class="container-fluid">
         <?php if (!empty($pageHero) && is_array($pageHero)): ?>
             <?php hub_render_page_hero($pageHero); ?>
+        <?php endif; ?>
+        <?php $hubStrip = hub_navigation_strip(); ?>
+        <?php if ($hubStrip !== null): ?>
+            <nav class="hub-section-tabs" aria-label="<?= htmlspecialchars($hubStrip['label'], ENT_QUOTES, 'UTF-8') ?> sections">
+                <ul class="nav">
+                    <?php foreach ($hubStrip['tabs'] as $stripTab): ?>
+                        <li class="nav-item"><a class="nav-link<?= !empty($stripTab['current']) ? ' active' : '' ?>"<?= !empty($stripTab['current']) ? ' aria-current="page"' : '' ?> href="<?= htmlspecialchars((string) $stripTab['href'], ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars((string) $stripTab['label'], ENT_QUOTES, 'UTF-8') ?><?= order_alert_badge(hub_navigation_badge_total($hubOrderAlerts, $stripTab['badge'] ?? [])) ?></a></li>
+                    <?php endforeach; ?>
+                </ul>
+            </nav>
         <?php endif; ?>
     <script>
         (function() {

@@ -7,20 +7,38 @@ require_once __DIR__ . '/lib/season.php';
 require_once __DIR__ . '/lib/stats.php';
 require_once __DIR__ . '/lib/player_match_stats.php';
 require_once __DIR__ . '/lib/opposition_report.php';
-$pageStyles = ['player-sponsors-match-player-of-match.css'];
+$pageStyles = ['player-sponsors-match-player-of-match.css', 'reports.css'];
 $pageHero = ['eyebrow' => 'Matchday', 'title' => 'Stats', 'subtitle' => 'Team performance, player contributions and match breakdowns.', 'actions' => []];
 require __DIR__ . '/header.php';
 $seasonId = (int)$seasonContext['season_id'];
-$tab = is_string($_GET['tab'] ?? null) && in_array($_GET['tab'], ['team', 'players', 'matches', 'potm', 'compare', 'opposition'], true) ? $_GET['tab'] : 'team';
+$tab = is_string($_GET['tab'] ?? null) && in_array($_GET['tab'], ['team', 'players', 'matches', 'potm', 'compare', 'opposition', 'league', 'fixtures', 'finder', 'competitions', 'seasons', 'career', 'records', 'teamstats', 'referees', 'player'], true) ? $_GET['tab'] : 'team';
+// Tabs rendered by stats_extra.php; they bring their own filters instead of the shared Season/Competition/Venue card.
+$extraTabs = ['league', 'fixtures', 'finder', 'competitions', 'seasons', 'career', 'records', 'teamstats'];
 $competition = is_string($_GET['competition'] ?? null) ? $_GET['competition'] : '';
 $venue = is_string($_GET['venue'] ?? null) && in_array($_GET['venue'], ['home', 'away'], true) ? $_GET['venue'] : '';
+// Team / Player / Match / POTM stats only cover the current season, and default to League fixtures only.
+$currentOnlyTabs = ['team', 'players', 'player', 'matches', 'potm'];
+$currentOnly = in_array($tab, $currentOnlyTabs, true);
+if ($currentOnly) {
+    foreach ($seasonContext['seasons'] as $s) {
+        if (!empty($s['is_current'])) { $seasonId = (int)$s['id']; break; }
+    }
+}
+$leagueCompetitionNames = array_map('strval', $pdo->query('SELECT name FROM match_competitions WHERE is_league = 1')->fetchAll(PDO::FETCH_COLUMN));
 $stmt = $pdo->prepare('SELECT * FROM match_fixtures WHERE season_id = ? AND status = ? ORDER BY match_date ASC, kickoff_time ASC, id ASC');
 $stmt->execute([$seasonId, 'played']);
 $allFixtures = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $competitions = array_values(array_unique(array_filter(array_column($allFixtures, 'competition'))));
 sort($competitions);
-if (!in_array($competition, $competitions, true)) $competition = '';
-$fixtures = array_values(array_filter($allFixtures, static fn(array $f): bool => ($competition === '' || $f['competition'] === $competition) && ($venue === '' || (int)$f['is_home'] === ($venue === 'home' ? 1 : 0))));
+// Competition scope buttons: League / Cups / Both (league + cups; friendlies are left out).
+$competition = match ($competition) { 'cups' => 'cups', 'both', 'all' => 'both', default => 'league' };
+$friendlyNames = array_map('strval', $pdo->query("SELECT name FROM match_competitions WHERE competition_type = 'friendly'")->fetchAll(PDO::FETCH_COLUMN));
+$inCompetitionScope = static function (string $name) use ($competition, $leagueCompetitionNames, $friendlyNames): bool {
+    if (in_array($name, $friendlyNames, true) || stripos($name, 'friendly') !== false) return false;
+    $isLeague = in_array($name, $leagueCompetitionNames, true);
+    return $competition === 'both' || ($competition === 'league' ? $isLeague : !$isLeague);
+};
+$fixtures = array_values(array_filter($allFixtures, static fn(array $f): bool => $inCompetitionScope((string)($f['competition'] ?? '')) && ($venue === '' || (int)$f['is_home'] === ($venue === 'home' ? 1 : 0))));
 $eventsByFixture = [];
 $dataFile = __DIR__ . '/data/matches.json';
 $eventsAvailable = false;
@@ -50,7 +68,7 @@ $compareMetrics = ['goals'];
 $competitionsBySeasonId = [];
 foreach ($pdo->query(
     "SELECT DISTINCT season_id, competition FROM match_fixtures
-     WHERE status = 'played' AND competition IS NOT NULL AND competition <> ''"
+     WHERE status = 'played' AND competition IS NOT NULL AND competition <> ''" . hub_stats_not_friendly_sql($pdo)
 ) as $row) {
     $competitionsBySeasonId[(int)$row['season_id']][] = (string)$row['competition'];
 }
@@ -87,18 +105,11 @@ foreach (is_array($_GET['season_ids'] ?? null) ? $_GET['season_ids'] : [] as $ri
     if ($rid > 0 && !in_array($rid, $playersSeasonIds, true)) $playersSeasonIds[] = $rid;
 }
 if (!$playersSeasonIds) $playersSeasonIds = [$seasonId];
-$playersCompetitions = array_values(array_filter(array_map('strval', is_array($_GET['competitions'] ?? null) ? $_GET['competitions'] : [])));
+$playersCompetitions = array_values(array_filter($competitions, $inCompetitionScope));
+if (in_array($tab, ['players', 'player'], true)) $playersSeasonIds = [$seasonId];
 $playersFixtures = [];
-if ($tab === 'players') {
-    $stmt = $pdo->prepare('SELECT * FROM match_fixtures WHERE season_id = ? AND status = ? ORDER BY match_date ASC, kickoff_time ASC, id ASC');
-    foreach ($playersSeasonIds as $psid) {
-        $stmt->execute([$psid, 'played']);
-        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $f) {
-            if ($venue !== '' && (int)$f['is_home'] !== ($venue === 'home' ? 1 : 0)) continue;
-            if ($playersCompetitions !== [] && !in_array((string)($f['competition'] ?? ''), $playersCompetitions, true)) continue;
-            $playersFixtures[] = $f;
-        }
-    }
+if (in_array($tab, ['players', 'player'], true)) {
+    $playersFixtures = hub_stats_player_fixtures($pdo, $playersSeasonIds[0], $playersCompetitions, $venue);
 }
 
 $url = static function (array $changes) use ($seasonId, $tab, $competition, $venue, $compareSeasonIds, $selectedCompetitions, $compareMetrics, $playersSeasonIds, $playersCompetitions): string {
@@ -109,10 +120,6 @@ $url = static function (array $changes) use ($seasonId, $tab, $competition, $ven
         $params['seasons'] = $compareSeasonIds ?: [$seasonId];
         $params['competitions'] = $selectedCompetitions;
         $params['pmetric'] = $compareMetrics;
-    } elseif ($targetTab === 'players') {
-        unset($params['competition']);
-        $params['season_ids'] = $playersSeasonIds;
-        $params['competitions'] = $playersCompetitions;
     }
     return '/admin/stats.php?' . http_build_query(array_merge($params, $changes));
 };
@@ -129,15 +136,77 @@ $comparePdfUrl = static function () use ($compareSeasonIds, $selectedCompetition
 $esc = static fn(mixed $value): string => htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
 $badge = static fn(string $result): string => ['W' => 'success', 'D' => 'secondary', 'L' => 'danger'][$result] ?? 'secondary';
 ?>
-<div class="container-fluid py-3">
-    <nav class="nav nav-tabs mb-4" aria-label="Statistics sections">
-        <?php foreach (['team' => 'Team stats', 'players' => 'Player Stats', 'matches' => 'Match Stats', 'potm' => 'POTM', 'compare' => 'Compare seasons', 'opposition' => 'Opposition Reports'] as $key => $label): ?>
-        <a class="nav-link <?= $tab === $key ? 'active' : '' ?>" <?= $tab === $key ? 'aria-current="page"' : '' ?> href="<?= $esc($url(['tab' => $key])) ?>"><?= $esc($label) ?></a>
+<div class="container-fluid py-3 rpt-page">
+<?php
+$statsNav = [
+    'Club' => [
+        'team' => ['Team stats', 'fa-chart-column', 'Results, goals and form'],
+        'players' => ['Player stats', 'fa-person-running', 'Apps, goals and cards'],
+        'matches' => ['Match stats', 'fa-futbol', 'Every match, event by event'],
+        'potm' => ['POTM', 'fa-award', 'Player of the match awards'],
+    ],
+    'League' => [
+        'league' => ['League & form', 'fa-ranking-star', 'Table, last 3/6/10 form, points graph'],
+        'teamstats' => ['Team stat explorer', 'fa-table-cells', '26 team stats: runs, clean sheets, goals, points'],
+        'competitions' => ['Competitions', 'fa-trophy', 'League and cup records by competition'],
+    ],
+    'Fixtures' => [
+        'fixtures' => ['Next & latest', 'fa-calendar-day', 'Upcoming fixtures and recent results'],
+        'finder' => ['Fixture finder', 'fa-magnifying-glass', 'Search every season by opponent or date'],
+    ],
+    'History' => [
+        'seasons' => ['Season history', 'fa-clock-rotate-left', 'Past season tables and summaries'],
+        'compare' => ['Compare seasons', 'fa-code-compare', 'Year-on-year team and player stats'],
+        'career' => ['Player careers', 'fa-id-card', 'Season-by-season player record'],
+        'records' => ['Records', 'fa-medal', 'Biggest wins, streaks and top scorers'],
+    ],
+    'Scouting' => [
+        'opposition' => ['Opposition reports', 'fa-binoculars', 'Uploaded opponent reports'],
+        'referees' => ['Referees', 'fa-user-tie', 'Card rates, record and fairness for each referee'],
+    ],
+];
+// PDF export: the tab's title, and the filters it states (only the tabs that use the shared filter card state them).
+$statsTabKey = $tab === 'player' ? 'players' : $tab;
+$statsTabLabel = '';
+foreach ($statsNav as $statsGroup) {
+    if (isset($statsGroup[$statsTabKey])) $statsTabLabel = $statsGroup[$statsTabKey][0];
+}
+$statsUsesFilters = in_array($tab, $currentOnlyTabs, true);
+$statsPdfSummary = implode('  ·  ', array_filter([
+    $statsTabLabel,
+    $statsUsesFilters ? (string)($seasonById[$seasonId]['name'] ?? '') : '',
+    $statsUsesFilters ? (['league' => 'League', 'cups' => 'Cups', 'both' => 'League and cups'][$competition] ?? '') : '',
+    $statsUsesFilters ? (['' => 'Home and away', 'home' => 'Home games', 'away' => 'Away games'][$venue] ?? '') : '',
+]));
+// Players and compare have their own PDF documents; every other tab prints the page as it shows on screen.
+$exportPdfUrl = static function () use ($tab, $playersSeasonIds, $playersCompetitions, $venue): string {
+    if ($tab === 'players') {
+        return '/admin/stats_players_pdf.php?' . http_build_query(['season_id' => $playersSeasonIds[0], 'competitions' => $playersCompetitions, 'venue' => $venue, 'sort' => $_GET['sort'] ?? null, 'direction' => $_GET['direction'] ?? null]);
+    }
+    return '/admin/stats_pdf.php?' . http_build_query($_GET);
+};
+?>
+<div class="rpt-layout">
+    <nav class="rpt-picker" aria-label="Statistics sections">
+        <?php foreach ($statsNav as $groupName => $items): ?>
+        <div class="rpt-picker__group">
+            <div class="rpt-picker__group-label"><?= $esc($groupName) ?></div>
+            <?php foreach ($items as $key => [$label, $icon, $desc]): ?>
+            <a class="rpt-picker__item <?= ($tab === $key || ($tab === 'player' && $key === 'players')) ? 'is-active' : '' ?>" <?= ($tab === $key || ($tab === 'player' && $key === 'players')) ? 'aria-current="page"' : '' ?> href="<?= $esc($url(['tab' => $key])) ?>">
+                <span class="rpt-picker__icon"><i class="fa-solid <?= $esc($icon) ?>" aria-hidden="true"></i></span>
+                <span class="rpt-picker__text"><strong><?= $esc($label) ?></strong><small><?= $esc($desc) ?></small></span>
+            </a>
+            <?php endforeach; ?>
+        </div>
         <?php endforeach; ?>
     </nav>
-    <?php if ($tab !== 'opposition'): ?>
+    <div class="rpt-main">
+    <?php if (!empty($statsPdfExport)): ?><div class="stats-pdf-summary"><?= $esc($statsPdfSummary) ?></div><?php endif; ?>
+    <?php if ($tab !== 'compare'): ?><div class="stats-export-row d-flex justify-content-end mb-3"><a class="btn btn-outline-secondary btn-sm" href="<?= $esc($exportPdfUrl()) ?>" target="_blank" rel="noopener"><i class="fa-solid fa-file-pdf me-1" aria-hidden="true"></i>Export as PDF</a></div><?php endif; ?>
+    <?php if ($tab !== 'opposition' && $tab !== 'referees' && !in_array($tab, $extraTabs, true)): ?>
     <form method="get" class="card card-body shadow-sm mb-4<?= $tab === 'compare' ? ' cmp-filter-card' : '' ?>">
         <input type="hidden" name="tab" value="<?= $esc($tab) ?>">
+        <?php if ($tab === 'player' && is_string($_GET['player'] ?? null)): ?><input type="hidden" name="player" value="<?= $esc($_GET['player']) ?>"><?php endif; ?>
         <?php if ($tab === 'compare'): ?>
         <?php
         $ddSummary = static function (array $items, string $all, string $word): string {
@@ -198,64 +267,46 @@ $badge = static fn(string $result): string => ['W' => 'success', 'D' => 'seconda
             <div class="col-md-2 d-grid"><label class="form-label d-none d-md-block">&nbsp;</label><button class="btn btn-primary" type="submit">Compare</button></div>
             <div class="col-md-2 d-grid"><label class="form-label d-none d-md-block">&nbsp;</label><a class="btn btn-outline-secondary" href="<?= $esc($comparePdfUrl()) ?>" target="_blank" rel="noopener"><i class="fa-solid fa-file-pdf me-1" aria-hidden="true"></i>Export as PDF</a></div>
         </div>
-        <?php elseif ($tab === 'players'): ?>
-        <?php
-        $playersSeasonSummary = count($playersSeasonIds) > 2
-            ? count($playersSeasonIds) . ' seasons selected'
-            : implode(', ', array_map(static fn($id) => (string)($seasonById[$id]['name'] ?? $id), $playersSeasonIds));
-        $playersCompSummary = $playersCompetitions === []
-            ? 'All competitions'
-            : (count($playersCompetitions) > 2 ? count($playersCompetitions) . ' competitions' : implode(', ', $playersCompetitions));
-        ?>
-        <style>.hub-checkbox-dropdown-field{overflow:visible}</style>
-        <div class="row g-3 align-items-end">
-            <div class="col-md-4 hub-checkbox-dropdown-field">
-                <label class="form-label" id="playersSeasonsLabel">Seasons</label>
-                <div class="dropdown hub-checkbox-dropdown">
-                    <button type="button" class="form-select hub-checkbox-dropdown__toggle" aria-haspopup="true" aria-expanded="false" aria-labelledby="playersSeasonsLabel">
-                        <span class="hub-checkbox-dropdown__summary" data-dd-summary data-dd-all="Choose seasons" data-dd-word="seasons selected"><?= $esc($playersSeasonSummary) ?></span>
-                    </button>
-                    <div class="dropdown-menu hub-checkbox-dropdown__menu" aria-label="Seasons">
-                        <?php foreach (array_reverse($seasonContext['seasons']) as $s): ?>
-                            <label class="hub-checkbox-dropdown__item">
-                                <input type="checkbox" name="season_ids[]" value="<?= (int)$s['id'] ?>" <?= in_array((int)$s['id'], $playersSeasonIds, true) ? 'checked' : '' ?>>
-                                <span><?= $esc($s['name']) ?></span>
-                            </label>
-                        <?php endforeach; ?>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4 hub-checkbox-dropdown-field">
-                <label class="form-label" id="playersCompsLabel">Competitions</label>
-                <div class="dropdown hub-checkbox-dropdown">
-                    <button type="button" class="form-select hub-checkbox-dropdown__toggle" aria-haspopup="true" aria-expanded="false" aria-labelledby="playersCompsLabel">
-                        <span class="hub-checkbox-dropdown__summary" data-dd-summary data-dd-all="All competitions" data-dd-word="competitions"><?= $esc($playersCompSummary) ?></span>
-                    </button>
-                    <div class="dropdown-menu hub-checkbox-dropdown__menu" aria-label="Competitions">
-                        <?php foreach ($allCompareCompetitions as $c): ?>
-                            <label class="hub-checkbox-dropdown__item">
-                                <input type="checkbox" name="competitions[]" value="<?= $esc($c) ?>" <?= in_array($c, $playersCompetitions, true) ? 'checked' : '' ?>>
-                                <span><?= $esc($c) ?></span>
-                            </label>
-                        <?php endforeach; ?>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-2"><label for="stats-venue" class="form-label">Venue</label><select class="form-select" id="stats-venue" name="venue"><option value="">Home &amp; away</option><option value="home" <?= $venue === 'home' ? 'selected' : '' ?>>Home</option><option value="away" <?= $venue === 'away' ? 'selected' : '' ?>>Away</option></select></div>
-            <div class="col-md-2"><button class="btn btn-primary w-100" type="submit">Apply filters</button></div>
-        </div>
         <?php else: ?>
+        <style>
+.stats-scope .btn{min-width:5.5rem;color:var(--brand-primary,#6a2036);border-color:var(--brand-primary,#6a2036);background:#fff}
+.stats-scope .btn:hover{background:var(--brand-light,#f6ecde);color:var(--brand-dark,#4b0818);border-color:var(--brand-primary,#6a2036)}
+.stats-scope--events .btn,.stats-scope--venue .btn,.stats-scope--result .btn{min-width:0;padding-left:.55rem;padding-right:.55rem}
+.stats-scope .btn-check:checked+.btn i{filter:drop-shadow(0 0 1px #fff)}
+.stats-scope .btn-check:checked+.btn,.stats-scope .btn-check:active+.btn{background:var(--brand-primary,#6a2036);border-color:var(--brand-primary,#6a2036);color:#fff}
+.stats-scope .btn-check:focus-visible+.btn{box-shadow:0 0 0 .2rem rgba(224,180,42,.45)}
+</style>
         <div class="row g-3 align-items-end">
-            <div class="col-md-4"><label for="stats-season" class="form-label">Season</label><select class="form-select" id="stats-season" name="season_id"><?php foreach ($seasonContext['seasons'] as $s): ?><option value="<?= (int)$s['id'] ?>" <?= (int)$s['id'] === $seasonId ? 'selected' : '' ?>><?= $esc($s['name']) ?></option><?php endforeach; ?></select></div>
-            <div class="col-md-4"><label for="stats-competition" class="form-label">Competition</label><select class="form-select" id="stats-competition" name="competition"><option value="">All competitions</option><?php foreach ($competitions as $c): ?><option <?= $competition === $c ? 'selected' : '' ?> value="<?= $esc($c) ?>"><?= $esc($c) ?></option><?php endforeach; ?></select></div>
-            <div class="col-md-2"><label for="stats-venue" class="form-label">Venue</label><select class="form-select" id="stats-venue" name="venue"><option value="">Home &amp; away</option><option value="home" <?= $venue === 'home' ? 'selected' : '' ?>>Home</option><option value="away" <?= $venue === 'away' ? 'selected' : '' ?>>Away</option></select></div>
-            <div class="col-md-2"><button class="btn btn-primary w-100" type="submit">Apply filters</button></div>
+            <div class="col-md-3"><label for="stats-season" class="form-label">Season</label><input type="hidden" name="season_id" value="<?= $seasonId ?>"><input type="text" class="form-control" id="stats-season" value="<?= $esc($seasonById[$seasonId]['name'] ?? '') ?> · Current" readonly></div>
+            <div class="col-md-4">
+                <span class="form-label d-block" id="stats-scope-label">Competition</span>
+                <div class="btn-group stats-scope w-100" role="group" aria-labelledby="stats-scope-label">
+                    <?php foreach (['league' => 'League', 'cups' => 'Cups', 'both' => 'Both'] as $k => $label): ?>
+                        <input type="radio" class="btn-check" name="competition" id="stats-scope-<?= $k ?>" value="<?= $k ?>" autocomplete="off" <?= $competition === $k ? 'checked' : '' ?> onchange="this.form.submit()">
+                        <label class="btn btn-outline-primary" for="stats-scope-<?= $k ?>"><?= $label ?></label>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <span class="form-label d-block" id="stats-venue-label">Venue</span>
+                <div class="btn-group stats-scope w-100" role="group" aria-labelledby="stats-venue-label">
+                    <?php foreach (['' => ['Home &amp; away', 'fa-arrows-left-right'], 'home' => ['Home', 'fa-house'], 'away' => ['Away', 'fa-bus']] as $k => [$label, $icon]): ?>
+                        <input type="radio" class="btn-check" name="venue" id="stats-venue-<?= $k === '' ? 'both' : $k ?>" value="<?= $k ?>" autocomplete="off" <?= $venue === $k ? 'checked' : '' ?> onchange="this.form.submit()">
+                        <label class="btn btn-outline-primary" for="stats-venue-<?= $k === '' ? 'both' : $k ?>" title="<?= $label ?>"><i class="fa-solid <?= $icon ?> me-1" aria-hidden="true"></i><span class="<?= $k === '' ? 'visually-hidden' : '' ?>"><?= $label ?></span></label>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+            <div class="col-md-2"><button class="btn btn-primary w-100" type="submit">Apply</button></div>
         </div>
         <?php endif; ?>
     </form>
     <?php endif; ?>
-    <?php if (!$eventsAvailable && $tab !== 'opposition'): ?><div class="alert alert-warning">Match events are currently unavailable. Player goals and cards may be incomplete.</div><?php endif; ?>
-    <?php if ($tab === 'opposition'): ?>
+    <?php if (!$eventsAvailable && $tab !== 'opposition' && $tab !== 'referees' && !in_array($tab, $extraTabs, true)): ?><div class="alert alert-warning">Match events are currently unavailable. Player goals and cards may be incomplete.</div><?php endif; ?>
+    <?php if (in_array($tab, $extraTabs, true)): ?>
+        <?php require __DIR__ . '/stats_extra.php'; ?>
+    <?php elseif ($tab === 'referees'): ?>
+        <?php require __DIR__ . '/stats_referees.php'; ?>
+    <?php elseif ($tab === 'opposition'): ?>
         <?php
         $oppUploaded = isset($_GET['uploaded']);
         $oppDeleted = isset($_GET['deleted']);
@@ -267,9 +318,44 @@ $badge = static fn(string $result): string => ['W' => 'success', 'D' => 'seconda
         <?php if ($oppDeleted): ?><div class="alert alert-success">Report deleted.</div><?php endif; ?>
         <?php if ($oppError !== ''): ?><div class="alert alert-danger"><?= $esc($oppErrorMessages[$oppError] ?? 'Something went wrong.') ?></div><?php endif; ?>
 
-        <div class="card card-body shadow-sm mb-4">
-            <h2 class="h5">Upload an opponent report</h2>
-            <p class="text-muted small">Drag and drop a COMET matches export (JSON) for an upcoming opponent, or click to browse. Once uploaded, download it as a formatted PDF or PowerPoint scouting report below.</p>
+        <div class="card card-body shadow-sm mb-4" id="cometFetchCard">
+            <h2 class="h5">Fetch<?php if (($_GET['test'] ?? '') === '1'): ?> <span class="badge text-bg-warning align-middle ms-1">Test mode &mdash; nothing is sent to COMET</span><?php endif; ?></h2>
+            <p class="text-muted small">Pulls the team&rsquo;s previous matches, line-ups and events straight from COMET and adds the report below &mdash; no export or upload needed. It takes a few minutes.</p>
+            <form id="cometFetchForm" class="row g-2 align-items-end">
+                <?= csrf_field() ?>
+                <div class="col-sm-6 col-md-4">
+                    <label class="form-label small" for="cometTeam">Opposition team</label>
+                    <select id="cometTeam" name="team" class="form-select" required>
+                        <option value="">-- Select team --</option>
+                        <?php $cometTeams = ['East Kilbride Thistle', 'Glenvale', 'East Kilbride YM', 'Royal Albert', 'Carluke Rovers', 'West Park United', 'Kello Rovers', 'Glasgow Perthshire', 'Eglinton', 'Vale of Leven', 'Lugar Boswell Thistle', 'Giffnock', 'Newmains United', 'Irvine Victoria', "St. Anthony's"]; sort($cometTeams, SORT_NATURAL | SORT_FLAG_CASE); foreach ($cometTeams as $cometTeam): ?>
+                            <option value="<?= $esc($cometTeam) ?>"><?= $esc($cometTeam) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <?php if (($_GET['test'] ?? '') === '1'): ?>
+                <div class="col-sm-6 col-md-4">
+                    <label class="form-label small" for="cometTestScenario">Simulate outcome (test only)</label>
+                    <select id="cometTestScenario" class="form-select">
+                        <option value="auto">Automatic (updated if already listed, otherwise new)</option>
+                        <option value="new">New report added</option>
+                        <option value="updated">Updated &mdash; 1 new match</option>
+                        <option value="same">Checked &mdash; no new matches</option>
+                    </select>
+                </div>
+                <?php endif; ?>
+                <div class="col-auto"><button type="submit" id="cometFetchBtn" class="btn btn-primary"><i class="fa-solid fa-cloud-arrow-down me-1" aria-hidden="true"></i><span>Fetch</span></button></div>
+            </form>
+            <div id="cometFetchMsg" class="alert d-none align-items-start gap-3 mt-3 mb-0" role="status" aria-live="polite">
+                <i id="cometFetchIcon" class="fa-solid fa-circle-notch fa-spin fs-4 mt-1" aria-hidden="true"></i>
+                <div class="flex-grow-1">
+                    <div id="cometFetchTitle" class="fw-semibold"></div>
+                    <div id="cometFetchDetail" class="small"></div>
+                    <div class="progress mt-2" style="height:8px" id="cometFetchBarWrap"><div id="cometFetchBar" class="progress-bar progress-bar-striped progress-bar-animated" style="width:0%"></div></div>
+                </div>
+            </div>
+            <details class="mt-3" id="oppUploadDetails"<?= $oppError !== '' ? ' open' : '' ?>>
+                <summary class="small text-muted" style="cursor:pointer">Or upload a COMET export manually (optional)</summary>
+            <p class="text-muted small mt-2">Drag and drop a COMET matches export (JSON) for an opponent, or click to browse. Once uploaded, download it as a formatted PDF or PowerPoint scouting report below.</p>
             <form id="oppUploadForm" method="post" action="/admin/opposition_report_upload.php" enctype="multipart/form-data">
                 <?= csrf_field() ?>
                 <input type="hidden" name="action" value="upload">
@@ -290,9 +376,92 @@ $badge = static fn(string $result): string => ['W' => 'success', 'D' => 'seconda
                     <div id="oppProgressMsg" class="opp-progress-card__msg"></div>
                 </div>
             </form>
+            </details>
         </div>
+        <script>
+        (function () {
+            var form = document.getElementById('cometFetchForm'), btn = document.getElementById('cometFetchBtn'), box = document.getElementById('cometFetchMsg');
+            var icon = document.getElementById('cometFetchIcon'), title = document.getElementById('cometFetchTitle'), detail = document.getElementById('cometFetchDetail');
+            var bar = document.getElementById('cometFetchBar'), barWrap = document.getElementById('cometFetchBarWrap'), btnLabel = btn.querySelector('span'), btnIcon = btn.querySelector('i');
+            var timer = null, sawActive = false;
+            var KINDS = { working: ['alert-primary', 'fa-circle-notch fa-spin'], success: ['alert-success', 'fa-circle-check'], error: ['alert-danger', 'fa-circle-exclamation'] };
+            function show(kind, head, sub, pct) {
+                var k = KINDS[kind];
+                box.className = 'alert d-flex align-items-start gap-3 mt-3 mb-0 ' + k[0];
+                icon.className = 'fa-solid ' + k[1] + ' fs-4 mt-1';
+                title.textContent = head; detail.textContent = sub || '';
+                barWrap.style.display = kind === 'working' ? '' : 'none';
+                bar.style.width = (pct == null ? 100 : pct) + '%';
+                bar.className = 'progress-bar progress-bar-striped' + (pct == null ? ' progress-bar-animated' : '');
+                box.animate([{ opacity: 0, transform: 'translateY(-6px)' }, { opacity: 1, transform: 'none' }], { duration: 220, easing: 'ease-out' });
+            }
+            function busy(on) {
+                btn.disabled = on;
+                btnLabel.textContent = on ? 'Fetching\u2026' : 'Fetch';
+                btnIcon.className = on ? 'fa-solid fa-circle-notch fa-spin me-1' : 'fa-solid fa-cloud-arrow-down me-1';
+            }
+            function poll() {
+                fetch('/admin/opposition_collect.php?action=status', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                    .then(function (r) { return r.json(); })
+                    .then(function (d) {
+                        var s = d.status; if (!s) { return; }
+                        if (s.phase === 'queued') { sawActive = true; busy(true); show('working', 'Request received for ' + s.team, 'Waiting for the server to pick it up \u2014 this takes up to a minute.', 8); }
+                        else if (s.phase === 'login' || s.phase === 'matches') { sawActive = true; busy(true); show('working', 'Connecting to COMET\u2026', 'Signing in and finding ' + s.team + '\u2019s previous matches.', 15); }
+                        else if (s.phase === 'collecting') { sawActive = true; busy(true); show('working', 'Collecting ' + s.team + ' \u2014 match ' + (s.done + 1) + ' of ' + s.total, s.current, 20 + Math.round(75 * s.done / Math.max(1, s.total))); }
+                        else if (s.phase === 'done') { clearInterval(timer); busy(false); if (sawActive) { var dsc = window.oppDescribe(s.team, s.matches != null ? s : null); show('success', dsc.head, dsc.sub); if (window.oppRefreshReports) { window.oppRefreshReports(s.team, dsc.badge); } } }
+                        else if (s.phase === 'error') { clearInterval(timer); busy(false); if (sawActive) { show('error', 'Fetch failed', s.message || 'Unknown error. Please try again.'); } }
+                    }).catch(function () {});
+            }
+            function startPolling() { clearInterval(timer); timer = setInterval(poll, 4000); poll(); }
+            var TEST = new URLSearchParams(window.location.search).get('test') === '1';
+            function addFakeRow(team, scenario) {
+                var now = new Date(), mon = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                var date = now.getDate() + ' ' + mon[now.getMonth()] + ' ' + now.getFullYear(), time = ('0' + now.getHours()).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2);
+                var body = document.getElementById('oppReportsBody');
+                if (!body) {
+                    var empty = document.getElementById('oppEmptyState');
+                    if (!empty) { return; }
+                    var wrap = document.createElement('div'); wrap.className = 'table-responsive';
+                    wrap.innerHTML = '<table class="table align-middle mb-0 hub-data-table"><thead><tr><th scope="col">Opponent</th><th scope="col">Competition</th><th scope="col">Matches</th><th scope="col">Uploaded</th><th scope="col" class="text-end">Actions</th></tr></thead><tbody id="oppReportsBody"></tbody></table>';
+                    empty.replaceWith(wrap); body = document.getElementById('oppReportsBody');
+                }
+                var existing = Array.prototype.find.call(body.rows, function (r) { return r.cells[0].firstChild.textContent.trim().toLowerCase() === team.toLowerCase(); });
+                var comp = body.rows.length ? body.rows[0].cells[1].textContent : 'West of Scotland Third Division 26/27';
+                var row = existing || body.insertRow(0);
+                var dis = function (icon, label) { return '<span class="btn btn-sm btn-outline-secondary disabled" title="' + label + ' (not available in test mode)" aria-label="' + label + '"><i class="fa-solid ' + icon + '" aria-hidden="true"></i></span> '; };
+                row.setAttribute('data-test-row', '1');
+                row.innerHTML = '<td></td><td></td><td>8</td><td><div>' + date + '</div><div class="text-muted small">' + time + '</div></td><td class="text-end">' + dis('fa-eye', 'Preview report') + dis('fa-file-powerpoint', 'Download PowerPoint') + dis('fa-film', 'Create video') + '<span class="btn btn-sm btn-outline-danger disabled" aria-label="Delete"><i class="fa-solid fa-trash" aria-hidden="true"></i></span></td>';
+                row.cells[0].textContent = team + ' '; var b = document.createElement('span'); b.className = 'badge text-bg-warning'; b.textContent = 'Test'; row.cells[0].appendChild(b); var b2 = document.createElement('span'); b2.className = 'badge ms-1 text-bg-success'; var sc = (scenario && scenario !== 'auto') ? scenario : (existing ? 'updated' : 'new'); b2.className = 'badge ms-1 ' + (sc === 'same' ? 'text-bg-secondary' : 'text-bg-success'); b2.textContent = sc === 'new' ? 'New' : (sc === 'same' ? 'Updated \u00b7 no new matches' : 'Updated \u00b7 +1'); row.cells[0].appendChild(b2);
+                row.cells[1].textContent = comp;
+                row.animate([{ backgroundColor: 'rgba(25,135,84,.35)' }, { backgroundColor: 'rgba(25,135,84,0)' }], { duration: 2600, easing: 'ease-out' });
+                row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                return sc;
+            }
+            function simulate(team) {
+                var fixtures = ['Home v ' + team, team + ' v Away', 'Home v ' + team, team + ' v Away', 'Home v ' + team, team + ' v Away', 'Home v ' + team, team + ' v Away'];
+                var steps = [[0, 'working', 'Request received for ' + team, 'Waiting for the server to pick it up \u2014 this takes up to a minute.', 8], [2200, 'working', 'Connecting to COMET\u2026', 'Signing in and finding ' + team + '\u2019s previous matches.', 15]];
+                fixtures.forEach(function (f, i) { steps.push([4200 + i * 1100, 'working', 'Collecting ' + team + ' \u2014 match ' + (i + 1) + ' of ' + fixtures.length, f + ' (simulated)', 20 + Math.round(75 * i / fixtures.length)]); });
+                steps.push([4200 + fixtures.length * 1100, 'success', null, null]);
+                steps.forEach(function (st) { setTimeout(function () { show(st[1], st[2], st[3], st[4]); if (st[1] === 'success') { busy(false); var scen = document.getElementById('cometTestScenario'), sc2 = addFakeRow(team, scen ? scen.value : 'auto'); var dd = window.oppDescribe(team, sc2 === 'new' ? { matches: 8, previous: null, added: 8 } : { matches: 8, previous: sc2 === 'same' ? 8 : 7, added: sc2 === 'same' ? 0 : 1 }); show('success', dd.head + ' (test)', dd.sub + ' Simulated \u2014 nothing was requested from COMET or saved.'); return; } }, st[0]); });
+            }
+            form.addEventListener('submit', function (e) {
+                e.preventDefault();
+                if (TEST) { if (!form.team.value) { return; } busy(true); simulate(form.team.value); return; }
+                busy(true); show('working', 'Sending request\u2026', '', 4);
+                fetch('/admin/opposition_collect.php', { method: 'POST', body: new FormData(form), headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                    .then(function (r) { return r.json(); })
+                    .then(function (d) { if (d.ok) { sawActive = true; show('working', 'Request received for ' + form.team.value, 'Waiting for the server to pick it up \u2014 this takes up to a minute.', 8); startPolling(); } else { busy(false); show('error', 'Could not start', d.message || 'Please try again.'); } })
+                    .catch(function () { busy(false); show('error', 'Could not reach the server', 'Check your connection and try again.'); });
+            });
+            if (!TEST) fetch('/admin/opposition_collect.php?action=status').then(function (r) { return r.json(); }).then(function (d) {
+                var p = d.status && d.status.phase;
+                if (p === 'queued' || p === 'login' || p === 'matches' || p === 'collecting') { busy(true); sawActive = true; startPolling(); }
+            }).catch(function () {});
+        })();
+        </script>
 
-        <section class="card shadow-sm">
+
+        <section class="card shadow-sm" id="oppReportsSection">
             <div class="card-body">
                 <h2 class="h5">Uploaded reports</h2>
                 <?php if (!$oppReports): ?>
@@ -301,7 +470,7 @@ $badge = static fn(string $result): string => ['W' => 'success', 'D' => 'seconda
                 <div class="table-responsive">
                     <table class="table align-middle mb-0 hub-data-table">
                         <thead><tr><th scope="col">Opponent</th><th scope="col">Competition</th><th scope="col">Matches</th><th scope="col">Uploaded</th><th scope="col" class="text-end">Actions</th></tr></thead>
-                        <tbody>
+                        <tbody id="oppReportsBody">
                         <?php foreach ($oppReports as $rep): ?>
                             <tr>
                                 <td><?= $esc($rep['team'] !== '' ? $rep['team'] : $rep['file']) ?><?php if (!$rep['valid']): ?> <span class="badge text-bg-warning">Unreadable</span><?php endif; ?></td>
@@ -338,7 +507,6 @@ $badge = static fn(string $result): string => ['W' => 'success', 'D' => 'seconda
             var token = <?= json_encode($_SESSION['csrf_token'] ?? '', JSON_UNESCAPED_SLASHES) ?>;
             var timer = null;
             function show(cls, html) {
-                box.hidden = false;
                 box.className = 'alert alert-' + cls + ' d-flex align-items-center gap-2 mt-4 mb-0';
                 box.innerHTML = html;
             }
@@ -450,9 +618,9 @@ $badge = static fn(string $result): string => ['W' => 'success', 'D' => 'seconda
                     if (ok) {
                         progressIcon.className = 'fa-solid fa-circle-check opp-progress-card__icon is-success';
                         progressBar.classList.add('is-success');
-                        progressMsg.textContent = (result.team ? result.team + ': ' : '') + 'Uploaded successfully.';
+                        progressMsg.textContent = (window.oppDescribe ? (function () { var d = window.oppDescribe(result.team || 'Report', result.matches != null ? result : null); return d.head + (result.matches != null ? ' \u2014 ' + d.sub : ''); })() : 'Uploaded successfully.');
                         progressMsg.classList.add('is-success');
-                        setTimeout(function () { window.location.href = '/admin/stats.php?tab=opposition&uploaded=1'; }, 700);
+                        setTimeout(function () { var dsu = window.oppDescribe(result.team, result.matches != null ? result : null); if (window.oppRefreshReports) { window.oppRefreshReports(result.team, dsu.badge); } progress.hidden = true; }, 700);
                     } else {
                         progressIcon.className = 'fa-solid fa-circle-xmark opp-progress-card__icon is-fail';
                         progressBar.classList.add('is-fail');
@@ -608,10 +776,21 @@ $badge = static fn(string $result): string => ['W' => 'success', 'D' => 'seconda
                     html += '</ul>';
                 }
 
+                if (report.cup_matches && report.cup_matches.length) {
+                    html += '<h3 class="h6 mt-4">Cup matches</h3>' + renderTable(
+                        [{ label: 'Date', align: 'start' }, { label: 'Competition', align: 'start' }, { label: 'Opponent', align: 'start' }, { label: 'Result', align: 'center' }, { label: 'Scorers', align: 'start' }],
+                        report.cup_matches.map(function (c) {
+                            var d = c.date ? new Date(c.date).toLocaleDateString('en-GB') : '';
+                            var comp = c.competition + (c.round ? ' (Round ' + c.round + ')' : '');
+                            return td('start', esc(d)) + td('start', esc(comp)) + td('start', esc(c.opponent) + ' (' + (c.home ? 'H' : 'A') + ')') + td('center', esc(c.outcome + ' ' + c.for + '-' + c.against)) + td('start', esc(c.scorers || '-'));
+                        }), '') + '<div class="small text-muted mt-1">Cup matches are shown separately and are not included in the league figures above.</div>';
+                }
+
                 body.innerHTML = html;
             }
 
-            document.querySelectorAll('.opp-preview-btn').forEach(function (btn) {
+            function bindPreview() { document.querySelectorAll('.opp-preview-btn').forEach(function (btn) {
+                if (btn.dataset.bound) return; btn.dataset.bound = '1';
                 btn.addEventListener('click', function () {
                     if (btn.classList.contains('disabled')) return;
                     var file = btn.getAttribute('data-file');
@@ -631,6 +810,46 @@ $badge = static fn(string $result): string => ['W' => 'success', 'D' => 'seconda
                             body.innerHTML = '<div class="alert alert-danger mb-0">Could not load that report — check your connection and try again.</div>';
                         });
                 });
+            }); }
+            bindPreview(); window.oppBindPreview = bindPreview;
+
+            // Live table updates: swap in the freshly rendered reports section, and delete rows in place.
+            window.oppDescribe = function (team, info, verb) {
+                if (!info) { return { head: team + ' report is ready', sub: 'It has been added to the list below.', badge: null }; }
+                var n = info.added || 0, plus = n === 1 ? '1 new match' : n + ' new matches';
+                if (info.previous === null || info.previous === undefined) { return { head: team + ' added', sub: info.matches + ' matches collected.', badge: ['New', 'text-bg-success'] }; }
+                if (n === 0) { return { head: team + ' checked \u2014 no new matches', sub: 'Still ' + info.matches + ' matches (was ' + info.previous + '). Data refreshed.', badge: ['Updated \u00b7 no new matches', 'text-bg-secondary'] }; }
+                return { head: team + ' updated \u2014 ' + plus, sub: info.matches + ' matches (was ' + info.previous + ').', badge: ['Updated \u00b7 +' + n, 'text-bg-success'] };
+            };
+            window.oppRefreshReports = function (highlightTeam, badge) {
+                return fetch('/admin/stats.php?tab=opposition', { headers: { 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' })
+                    .then(function (r) { return r.text(); })
+                    .then(function (html) {
+                        var doc = new DOMParser().parseFromString(html, 'text/html'), fresh = doc.getElementById('oppReportsSection'), cur = document.getElementById('oppReportsSection');
+                        if (!fresh || !cur) { return; }
+                        cur.innerHTML = fresh.innerHTML; bindPreview();
+                        if (highlightTeam) {
+                            Array.prototype.forEach.call(cur.querySelectorAll('tbody tr'), function (tr) {
+                                if (tr.cells[0].textContent.trim().toLowerCase() === highlightTeam.toLowerCase()) {
+                                    if (badge) { var bd = document.createElement('span'); bd.className = 'badge ms-2 ' + badge[1]; bd.textContent = badge[0]; tr.cells[0].appendChild(bd); }
+                                    tr.animate([{ backgroundColor: 'rgba(25,135,84,.35)' }, { backgroundColor: 'rgba(25,135,84,0)' }], { duration: 2600, easing: 'ease-out' });
+                                }
+                            });
+                        }
+                    }).catch(function () {});
+            };
+            document.addEventListener('submit', function (e) {
+                var f = e.target;
+                if (!f.matches || !f.matches('#oppReportsSection form') || f.dataset.confirmed !== 'true') { return; }
+                e.preventDefault();
+                var tr = f.closest('tr'); if (tr) { tr.style.opacity = '.45'; }
+                fetch(f.getAttribute('action'), { method: 'POST', body: new FormData(f), credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                    .then(function (r) { return r.json(); })
+                    .then(function (d) {
+                        if (d.ok && tr) { tr.style.transition = 'opacity .3s'; tr.style.opacity = '0'; setTimeout(function () { window.oppRefreshReports(); }, 320); }
+                        else { if (tr) { tr.style.opacity = ''; } f.dataset.confirmed = ''; if (window.hubConfirm) { window.hubConfirm(d.message || 'Could not delete that report.', { title: 'Delete failed', actionLabel: 'OK', actionClass: 'btn-secondary' }); } }
+                    })
+                    .catch(function () { if (tr) { tr.style.opacity = ''; } f.dataset.confirmed = ''; });
             });
         })();
         </script>
@@ -754,7 +973,7 @@ $badge = static fn(string $result): string => ['W' => 'success', 'D' => 'seconda
         <?php endforeach; ?>
         <?php endif; ?>
         <?php endif; ?>
-    <?php elseif ($tab === 'players' ? !$playersFixtures : !$fixtures): ?>
+    <?php elseif (in_array($tab, ['players', 'player'], true) ? !$playersFixtures : !$fixtures): ?>
         <div class="card card-body text-center py-5"><h2 class="h5">No played matches found</h2><p class="text-muted mb-0">Choose another season or filter, or record a result in Match day to start building your stats.</p></div>
     <?php elseif ($tab === 'team'): ?>
         <div class="row g-3 mb-4">
@@ -788,7 +1007,30 @@ $badge = static fn(string $result): string => ['W' => 'success', 'D' => 'seconda
         <section class="card shadow-sm"><div class="card-body"><h2 class="h5">Home &amp; away performance</h2></div><div class="table-responsive"><table class="table mb-0 hub-data-table"><thead><tr><th scope="col">Venue</th><?php foreach (['Played', 'Won', 'Drawn', 'Lost', 'GF', 'GA', 'Clean sheets'] as $label): ?><th scope="col" class="text-center"><?= $label ?></th><?php endforeach; ?></tr></thead><tbody><?php foreach ([1 => 'Home', 0 => 'Away'] as $home => $label): $s = hub_stats_summary(array_filter($fixtures, static fn(array $f): bool => (int)$f['is_home'] === $home)); ?><tr><th scope="row"><?= $label ?></th><?php foreach (['played', 'wins', 'draws', 'losses', 'goals_for', 'goals_against', 'clean_sheets'] as $k): ?><td class="text-center"><?= $s[$k] ?></td><?php endforeach; ?></tr><?php endforeach; ?></tbody></table></div></section>
     <?php elseif ($tab === 'players'): ?>
         <?php
-        // Include names in historic lineups/events even when their player record has since left the club.
+        // Rows, sort order and the Current / Left split come from the shared model in lib/stats.php (the PDF export uses it too).
+        $playerTable = hub_stats_player_contributions($pdo, $playersSeasonIds[0], $playersFixtures, $eventsByFixture, $dataFile, $_GET['sort'] ?? null, $_GET['direction'] ?? null);
+        $sorts = $playerTable['sorts'];
+        $sort = $playerTable['sort'];
+        $direction = $playerTable['direction'];
+        $hasPlayers = $playerTable['current'] || $playerTable['left'];
+        $playerGroups = ['Current' => $playerTable['current']];
+        if ($playerTable['left']) $playerGroups['Left'] = $playerTable['left'];
+        ?>
+        <section class="card shadow-sm"><div class="card-body"><h2 class="h5">Player contributions</h2><p class="text-muted small">From recorded lineups and match events. Minutes are estimated over 90 minutes; unused substitutes do not count as appearances. Clean sheets apply to the starting goalkeeper.</p><p class="text-muted small mb-0">Click a column heading to sort; click again to reverse the order.</p></div>
+        <?php foreach ($playerGroups as $groupLabel => $groupPlayers): ?>
+        <div class="card-body pb-2"><h3 class="h6 mb-0"><?= $esc($groupLabel) ?></h3></div>
+        <div class="table-responsive"><table class="table table-hover align-middle mb-0 hub-data-table"><thead><tr><?php foreach ($sorts as $key => $label):
+            $activeSort = $sort === $key;
+            $nextDirection = $activeSort ? ($direction === 'asc' ? 'desc' : 'asc') : ($key === 'name' ? 'asc' : 'desc');
+        ?><th scope="col" class="text-nowrap<?= $key === 'name' ? '' : ' text-center' ?>"<?= $activeSort ? ' aria-sort="' . ($direction === 'asc' ? 'ascending' : 'descending') . '"' : '' ?>><a class="d-block text-reset text-decoration-none" href="<?= $esc($url(['sort' => $key, 'direction' => $nextDirection])) ?>" aria-label="<?= $esc('Sort by ' . $label . ', ' . ($nextDirection === 'asc' ? 'ascending' : 'descending')) ?>"><?= $esc($label) ?> <span aria-hidden="true" class="<?= $activeSort ? '' : 'text-muted' ?>"><?= $activeSort ? ($direction === 'asc' ? '↑' : '↓') : '↕' ?></span></a></th><?php endforeach; ?></tr></thead><tbody>
+        <?php foreach ($groupPlayers as $player): ?><tr><th scope="row"><a class="fw-semibold text-decoration-none" href="<?= $esc($url(['tab' => 'player', 'player' => $player['name'], 'sort' => null, 'direction' => null])) ?>"><?= $esc($player['name']) ?></a></th><?php foreach (['appearances', 'starts', 'substitute_appearances', 'minutes_played', 'goals', 'yellow_cards', 'red_cards', 'clean_sheets'] as $key): ?><td class="text-center"><?= $key === 'clean_sheets' && !$player['is_goalkeeper'] ? '—' : (int)$player[$key] ?></td><?php endforeach; ?></tr><?php endforeach; ?>
+        <?php if (!$groupPlayers): ?><tr><td colspan="9" class="text-muted text-center py-4"><?= $hasPlayers ? 'No current players in these matches.' : 'No player lineups or events recorded for these matches yet.' ?></td></tr><?php endif; ?>
+        </tbody></table></div>
+        <?php endforeach; ?>
+        </section>
+    <?php elseif ($tab === 'player'): ?>
+        <?php
+        // ---- Single player page -------------------------------------------------
         $names = [];
         foreach ($playersFixtures as $f) {
             foreach (['starting11_starters_json', 'starting11_substitutes_json'] as $field) {
@@ -799,29 +1041,186 @@ $badge = static fn(string $result): string => ['W' => 'success', 'D' => 'seconda
                 if (hub_player_stats_is_club_player_event($event) && trim((string)($event['player'] ?? '')) !== '') $names[hub_player_stats_normalize_name((string)$event['player'])] = (string)$event['player'];
             }
         }
-        $players = [];
-        foreach ($names as $name) $players[] = ['name' => $name] + hub_player_match_stats($pdo, $playersSeasonIds[0], $name, $dataFile, $playersFixtures, $eventsByFixture);
-        $sorts = ['name' => 'Player', 'appearances' => 'Apps', 'starts' => 'Starts', 'substitute_appearances' => 'Sub apps', 'minutes_played' => 'Minutes', 'goals' => 'Goals', 'yellow_cards' => 'Yellow cards', 'red_cards' => 'Red cards', 'clean_sheets' => 'Clean sheets'];
-        $sort = is_string($_GET['sort'] ?? null) && isset($sorts[$_GET['sort']]) ? $_GET['sort'] : 'goals';
-        $direction = is_string($_GET['direction'] ?? null) && in_array($_GET['direction'], ['asc', 'desc'], true)
-            ? $_GET['direction'] : ($sort === 'name' ? 'asc' : 'desc');
-        usort($players, static function (array $a, array $b) use ($sort, $direction): int {
-            // Keep the displayed em dashes below goalkeeper clean-sheet values.
-            if ($sort === 'clean_sheets' && $a['is_goalkeeper'] !== $b['is_goalkeeper']) {
-                return $a['is_goalkeeper'] ? -1 : 1;
-            }
-            $comparison = $sort === 'name' ? strcasecmp($a['name'], $b['name']) : ($a[$sort] <=> $b[$sort]);
-            return ($direction === 'asc' ? $comparison : -$comparison) ?: strcasecmp($a['name'], $b['name']);
-        });
+        $playerList = array_values($names);
+        usort($playerList, static fn(string $a, string $b): int => strcasecmp($a, $b));
+        $wanted = is_string($_GET['player'] ?? null) ? hub_player_stats_normalize_name($_GET['player']) : '';
+        $playerName = '';
+        foreach ($playerList as $pn) if (hub_player_stats_normalize_name($pn) === $wanted) $playerName = $pn;
+        if ($playerName === '' && $playerList) $playerName = $playerList[0];
+        $playerIdx = array_search($playerName, $playerList, true);
+        $prevPlayer = ($playerIdx !== false && $playerIdx > 0) ? $playerList[$playerIdx - 1] : null;
+        $nextPlayer = ($playerIdx !== false && $playerIdx < count($playerList) - 1) ? $playerList[$playerIdx + 1] : null;
+        $playerUrl = static fn(string $n): string => $url(['tab' => 'player', 'player' => $n, 'sort' => null, 'direction' => null]);
         ?>
-        <section class="card shadow-sm"><div class="card-body"><h2 class="h5">Player contributions</h2><p class="text-muted small">From recorded lineups and match events. Minutes are estimated over 90 minutes; unused substitutes do not count as appearances. Clean sheets apply to the starting goalkeeper.</p><p class="text-muted small mb-0">Click a column heading to sort; click again to reverse the order.</p></div>
-        <div class="table-responsive"><table class="table table-hover align-middle mb-0 hub-data-table"><thead><tr><?php foreach ($sorts as $key => $label):
-            $activeSort = $sort === $key;
-            $nextDirection = $activeSort ? ($direction === 'asc' ? 'desc' : 'asc') : ($key === 'name' ? 'asc' : 'desc');
-        ?><th scope="col" class="text-nowrap<?= $key === 'name' ? '' : ' text-center' ?>"<?= $activeSort ? ' aria-sort="' . ($direction === 'asc' ? 'ascending' : 'descending') . '"' : '' ?>><a class="d-block text-reset text-decoration-none" href="<?= $esc($url(['sort' => $key, 'direction' => $nextDirection])) ?>" aria-label="<?= $esc('Sort by ' . $label . ', ' . ($nextDirection === 'asc' ? 'ascending' : 'descending')) ?>"><?= $esc($label) ?> <span aria-hidden="true" class="<?= $activeSort ? '' : 'text-muted' ?>"><?= $activeSort ? ($direction === 'asc' ? '↑' : '↓') : '↕' ?></span></a></th><?php endforeach; ?></tr></thead><tbody>
-        <?php foreach ($players as $player): ?><tr><th scope="row"><button type="button" class="btn btn-link p-0 text-start text-decoration-none stats-player-link" data-player="<?= $esc($player['name']) ?>" data-metric="all" data-metric-label="Match-by-match"><?= $esc($player['name']) ?></button></th><?php foreach (['appearances', 'starts', 'substitute_appearances', 'minutes_played', 'goals', 'yellow_cards', 'red_cards', 'clean_sheets'] as $key): ?><td class="text-center"><?= $key === 'clean_sheets' && !$player['is_goalkeeper'] ? '—' : (int)$player[$key] ?></td><?php endforeach; ?></tr><?php endforeach; ?>
-        <?php if (!$players): ?><tr><td colspan="9" class="text-muted text-center py-4">No player lineups or events recorded for these matches yet.</td></tr><?php endif; ?>
-        </tbody></table></div></section>
+        <?php if (!$playerList): ?>
+            <div class="card card-body text-center py-5"><h2 class="h5">No players found</h2><p class="text-muted mb-0">No player line-ups or events are recorded for these matches yet.</p></div>
+        <?php else:
+            $pstats = hub_player_match_stats($pdo, $playersSeasonIds[0], $playerName, $dataFile, $playersFixtures, $eventsByFixture);
+            $detail = hub_player_all_events_match_rows($pdo, $playersSeasonIds, $seasonById, $playerName, $playersCompetitions, $venue, $dataFile);
+            $avatar = '';
+            $av = $pdo->prepare('SELECT avatar FROM players WHERE name = ? LIMIT 1');
+            $av->execute([$playerName]);
+            $avFile = trim((string)$av->fetchColumn());
+            if ($avFile !== '') $avatar = '/uploads/players/' . rawurlencode($avFile);
+            $initials = '';
+            foreach (preg_split('/\s+/', trim($playerName)) as $part) { if ($part !== '') $initials .= mb_strtoupper(mb_substr($part, 0, 1)); }
+            $initials = mb_substr($initials, 0, 2);
+            $pdfParams = ['player' => $playerName, 'metric' => 'all', 'venue' => $venue, 'download' => 1, 'seasons' => $playersSeasonIds, 'competitions' => $playersCompetitions];
+            $tiles = [
+                ['Apps', $pstats['appearances']], ['Starts', $pstats['starts']], ['Sub apps', $pstats['substitute_appearances']],
+                ['Minutes', $pstats['minutes_played']], ['Goals', $pstats['goals']], ['Yellow', $pstats['yellow_cards']],
+                ['Red', $pstats['red_cards']], ['Clean sheets', $pstats['is_goalkeeper'] ? $pstats['clean_sheets'] : '—'],
+            ];
+        ?>
+        <style>
+        .pp-switch{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin-bottom:1rem}
+        .pp-switch select{flex:1 1 14rem;min-width:0;max-width:24rem}
+        .pp-switch .btn{white-space:nowrap}
+        .pp-head{display:flex;flex-wrap:wrap;align-items:center;gap:1rem;padding:1.1rem 1.25rem;border-radius:var(--hub-radius,1rem);background:linear-gradient(135deg,#4c1521,#6d2231);color:#fff;margin-bottom:1rem}
+        .pp-avatar{flex:none;width:4rem;height:4rem;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.16);font-weight:800;font-size:1.3rem;overflow:hidden}
+        .pp-avatar img{width:100%;height:100%;object-fit:cover}
+        .pp-head h2{margin:0;font-size:1.5rem;font-weight:800;color:#fff!important}.pp-head p{margin:.15rem 0 0;color:rgba(255,255,255,.8)!important;font-size:.85rem}
+        .pp-head .btn{margin-left:auto}
+        .pp-tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.6rem;margin-bottom:1rem}
+        .pp-tile{padding:.65rem .85rem;background:var(--hub-surface,#fffdf9);border:1px solid var(--hub-line,rgba(75,8,24,.12));border-radius:var(--hub-radius-sm,.7rem)}
+        .pp-tile span{display:block;font-size:.66rem;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--hub-muted,#70676b)}
+        .pp-tile strong{font-size:1.4rem;font-variant-numeric:tabular-nums}
+        .pp-filters{display:flex;flex-wrap:wrap;align-items:center;gap:.6rem 1rem;margin-bottom:.9rem}
+        .pp-seg{display:inline-flex;padding:.15rem;gap:.1rem;background:rgba(75,8,24,.06);border-radius:.65rem}
+        .pp-seg button{border:0;background:transparent;padding:.35rem .8rem;border-radius:.5rem;font-size:.82rem;font-weight:600;color:var(--hub-ink,#1f1a1d);white-space:nowrap}
+        .pp-seg button[aria-pressed=true]{background:#fff;color:#6a2036;box-shadow:0 1px 3px rgba(31,26,29,.18)}
+        .pp-search{flex:1 1 12rem;max-width:20rem}
+        .pp-evi--g{color:#23653f}.pp-evi--y{color:#e0b42a}.pp-evi--r{color:#b23b3b}.pp-evi--s{color:#276884}
+        .pp-seg--multi{flex-wrap:wrap}
+        .pp-ev{display:inline-flex;align-items:center;gap:.25rem;padding:.1rem .5rem;margin:.1rem .25rem .1rem 0;border-radius:999px;background:rgba(75,8,24,.06);font-size:.74rem;font-weight:700;white-space:nowrap}
+        .pp-ev i.g{color:#23653f}.pp-ev i.y{color:#e0b42a}.pp-ev i.r{color:#b23b3b}.pp-ev i.s{color:#276884}
+        .pp-row{cursor:pointer}
+        .pp-comp{max-width:16rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        @media (max-width:767.98px){.pp-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}.pp-head .btn{margin-left:0}.pp-comp{display:none}}
+        </style>
+
+        <div class="pp-switch">
+            <a class="btn btn-outline-secondary btn-sm" href="<?= $esc($url(['tab' => 'players', 'player' => null])) ?>"><i class="fa-solid fa-arrow-left me-1" aria-hidden="true"></i>All players</a>
+            <?php if ($prevPlayer !== null): ?><a class="btn btn-outline-secondary btn-sm" href="<?= $esc($playerUrl($prevPlayer)) ?>" title="<?= $esc($prevPlayer) ?>" aria-label="Previous player: <?= $esc($prevPlayer) ?>"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i></a><?php endif; ?>
+            <label class="visually-hidden" for="ppPlayerSelect">Choose a player</label>
+            <select id="ppPlayerSelect" class="form-select form-select-sm" onchange="window.location.assign(this.value)">
+                <?php foreach ($playerList as $pn): ?><option value="<?= $esc($playerUrl($pn)) ?>"<?= $pn === $playerName ? ' selected' : '' ?>><?= $esc($pn) ?></option><?php endforeach; ?>
+            </select>
+            <?php if ($nextPlayer !== null): ?><a class="btn btn-outline-secondary btn-sm" href="<?= $esc($playerUrl($nextPlayer)) ?>" title="<?= $esc($nextPlayer) ?>" aria-label="Next player: <?= $esc($nextPlayer) ?>"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></a><?php endif; ?>
+        </div>
+
+        <header class="pp-head">
+            <span class="pp-avatar"><?php if ($avatar !== ''): ?><img src="<?= $esc($avatar) ?>" alt=""><?php else: ?><?= $esc($initials) ?><?php endif; ?></span>
+            <div><h2><?= $esc($playerName) ?></h2><p><?= $esc($seasonById[$seasonId]['name'] ?? '') ?> · <?= ['league' => 'League', 'cups' => 'Cups', 'both' => 'League and cups'][$competition] ?? 'League' ?><?= $venue !== '' ? ' · ' . ($venue === 'home' ? 'Home games' : 'Away games') : '' ?></p></div>
+            <a class="btn btn-light btn-sm" href="/admin/stats_player_detail_pdf.php?<?= $esc(http_build_query($pdfParams)) ?>" target="_blank" rel="noopener"><i class="fa-solid fa-file-pdf me-1" aria-hidden="true"></i>Download PDF</a>
+        </header>
+
+        <section class="pp-tiles" aria-label="Player summary">
+            <?php foreach ($tiles as [$tl, $tv]): ?><div class="pp-tile"><span><?= $esc($tl) ?></span><strong><?= $esc($tv) ?></strong></div><?php endforeach; ?>
+        </section>
+
+        <section class="card shadow-sm"><div class="card-body">
+            <h3 class="h5 mb-3">Match by match</h3>
+            <?php if (!$detail['rows']): ?><p class="text-muted mb-0">No matches found for the current filters.</p><?php else: ?>
+            <?php
+            $evDefs = ['goal' => ['Goals', 'fa-futbol', 'g'], 'pen' => ['Penalties', 'fa-bullseye', 'g'], 'yellow' => ['Yellow cards', 'fa-square', 'y'], 'red' => ['Red cards', 'fa-square', 'r'], 'clean' => ['Clean sheets', 'fa-shield-halved', 'g'], 'start' => ['Started', 'fa-shirt', 's'], 'sub' => ['Came on', 'fa-arrow-up', 's']];
+            $presentEv = [];
+            foreach ($detail['rows'] as $r0) {
+                $d0 = (string)($r0['detail'] ?? '');
+                foreach (['goal' => '/Scored/', 'pen' => '/\(pen\)/', 'yellow' => '/Yellow card/', 'red' => '/Red card/', 'clean' => '/Clean sheet/', 'start' => '/Started/', 'sub' => '/Came on/'] as $k0 => $re0) { if (preg_match($re0, $d0)) $presentEv[$k0] = true; }
+            }
+            ?>
+            <div class="pp-filters">
+                <?php if ($presentEv): ?>
+                <div class="pp-seg pp-seg--multi" role="group" aria-label="Events" data-filter="ev">
+                    <?php foreach ($evDefs as $ek => [$el, $ei, $ec]): if (!isset($presentEv[$ek])) continue; ?>
+                        <button type="button" data-value="<?= $ek ?>" aria-pressed="false" title="<?= $esc($el) ?>"><i class="fa-solid <?= $ei ?> pp-evi pp-evi--<?= $ec ?>" aria-hidden="true"></i> <?= $esc($el) ?></button>
+                    <?php endforeach; ?>
+                </div>
+                <?php endif; ?>
+                <div class="pp-seg" role="group" aria-label="Venue" data-filter="venue">
+                    <button type="button" data-value="" aria-pressed="true">All</button><button type="button" data-value="home" aria-pressed="false">Home</button><button type="button" data-value="away" aria-pressed="false">Away</button>
+                </div>
+                <div class="pp-seg" role="group" aria-label="Result" data-filter="result">
+                    <button type="button" data-value="" aria-pressed="true">Any</button><button type="button" data-value="W" aria-pressed="false">Won</button><button type="button" data-value="D" aria-pressed="false">Drawn</button><button type="button" data-value="L" aria-pressed="false">Lost</button>
+                </div>
+                <input type="search" id="ppSearch" class="form-control form-control-sm pp-search" placeholder="Search opponent…" autocomplete="off">
+                <span class="text-muted small" id="ppCount"></span>
+            </div>
+            <div class="table-responsive"><table class="table table-sm table-hover align-middle mb-0 hub-data-table" id="ppTable"><thead><tr><th>Date</th><th>Opponent</th><th>Venue</th><th class="pp-comp">Competition</th><th>Score</th><th>Contribution</th></tr></thead><tbody>
+            <?php foreach (array_reverse($detail["rows"]) as $row):
+                $det = (string)($row['detail'] ?? '');
+                $badges = [];
+                if (preg_match_all('/Scored[^\n]*/', $det, $gm)) { foreach ($gm[0] as $g) $badges[] = ['g', 'fa-futbol', trim($g)]; }
+                if (preg_match('/Yellow card/', $det)) $badges[] = ['y', 'fa-square', 'Yellow card'];
+                if (preg_match('/Red card/', $det)) $badges[] = ['r', 'fa-square', 'Red card'];
+                if (preg_match('/Clean sheet/', $det)) $badges[] = ['g', 'fa-shield-halved', 'Clean sheet'];
+                if (preg_match('/Came on/', $det)) $badges[] = ['s', 'fa-arrow-up', 'Came on'];
+                elseif (preg_match('/Started/', $det)) $badges[] = ['s', 'fa-shirt', 'Started'];
+                if (preg_match('/Subbed off|Substituted off|Taken off/i', $det)) $badges[] = ['r', 'fa-arrow-down', 'Subbed off'];
+                $evKeys = [];
+                if (preg_match('/Scored/', $det)) $evKeys[] = 'goal';
+                if (preg_match('/\(pen\)/', $det)) $evKeys[] = 'pen';
+                if (preg_match('/Yellow card/', $det)) $evKeys[] = 'yellow';
+                if (preg_match('/Red card/', $det)) $evKeys[] = 'red';
+                if (preg_match('/Clean sheet/', $det)) $evKeys[] = 'clean';
+                if (preg_match('/Started/', $det)) $evKeys[] = 'start';
+                if (preg_match('/Came on/', $det)) $evKeys[] = 'sub';
+                $allEv = array_merge($allEv ?? [], $evKeys);
+                $matchHref = '';
+                foreach ($playersFixtures as $pf) { if ((string)$pf['match_date'] === $row['date'] && (string)$pf['opponent'] === $row['opponent']) { $matchHref = $url(['tab' => 'matches', 'match_id' => $pf['id'], 'player' => null]) . '#match-breakdown'; break; } }
+            ?>
+                <tr class="pp-row" data-ev="<?= $esc(implode(' ', $evKeys)) ?>" data-venue="<?= $esc(strtolower((string)$row['venue'])) ?>" data-result="<?= $esc((string)($row['result'] ?? '')) ?>" data-search="<?= $esc(strtolower($row['opponent'] . ' ' . $row['competition'])) ?>"<?= $matchHref !== '' ? ' role="link" tabindex="0" data-href="' . $esc($matchHref) . '"' : '' ?>>
+                    <td class="text-nowrap"><?= $esc(date('j M Y', strtotime($row['date']))) ?></td>
+                    <th scope="row"><?= $esc($row['opponent']) ?></th>
+                    <td><?= $esc($row['venue']) ?></td>
+                    <td class="pp-comp" title="<?= $esc($row['competition']) ?>"><?= $esc($row['competition']) ?></td>
+                    <td class="text-nowrap"><?= $row['score'] !== null ? $esc($row['score']) . ' <span class="badge text-bg-' . $badge((string)$row['result']) . '">' . $esc($row['result']) . '</span>' : '—' ?></td>
+                    <td><?php foreach ($badges as [$bc, $bi, $bl]): ?><span class="pp-ev" title="<?= $esc($bl) ?>"><i class="fa-solid <?= $bi ?> <?= $bc ?>" aria-hidden="true"></i><?= $esc(mb_strlen($bl) > 22 ? mb_substr($bl, 0, 21) . '…' : $bl) ?></span><?php endforeach; ?></td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody></table></div>
+            <script>
+            (function () {
+                var rows = Array.prototype.slice.call(document.querySelectorAll('#ppTable tbody .pp-row'));
+                var state = { venue: '', result: '', ev: [] };
+                var search = document.getElementById('ppSearch'), count = document.getElementById('ppCount');
+                function apply() {
+                    var q = (search.value || '').toLowerCase().trim(), shown = 0;
+                    rows.forEach(function (r) {
+                        var have = ' ' + (r.dataset.ev || '') + ' ';
+                        var ok = (!state.ev.length || state.ev.some(function (e) { return have.indexOf(' ' + e + ' ') !== -1; })) && (!state.venue || r.dataset.venue === state.venue) && (!state.result || r.dataset.result === state.result) && (!q || r.dataset.search.indexOf(q) !== -1);
+                        r.hidden = !ok; if (ok) shown++;
+                    });
+                    count.textContent = shown === rows.length ? rows.length + ' matches' : 'Showing ' + shown + ' of ' + rows.length;
+                }
+                document.querySelectorAll('.pp-seg').forEach(function (seg) {
+                    seg.addEventListener('click', function (e) {
+                        var b = e.target.closest('button'); if (!b) return;
+                        if (seg.dataset.filter === 'ev') {
+                            var on = b.getAttribute('aria-pressed') !== 'true';
+                            b.setAttribute('aria-pressed', on ? 'true' : 'false');
+                            state.ev = Array.prototype.map.call(seg.querySelectorAll('button[aria-pressed=true]'), function (x) { return x.dataset.value; });
+                            apply();
+                            return;
+                        }
+                        state[seg.dataset.filter] = b.dataset.value;
+                        seg.querySelectorAll('button').forEach(function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+                        apply();
+                    });
+                });
+                search.addEventListener('input', apply);
+                rows.forEach(function (r) {
+                    if (!r.dataset.href) return;
+                    r.addEventListener('click', function () { window.location.assign(r.dataset.href); });
+                    r.addEventListener('keydown', function (e) { if (e.key === 'Enter') window.location.assign(r.dataset.href); });
+                });
+                apply();
+            })();
+            </script>
+            <?php endif; ?>
+        </div></section>
+        <?php endif; ?>
     <?php elseif ($tab === 'potm'): ?>
         <?php
         csrf_field(); // ensures $_SESSION['csrf_token'] exists for the award-modal fetch below
@@ -1028,9 +1427,45 @@ $badge = static fn(string $result): string => ['W' => 'success', 'D' => 'seconda
         })();
         </script>
     <?php else: ?>
-        <section class="card shadow-sm mb-4"><div class="card-body"><h2 class="h5">Match results</h2><p class="text-muted small mb-0">Scores are shown as home – away. Results are from your club's perspective.</p></div><div class="table-responsive"><table class="table table-hover align-middle mb-0 hub-data-table"><thead><tr><?php foreach (['Date', 'Opponent', 'Venue', 'Competition', 'Half time', 'Full time', 'Result', 'Details'] as $label): ?><th scope="col" class="text-nowrap"><?= $label ?></th><?php endforeach; ?></tr></thead><tbody>
-        <?php foreach (array_reverse($fixtures) as $f): $r = hub_stats_result($f); ?><tr><td class="text-nowrap"><?= $esc(date('j M Y', strtotime($f['match_date']))) ?></td><th scope="row"><?= $esc($f['opponent']) ?></th><td><?= (int)$f['is_home'] === 1 ? 'Home' : 'Away' ?></td><td><?= $esc($f['competition'] ?: '—') ?></td><?php foreach (['half_time', 'full_time'] as $period): ?><td class="text-nowrap"><?= isset($f[$period . '_home_score'], $f[$period . '_away_score']) ? (int)$f[$period . '_home_score'] . ' – ' . (int)$f[$period . '_away_score'] : '—' ?></td><?php endforeach; ?><td><span class="badge text-bg-<?= $badge($r['result'] ?? '') ?>"><?= $esc($r['result'] ?? 'No score') ?></span></td><td><a href="<?= $esc($url(['match_id' => $f['id']])) ?>#match-breakdown" class="btn btn-outline-primary btn-sm">Breakdown</a></td></tr><?php endforeach; ?>
-        </tbody></table></div></section>
+        <section class="card shadow-sm mb-4"><div class="card-body"><h2 class="h5">Match results</h2><p class="text-muted small mb-0">Scores are shown as home – away. Results are from your club's perspective. Choose a match to see its breakdown.</p></div><div class="table-responsive d-none d-lg-block"><table class="table table-hover align-middle mb-0 hub-data-table"><thead><tr><?php foreach (['Date', 'Opponent', 'Venue', 'Competition', 'Half time', 'Full time', 'Result', ''] as $label): ?><th scope="col" class="text-nowrap"><?php if ($label === ''): ?><span class="visually-hidden">Open breakdown</span><?php else: ?><?= $label ?><?php endif; ?></th><?php endforeach; ?></tr></thead><tbody>
+        <?php foreach (array_reverse($fixtures) as $f): $r = hub_stats_result($f); $rowHref = $url(['match_id' => $f['id']]) . '#match-breakdown'; $rowSel = (int)$f['id'] === (int)($_GET['match_id'] ?? 0); ?><tr class="mr-row<?= $rowSel ? ' is-selected' : '' ?>" role="link" tabindex="0" data-href="<?= $esc($rowHref) ?>" aria-label="Open breakdown: <?= $esc($f['opponent']) ?>"><td class="text-nowrap"><?= $esc(date('j M Y', strtotime($f['match_date']))) ?></td><th scope="row"><?= $esc($f['opponent']) ?></th><td><?= (int)$f['is_home'] === 1 ? 'Home' : 'Away' ?></td><td><?= $esc($f['competition'] ?: '—') ?></td><?php foreach (['half_time', 'full_time'] as $period): ?><td class="text-nowrap"><?= isset($f[$period . '_home_score'], $f[$period . '_away_score']) ? (int)$f[$period . '_home_score'] . ' – ' . (int)$f[$period . '_away_score'] : '—' ?></td><?php endforeach; ?><td><span class="badge text-bg-<?= $badge($r['result'] ?? '') ?>"><?= $esc($r['result'] ?? 'No score') ?></span></td><td class="text-end text-muted"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></td></tr><?php endforeach; ?>
+        </tbody></table></div>
+        <div class="d-lg-none mr-cards">
+        <?php foreach (array_reverse($fixtures) as $f): $r = hub_stats_result($f); $isSel = (int)$f['id'] === (int)($_GET['match_id'] ?? 0); ?>
+            <a class="mr-card<?= $isSel ? ' is-selected' : '' ?>" href="<?= $esc($url(['match_id' => $f['id']])) ?>#match-breakdown">
+                <span class="mr-card__date"><strong><?= $esc(date('j', strtotime($f['match_date']))) ?></strong><span><?= $esc(date('M', strtotime($f['match_date']))) ?></span></span>
+                <span class="mr-card__main">
+                    <span class="mr-card__opp"><?= $esc($f['opponent']) ?></span>
+                    <span class="mr-card__meta"><?= (int)$f['is_home'] === 1 ? 'Home' : 'Away' ?><?= !empty($f['competition']) ? ' · ' . $esc($f['competition']) : '' ?></span>
+                </span>
+                <span class="mr-card__score">
+                    <?php if (isset($f['full_time_home_score'], $f['full_time_away_score'])): ?><strong><?= (int)$f['full_time_home_score'] ?> – <?= (int)$f['full_time_away_score'] ?></strong><?php endif; ?>
+                    <span class="badge text-bg-<?= $badge($r['result'] ?? '') ?>"><?= $esc($r['result'] ?? '—') ?></span>
+                </span>
+            </a>
+        <?php endforeach; ?>
+        </div>
+        <style>
+        .mr-row{cursor:pointer}.mr-row:hover td,.mr-row:hover th{background:rgba(106,32,54,.05)}
+        .mr-row.is-selected td,.mr-row.is-selected th{background:rgba(106,32,54,.08)}
+        .mr-row:focus-visible{outline:2px solid #6a2036;outline-offset:-2px}
+        .mr-cards{display:flex;flex-direction:column;gap:.5rem;padding:0 1rem 1rem}
+        .mr-card{display:flex;align-items:center;gap:.8rem;padding:.6rem .75rem;border:1px solid var(--hub-line,#eadfdf);border-radius:.8rem;background:#fff;text-decoration:none;color:inherit}
+        .mr-card.is-selected{border-color:#6a2036;box-shadow:0 0 0 2px rgba(106,32,54,.15)}
+        .mr-card__date{flex:0 0 2.7rem;display:flex;flex-direction:column;align-items:center;line-height:1.05;padding:.35rem 0;border-radius:.6rem;background:rgba(106,32,54,.07);color:#6a2036}
+        .mr-card__date strong{font-size:1.15rem}.mr-card__date span{font-size:.65rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
+        .mr-card__main{flex:1;min-width:0;display:flex;flex-direction:column}
+        .mr-card__opp{font-weight:700;overflow-wrap:anywhere}.mr-card__meta{font-size:.76rem;color:var(--hub-muted,#70676b);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .mr-card__score{display:flex;flex-direction:column;align-items:flex-end;gap:.15rem;font-variant-numeric:tabular-nums;white-space:nowrap}
+        </style>
+        </section>
+        <script>
+        document.querySelectorAll('.mr-row[data-href]').forEach(function (row) {
+            function go() { window.location.assign(row.dataset.href); }
+            row.addEventListener('click', function (e) { if (!e.target.closest('a,button')) { go(); } });
+            row.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
+        });
+        </script>
         <?php
         $selected = null;
         $matchId = (int)($_GET['match_id'] ?? 0);
@@ -1039,21 +1474,379 @@ $badge = static fn(string $result): string => ['W' => 'success', 'D' => 'seconda
         $events = $eventsByFixture[(int)$selected['id']] ?? [];
         usort($events, static fn(array $a, array $b): int => (int)($a['sequence'] ?? 0) <=> (int)($b['sequence'] ?? 0));
         ?>
-        <section class="card shadow-sm" id="match-breakdown"><div class="card-body"><div class="d-flex flex-wrap justify-content-between gap-2 mb-3"><div><h2 class="h5">Match breakdown: <?= $esc($selected['opponent']) ?></h2><span class="text-muted small"><?= $esc(date('j M Y', strtotime($selected['match_date']))) ?></span></div><a class="btn btn-outline-primary align-self-start" href="/admin/match.php?id=<?= (int)$selected['id'] ?>&amp;season_id=<?= $seasonId ?>">Open match</a></div>
-        <h3 class="h6">Match timeline</h3>
-        <?php if (!$events): ?><p class="text-muted">No match events recorded yet.</p><?php else: ?><ol class="list-group list-group-numbered mb-4"><?php foreach ($events as $event): ?><li class="list-group-item"><strong><?= $esc(($event['minute'] ?? '') !== '' ? $event['minute'] . "′ · " : '') ?><?= $esc(ucwords(str_replace('_', ' ', (string)($event['type'] ?? 'Event')))) ?></strong> <span class="text-muted"><?= $esc(($event['team'] ?? '') === 'opponent' ? $selected['opponent'] : (($event['team'] ?? '') === 'svfc' ? 'Our team' : '')) ?></span> <?= $esc($event['player'] ?? '') ?><?php if (!empty($event['secondary_player'])): ?> → <?= $esc($event['secondary_player']) ?><?php endif; ?><?php foreach (is_array($event['substitutions'] ?? null) ? $event['substitutions'] : [] as $change): if (!is_array($change)) continue; ?> <span class="d-block small">Off: <?= $esc($change['off'] ?? '') ?> · On: <?= $esc($change['on'] ?? '') ?></span><?php endforeach; ?><?php if (!empty($event['outcome'])): ?> · <?= $esc(ucfirst((string)$event['outcome'])) ?><?php endif; ?><?php if (!empty($event['note'])): ?> · <?= $esc((string)$event['note']) ?><?php endif; ?></li><?php endforeach; ?></ol><?php endif; ?>
-        <div class="row g-3"><?php foreach (['starting11_starters_json' => 'Starting XI', 'starting11_substitutes_json' => 'Substitutes'] as $field => $label): $names = json_decode((string)($selected[$field] ?? '[]'), true); $names = is_array($names) ? array_filter($names, 'is_string') : []; ?><div class="col-md-6"><h3 class="h6"><?= $label ?></h3><?php if (!$names): ?><p class="text-muted">No lineup recorded.</p><?php else: ?><ul class="mb-0"><?php foreach ($names as $name): if (trim($name) === '') continue; ?><li><?= $esc($name) ?></li><?php endforeach; ?></ul><?php endif; ?></div><?php endforeach; ?></div>
-        </div></section>
+        <?php
+        require_once __DIR__ . '/lib/site_settings.php';
+        try { $mbClub = trim(site_setting($pdo, 'club_name', 'Saltcoats Victoria')) ?: 'Saltcoats Victoria'; } catch (Throwable $e) { $mbClub = 'Saltcoats Victoria'; }
+        $mbHomeIsUs = (int)$selected['is_home'] === 1;
+        $mbHomeName = $mbHomeIsUs ? $mbClub : (string)$selected['opponent'];
+        $mbAwayName = $mbHomeIsUs ? (string)$selected['opponent'] : $mbClub;
+        $mbHasFt = isset($selected['full_time_home_score'], $selected['full_time_away_score']);
+        $mbHasHt = isset($selected['half_time_home_score'], $selected['half_time_away_score']);
+        $mbResult = $mbHasFt ? hub_stats_result($selected) : null;
+        $mbTypes = [
+            'goal' => ['Goal', 'fa-futbol', 'goal'], 'own_goal' => ['Own goal', 'fa-futbol', 'owngoal'], 'penalty_goal' => ['Penalty goal', 'fa-futbol', 'goal'],
+            'yellow_card' => ['Yellow card', 'fa-square', 'yellow'], 'red_card' => ['Red card', 'fa-square', 'red'], 'second_yellow' => ['Second yellow', 'fa-square', 'red'],
+            'substitution' => ['Substitution', 'fa-right-left', 'sub'],
+        ];
+        $mbHalves = ['First half' => [], 'Second half' => []];
+        foreach ($events as $event) {
+            $mbHalves[((int)($event['minute'] ?? 0)) > 45 ? 'Second half' : 'First half'][] = $event;
+        }
+        ?>
+        <style>
+        .mb-card{background:var(--hub-surface,#fffdf9);border:1px solid var(--hub-line,rgba(75,8,24,.12));border-radius:var(--hub-radius,1rem);box-shadow:var(--hub-shadow-sm,none);overflow:hidden}
+        .mb-head{padding:1.1rem 1.25rem 1.25rem;background:linear-gradient(135deg,#4c1521,#6d2231);color:#fff}
+        .mb-meta{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.5rem;font-size:.78rem;letter-spacing:.04em;text-transform:uppercase;opacity:.9}
+        .mb-meta .btn{--bs-btn-padding-y:.2rem;--bs-btn-font-size:.78rem;text-transform:none;letter-spacing:0}
+        .mb-board{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:1rem;margin-top:.9rem}
+        .mb-team{font-size:1.15rem;font-weight:800;line-height:1.2}
+        .mb-team--home{text-align:right}.mb-team--away{text-align:left}
+        .mb-team small{display:block;font-size:.68rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;opacity:.7}
+        .mb-score{text-align:center}
+        .mb-ft{display:inline-block;padding:.2rem .9rem;border-radius:.7rem;background:rgba(255,255,255,.14);font-size:2rem;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+        .mb-ht{display:block;margin-top:.3rem;font-size:.75rem;opacity:.8}
+        .mb-chip{display:inline-block;margin-top:.35rem;padding:.1rem .65rem;border-radius:999px;font-size:.72rem;font-weight:800;letter-spacing:.06em}
+        .mb-chip--W{background:#2f7d55}.mb-chip--D{background:#8a8a8a}.mb-chip--L{background:#b23b3b}
+        .mb-body{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr);gap:1.5rem;padding:1.25rem}
+        .mb-section-title{margin:0 0 .75rem;font-size:.72rem;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--hub-muted,#70676b)}
+        .mb-half{margin-bottom:1.25rem}.mb-half:last-child{margin-bottom:0}
+        .mb-half__label{display:inline-block;margin:0 0 .6rem;padding:.2rem .7rem;border-radius:999px;background:rgba(106,32,54,.08);color:#6a2036;font-size:.72rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase}
+        .mb-events{list-style:none;margin:0;padding:0;position:relative}
+        .mb-events::before{content:"";position:absolute;top:.3rem;bottom:.3rem;left:50%;width:2px;margin-left:-1px;background:var(--hub-line,#eadfdf)}
+        .mb-ev{display:grid;grid-template-columns:minmax(0,1fr) 3.6rem minmax(0,1fr);align-items:center;margin-bottom:.5rem;position:relative}
+        .mb-min{grid-column:2;grid-row:1;justify-self:center;position:relative;z-index:1;min-width:2.6rem;padding:.12rem .4rem;text-align:center;border-radius:999px;background:#fff;border:2px solid var(--hub-line-strong,#d9c9cc);font-size:.76rem;font-weight:800;font-variant-numeric:tabular-nums}
+        .mb-ev__card{grid-row:1;display:flex;align-items:flex-start;gap:.55rem;padding:.5rem .7rem;border:1px solid var(--hub-line,#eadfdf);border-radius:.7rem;background:#fff;min-width:0}
+        .mb-ev--home .mb-ev__card{grid-column:1;justify-self:end;flex-direction:row-reverse;text-align:right}
+        .mb-ev--away .mb-ev__card{grid-column:3;justify-self:start}
+        .mb-ev--neutral .mb-ev__card{grid-column:1 / -1;justify-self:center}
+        .mb-ev--ours .mb-ev__card{border-color:rgba(106,32,54,.28);background:rgba(106,32,54,.035)}
+        .mb-ico{flex:none;display:grid;place-items:center;width:1.7rem;height:1.7rem;border-radius:50%;font-size:.8rem;background:#f1ebe6;color:#555}
+        .mb-ico--goal{background:rgba(47,125,85,.15);color:#23653f}.mb-ico--owngoal{background:rgba(178,59,59,.13);color:#a32a3a}
+        .mb-ico--yellow{background:rgba(240,185,11,.2);color:#b88400}.mb-ico--red{background:rgba(178,59,59,.15);color:#b23b3b}
+        .mb-ico--sub{background:rgba(39,104,132,.13);color:#276884}
+        .mb-ev__text{min-width:0;line-height:1.25}.mb-ev__type{display:block;font-size:.68rem;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--hub-muted,#70676b)}
+        .mb-ev__player{font-weight:700;overflow-wrap:anywhere}.mb-ev__note{display:block;font-size:.78rem;color:var(--hub-muted,#70676b)}
+        .mb-ev__team{display:none;font-size:.7rem;font-weight:700;color:var(--hub-muted,#70676b)}
+        .mb-sub-line{display:block;font-size:.82rem}.mb-sub-line b{font-weight:700}.mb-on{color:#23653f}.mb-off{color:#a32a3a}
+        .mb-lineups{display:flex;flex-direction:column;gap:1.25rem}
+        .mb-lineup{margin:0;padding:0;list-style:none;display:grid;gap:.3rem}
+        .mb-lineup li{display:flex;align-items:center;gap:.6rem;padding:.4rem .6rem;border-radius:.6rem;background:rgba(75,8,24,.04);font-weight:600}
+        .mb-lineup li span{flex:none;display:grid;place-items:center;width:1.5rem;height:1.5rem;border-radius:50%;background:#6a2036;color:#fff;font-size:.7rem;font-weight:800}
+        .mb-lineup--subs li span{background:#8d7f83}
+        .mb-lineup li em{font-style:normal;flex:1;min-width:0;overflow-wrap:anywhere}
+        .mb-tag{flex:none;display:inline-flex;align-items:center;gap:.25rem;padding:.1rem .5rem;border-radius:999px;font-size:.68rem;font-weight:800;letter-spacing:.03em;white-space:nowrap}
+        .mb-tag--on{background:rgba(47,125,85,.14);color:#23653f}.mb-tag--off{background:rgba(178,59,59,.13);color:#a32a3a}
+        .mb-tag--unused,.mb-tag--full{background:rgba(75,8,24,.06);color:var(--hub-muted,#70676b);font-weight:700}
+        .mb-empty{margin:0;color:var(--hub-muted,#70676b)}
+        .mb-stats{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.35fr);gap:1.5rem;padding:1.25rem;border-top:1px solid var(--hub-line,#eadfdf);background:rgba(75,8,24,.02)}
+        .mb-vs__head{display:flex;justify-content:space-between;gap:1rem;margin-bottom:.4rem;font-size:.78rem;font-weight:800;color:var(--hub-ink,#1f1a1d)}
+        .mb-vs__row{display:grid;grid-template-columns:1.6rem 1fr 1.6rem;align-items:center;gap:.6rem;margin-bottom:.7rem}
+        .mb-vs__v{font-size:1.05rem;text-align:center;font-variant-numeric:tabular-nums}
+        .mb-vs__label{display:block;text-align:center;font-size:.7rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--hub-muted,#70676b);margin-bottom:.2rem}
+        .mb-vs__bar{display:flex;gap:3px;height:.55rem}
+        .mb-vs__bar i{display:block;border-radius:999px;background:#cfc6c8;min-width:0}
+        .mb-vs__bar i.is-us{background:#6a2036}
+        .mb-bands{display:grid;grid-template-columns:repeat(6,1fr);gap:.4rem;align-items:end;height:8.5rem;padding-top:.5rem}
+        .mb-band{display:flex;flex-direction:column;align-items:center;height:100%}
+        .mb-band__bars{flex:1;width:100%;display:flex;align-items:flex-end;justify-content:center;gap:3px}
+        .mb-band__bar{display:flex;align-items:flex-start;justify-content:center;width:26%;max-width:1.2rem;min-height:2px;border-radius:.3rem .3rem 0 0;font-style:normal;font-size:.65rem;font-weight:800;color:#fff;line-height:1.3}
+        .mb-band__bar--us{background:#6a2036}.mb-band__bar--them{background:#9b9094}.mb-band__bar--card{background:#e0b42a;color:#5c4400}
+        .mb-band__label{margin-top:.35rem;font-size:.66rem;font-weight:700;color:var(--hub-muted,#70676b)}
+        .mb-legend,.mb-gantt__foot{display:flex;flex-wrap:wrap;gap:.35rem 1rem;margin:.7rem 0 0;font-size:.74rem;color:var(--hub-muted,#70676b)}
+        .mb-legend span,.mb-gantt__foot span{display:inline-flex;align-items:center;gap:.35rem}
+        .lg{display:inline-block;width:.7rem;height:.7rem;border-radius:.2rem}.lg--us{background:#6a2036}.lg--them{background:#9b9094}.lg--card{background:#e0b42a}.lg--start{background:#6a2036}.lg--sub{background:#2f7d55}
+        .mk-goal{color:#23653f}.mk-assist{color:#276884}.mk-yellow{color:#e0b42a}.mk-red{color:#b23b3b}
+        .mb-gantt__axis{position:relative;height:1.1rem;margin-left:0;font-size:.66rem;font-weight:700;color:var(--hub-muted,#70676b)}
+        .mb-gantt__axis span{position:absolute;transform:translateX(-50%)}.mb-gantt__axis span:first-child{transform:none}.mb-gantt__axis span:last-child{transform:translateX(-100%)}
+        .mb-gantt__row{padding:.45rem 0;border-top:1px solid var(--hub-line,#eadfdf)}
+        .mb-gantt__who{display:flex;align-items:baseline;gap:.5rem;margin-bottom:.3rem}
+        .mb-gantt__who strong{font-size:.88rem;min-width:0;overflow-wrap:anywhere}.mb-gantt__who small{font-size:.66rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--hub-muted,#70676b)}
+        .mb-gantt__mins{margin-left:auto;font-size:.88rem;font-variant-numeric:tabular-nums;color:#6a2036}
+        .mb-gantt__track{position:relative;height:1.35rem;border-radius:.4rem;background:
+            linear-gradient(to right,transparent calc(50% - 1px),rgba(75,8,24,.28) calc(50% - 1px),rgba(75,8,24,.28) calc(50% + 1px),transparent calc(50% + 1px)),
+            repeating-linear-gradient(to right,rgba(75,8,24,.07) 0,rgba(75,8,24,.07) 1px,transparent 1px,transparent 16.666%),rgba(75,8,24,.05)}
+        .mb-gantt__bar{position:absolute;top:.2rem;bottom:.2rem;border-radius:999px;background:#6a2036}.mb-gantt__bar--sub{background:#2f7d55}
+        .mb-mk{position:absolute;top:50%;transform:translate(-50%,-50%);display:grid;place-items:center;width:1.15rem;height:1.15rem;border-radius:50%;background:#fff;font-size:.62rem;box-shadow:0 0 0 1.5px rgba(31,26,29,.25)}
+        .mb-mk--goal{color:#23653f}.mb-mk--assist{color:#276884}.mb-mk--yellow{color:#e0b42a}.mb-mk--red{color:#b23b3b}
+        .mb-gantt__unused{margin:.6rem 0 0;font-size:.8rem;color:var(--hub-muted,#70676b)}
+        .mb-mini,.mb-mins{width:100%;border-collapse:collapse;font-size:.88rem}
+        .mb-mini th,.mb-mini td,.mb-mins th,.mb-mins td{padding:.45rem .5rem;border-bottom:1px solid var(--hub-line,#eadfdf);text-align:left;vertical-align:middle}
+        .mb-mini thead th,.mb-mins thead th{font-size:.66rem;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--hub-muted,#70676b);border-bottom-width:2px}
+        .mb-mini thead th small{text-transform:none;letter-spacing:0;font-weight:600}
+        .mb-mini--center th,.mb-mini--center td{text-align:center!important}.mb-mini tbody th{font-weight:700;white-space:nowrap}.mb-mini td{font-variant-numeric:tabular-nums}
+        .mb-mins tbody th{font-weight:600}.mb-mins tbody tr:last-child th,.mb-mins tbody tr:last-child td,.mb-mini tbody tr:last-child th,.mb-mini tbody tr:last-child td{border-bottom:0}
+        .mb-subtag{margin-left:.35rem;padding:.05rem .4rem;border-radius:999px;background:rgba(47,125,85,.14);color:#23653f;font-size:.62rem;font-weight:800;letter-spacing:.05em;text-transform:uppercase}
+        .mb-mins td strong{font-variant-numeric:tabular-nums}
+        .mb-mins__notes{display:flex;flex-wrap:wrap;align-items:center;gap:.25rem .5rem}
+        .mb-mins__span{font-size:.76rem;color:var(--hub-muted,#70676b)}.mb-mins__span.is-part{color:#a32a3a;font-weight:700}
+        .mb-chipmk{display:inline-flex;align-items:center;gap:.25rem;padding:.05rem .4rem;border-radius:999px;background:rgba(75,8,24,.06);font-size:.7rem;font-weight:700}
+        @media (max-width:991.98px){.mb-stats{grid-template-columns:1fr}}
+        @media (max-width:767.98px){.mb-stats{padding:1rem}}
+        @media (max-width:991.98px){.mb-body{grid-template-columns:1fr}}
+        @media (max-width:767.98px){
+            .mb-head{padding:1rem}.mb-board{gap:.5rem}.mb-team{font-size:.95rem}.mb-ft{font-size:1.5rem;padding:.15rem .6rem}
+            .mb-body{padding:1rem}
+            .mb-events::before{left:1.3rem}
+            .mb-ev{grid-template-columns:2.6rem minmax(0,1fr);gap:.6rem;align-items:flex-start}
+            .mb-min{grid-column:1;min-width:2.6rem;margin-top:.25rem}
+            .mb-ev--home .mb-ev__card,.mb-ev--away .mb-ev__card,.mb-ev--neutral .mb-ev__card{grid-column:2;grid-row:1;justify-self:stretch;flex-direction:row;text-align:left}
+            .mb-ev__team{display:block}
+        }
+        </style>
+        <section class="mb-card" id="match-breakdown" aria-label="Match breakdown">
+            <header class="mb-head">
+                <div class="mb-meta">
+                    <span><?= $esc(date('D j M Y', strtotime($selected['match_date']))) ?><?= !empty($selected['competition']) ? ' · ' . $esc($selected['competition']) : '' ?> · <?= $mbHomeIsUs ? 'Home' : 'Away' ?></span>
+                    <a class="btn btn-light btn-sm" href="/admin/match.php?id=<?= (int)$selected['id'] ?>&amp;season_id=<?= $seasonId ?>">Open match</a>
+                </div>
+                <div class="mb-board">
+                    <div class="mb-team mb-team--home"><?= $esc($mbHomeName) ?><small>Home</small></div>
+                    <div class="mb-score">
+                        <?php if ($mbHasFt): ?>
+                            <span class="mb-ft"><?= (int)$selected['full_time_home_score'] ?> – <?= (int)$selected['full_time_away_score'] ?></span>
+                            <?php if ($mbHasHt): ?><span class="mb-ht">Half time <?= (int)$selected['half_time_home_score'] ?> – <?= (int)$selected['half_time_away_score'] ?></span><?php endif; ?>
+                            <?php if ($mbResult): ?><span class="mb-chip mb-chip--<?= $esc($mbResult['result']) ?>"><?= ['W' => 'WIN', 'D' => 'DRAW', 'L' => 'LOSS'][$mbResult['result']] ?? '' ?></span><?php endif; ?>
+                        <?php else: ?>
+                            <span class="mb-ft">v</span>
+                        <?php endif; ?>
+                    </div>
+                    <div class="mb-team mb-team--away"><?= $esc($mbAwayName) ?><small>Away</small></div>
+                </div>
+            </header>
+
+            <div class="mb-body">
+                <div>
+                    <h3 class="mb-section-title">Match timeline</h3>
+                    <?php if (!$events): ?><p class="mb-empty">No match events recorded yet.</p><?php else: ?>
+                        <?php foreach ($mbHalves as $halfLabel => $halfEvents): if (!$halfEvents) continue; ?>
+                        <div class="mb-half">
+                            <span class="mb-half__label"><?= $esc($halfLabel) ?></span>
+                            <ol class="mb-events">
+                            <?php foreach ($halfEvents as $event):
+                                $type = (string)($event['type'] ?? 'event');
+                                [$tLabel, $tIcon, $tTone] = $mbTypes[$type] ?? [ucwords(str_replace('_', ' ', $type)), 'fa-circle', 'other'];
+                                $team = (string)($event['team'] ?? '');
+                                $ours = $team === 'svfc';
+                                $isOpp = $team === 'opponent';
+                                $side = $team === '' ? 'neutral' : (($ours === $mbHomeIsUs) ? 'home' : 'away');
+                                $teamName = $ours ? $mbClub : ($isOpp ? (string)$selected['opponent'] : '');
+                            ?>
+                                <li class="mb-ev mb-ev--<?= $side ?><?= $ours ? ' mb-ev--ours' : '' ?>">
+                                    <span class="mb-min"><?= $esc(($event['minute'] ?? '') !== '' ? $event['minute'] . '′' : '–') ?></span>
+                                    <div class="mb-ev__card">
+                                        <span class="mb-ico mb-ico--<?= $tTone ?>"><i class="fa-solid <?= $tIcon ?>" aria-hidden="true"></i></span>
+                                        <div class="mb-ev__text">
+                                            <span class="mb-ev__type"><?= $esc($tLabel) ?></span>
+                                            <?php if ($type !== 'substitution' && !empty($event['player'])): ?><span class="mb-ev__player"><?= $esc($event['player']) ?></span><?php endif; ?>
+                                            <?php if ($type !== 'substitution' && !empty($event['secondary_player'])): ?><span class="mb-ev__note">Assist: <?= $esc($event['secondary_player']) ?></span><?php endif; ?>
+                                            <?php if ($type === 'substitution'):
+                                                $changes = is_array($event['substitutions'] ?? null) ? $event['substitutions'] : [];
+                                                if (!$changes && (!empty($event['player']) || !empty($event['secondary_player']))) { $changes = [['off' => $event['player'] ?? '', 'on' => $event['secondary_player'] ?? '']]; }
+                                                foreach ($changes as $change): if (!is_array($change)) continue; ?>
+                                                    <span class="mb-sub-line"><b class="mb-on">▲</b> <?= $esc($change['on'] ?? '') ?> <b class="mb-off">▼</b> <?= $esc($change['off'] ?? '') ?></span>
+                                                <?php endforeach; endif; ?>
+                                            <?php if (!empty($event['outcome'])): ?><span class="mb-ev__note"><?= $esc(ucfirst((string)$event['outcome'])) ?></span><?php endif; ?>
+                                            <?php if (!empty($event['note'])): ?><span class="mb-ev__note"><?= $esc((string)$event['note']) ?></span><?php endif; ?>
+                                            <?php if ($teamName !== ''): ?><span class="mb-ev__team"><?= $esc($teamName) ?></span><?php endif; ?>
+                                        </div>
+                                    </div>
+                                </li>
+                            <?php endforeach; ?>
+                            </ol>
+                        </div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </div>
+
+                <?php
+                // Who came on / went off for our team, from the substitution events.
+                $mbNorm = static fn($n): string => mb_strtolower(trim((string)$n));
+                $mbOff = $mbOn = [];
+                foreach ($events as $event) {
+                    if (($event['type'] ?? '') !== 'substitution' || ($event['team'] ?? '') !== 'svfc') continue;
+                    $min = ($event['minute'] ?? '') !== '' ? $event['minute'] . '′' : '';
+                    $changes = is_array($event['substitutions'] ?? null) ? $event['substitutions'] : [];
+                    if (!$changes && (!empty($event['player']) || !empty($event['secondary_player']))) { $changes = [['off' => $event['player'] ?? '', 'on' => $event['secondary_player'] ?? '']]; }
+                    foreach ($changes as $change) {
+                        if (!is_array($change)) continue;
+                        if (!empty($change['off'])) $mbOff[$mbNorm($change['off'])] = $min;
+                        if (!empty($change['on'])) $mbOn[$mbNorm($change['on'])] = $min;
+                    }
+                }
+                ?>
+                <aside class="mb-lineups" aria-label="Line-up">
+                    <?php foreach (['starting11_starters_json' => ['Starting XI', ''], 'starting11_substitutes_json' => ['Substitutes', 'mb-lineup--subs']] as $field => [$label, $extra]):
+                        $names = json_decode((string)($selected[$field] ?? '[]'), true);
+                        $names = is_array($names) ? array_values(array_filter($names, static fn($n) => is_string($n) && trim($n) !== '')) : []; ?>
+                        <div>
+                            <h3 class="mb-section-title"><?= $label ?> · <?= $esc($mbClub) ?></h3>
+                            <?php if (!$names): ?><p class="mb-empty">No lineup recorded.</p><?php else: ?>
+                                <ul class="mb-lineup <?= $extra ?>"><?php foreach ($names as $i => $name): $key = $mbNorm($name);
+                                    $isSubList = $field === 'starting11_substitutes_json';
+                                    $wentOff = !$isSubList && isset($mbOff[$key]);
+                                    $cameOn = $isSubList && isset($mbOn[$key]);
+                                    $alsoOff = $isSubList && $cameOn && isset($mbOff[$key]); ?>
+                                    <li><span><?= $i + 1 ?></span><em><?= $esc($name) ?></em>
+                                        <?php if ($wentOff): ?><b class="mb-tag mb-tag--off" title="Substituted off"><i class="fa-solid fa-arrow-down" aria-hidden="true"></i> Off<?= $mbOff[$key] !== '' ? ' ' . $esc($mbOff[$key]) : '' ?></b>
+                                        <?php elseif ($cameOn): ?><b class="mb-tag mb-tag--on" title="Came on as a substitute"><i class="fa-solid fa-arrow-up" aria-hidden="true"></i> On <?= $esc($mbOn[$key]) ?></b><?php if ($alsoOff): ?><b class="mb-tag mb-tag--off"><i class="fa-solid fa-arrow-down" aria-hidden="true"></i> Off <?= $esc($mbOff[$key]) ?></b><?php endif; ?>
+                                        <?php elseif ($isSubList): ?><b class="mb-tag mb-tag--unused">Not used</b>
+                                        <?php else: ?><b class="mb-tag mb-tag--full">Full match</b><?php endif; ?>
+                                    </li><?php endforeach; ?></ul>
+                            <?php endif; ?>
+                        </div>
+                    <?php endforeach; ?>
+                </aside>
+            </div>
+
+            <?php
+            // ---- Match statistics, derived from the recorded events and line-up ----
+            $mbTotal = 90;
+            foreach ($events as $ev) { if ((int)($ev['minute'] ?? 0) > $mbTotal) $mbTotal = (int)$ev['minute']; }
+            $mbPct = static fn(int $m): float => round(min(100, max(0, $m / $mbTotal * 100)), 2);
+            $mbMin = static fn($m): ?int => ($m === null || $m === '') ? null : (int)$m;
+
+            // Team comparison counters: [ours, theirs]
+            $mbCount = ['goals' => [0, 0], 'g1' => [0, 0], 'g2' => [0, 0], 'yellow' => [0, 0], 'red' => [0, 0], 'subs' => [0, 0]];
+            $mbBands = [[0, 15], [16, 30], [31, 45], [46, 60], [61, 75], [76, 999]];
+            $mbBandLabels = ['0–15', '16–30', '31–45', '46–60', '61–75', '76+'];
+            $mbBandData = array_fill(0, 6, ['goals_us' => 0, 'goals_them' => 0, 'cards' => 0]);
+            $mbMarks = [];
+            foreach ($events as $ev) {
+                $team = (string)($ev['team'] ?? '');
+                if ($team !== 'svfc' && $team !== 'opponent') continue;
+                $idx = $team === 'svfc' ? 0 : 1;
+                $type = (string)($ev['type'] ?? '');
+                $m = (int)($ev['minute'] ?? 0);
+                $band = 5; foreach ($mbBands as $bi => [$lo, $hi]) { if ($m >= $lo && $m <= $hi) { $band = $bi; break; } }
+                if (in_array($type, ['goal', 'own_goal', 'penalty_goal'], true)) {
+                    $mbCount['goals'][$idx]++; $mbCount[$m > 45 ? 'g2' : 'g1'][$idx]++;
+                    $mbBandData[$band][$idx === 0 ? 'goals_us' : 'goals_them']++;
+                    if ($idx === 0) {
+                        if (!empty($ev['player']) && $type !== 'own_goal') $mbMarks[$mbNorm($ev['player'])][] = ['goal', $m];
+                        if (!empty($ev['secondary_player'])) $mbMarks[$mbNorm($ev['secondary_player'])][] = ['assist', $m];
+                    }
+                } elseif ($type === 'yellow_card' || $type === 'second_yellow') {
+                    $mbCount['yellow'][$idx]++; $mbBandData[$band]['cards']++;
+                    if ($idx === 0 && !empty($ev['player'])) $mbMarks[$mbNorm($ev['player'])][] = ['yellow', $m];
+                } elseif ($type === 'red_card') {
+                    $mbCount['red'][$idx]++; $mbBandData[$band]['cards']++;
+                    if ($idx === 0 && !empty($ev['player'])) $mbMarks[$mbNorm($ev['player'])][] = ['red', $m];
+                } elseif ($type === 'substitution') {
+                    $changes = is_array($ev['substitutions'] ?? null) ? count($ev['substitutions']) : 0;
+                    $mbCount['subs'][$idx] += max(1, $changes);
+                }
+            }
+            // Player minutes (our team)
+            $mbStarters = json_decode((string)($selected['starting11_starters_json'] ?? '[]'), true);
+            $mbSubsList = json_decode((string)($selected['starting11_substitutes_json'] ?? '[]'), true);
+            $mbStarters = is_array($mbStarters) ? array_values(array_filter($mbStarters, static fn($n) => is_string($n) && trim($n) !== '')) : [];
+            $mbSubsList = is_array($mbSubsList) ? array_values(array_filter($mbSubsList, static fn($n) => is_string($n) && trim($n) !== '')) : [];
+            $mbRedAt = [];
+            foreach ($mbMarks as $k => $list) { foreach ($list as [$kind, $mm]) { if ($kind === 'red') $mbRedAt[$k] = $mm; } }
+            $mbPlayers = [];
+            foreach ($mbStarters as $n) {
+                $k = $mbNorm($n);
+                $end = $mbTotal;
+                if (isset($mbOff[$k]) && $mbMin(rtrim($mbOff[$k], '′')) !== null) $end = (int)rtrim($mbOff[$k], '′');
+                if (isset($mbRedAt[$k])) $end = min($end, $mbRedAt[$k]);
+                $mbPlayers[] = ['name' => $n, 'role' => 'Starter', 'start' => 0, 'end' => $end, 'key' => $k];
+            }
+            $mbUnused = [];
+            foreach ($mbSubsList as $n) {
+                $k = $mbNorm($n);
+                if (!isset($mbOn[$k])) { $mbUnused[] = $n; continue; }
+                $start = $mbMin(rtrim($mbOn[$k], '′'));
+                if ($start === null) { continue; }
+                $end = $mbTotal;
+                if (isset($mbOff[$k]) && $mbMin(rtrim($mbOff[$k], '′')) !== null) $end = (int)rtrim($mbOff[$k], '′');
+                if (isset($mbRedAt[$k])) $end = min($end, $mbRedAt[$k]);
+                $mbPlayers[] = ['name' => $n, 'role' => 'Sub', 'start' => $start, 'end' => max($start, $end), 'key' => $k];
+            }
+            $mbTotalMinutes = array_sum(array_map(static fn($pl) => $pl['end'] - $pl['start'], $mbPlayers));
+            $mbRows = [
+                ['Goals', 'goals'], ['First-half goals', 'g1'], ['Second-half goals', 'g2'],
+                ['Yellow cards', 'yellow'], ['Red cards', 'red'], ['Substitutions', 'subs'],
+            ];
+            $mbMaxBand = max(1, ...array_map(static fn($b) => max($b['goals_us'], $b['goals_them'], $b['cards']), $mbBandData));
+            ?>
+            <div class="mb-stats">
+                <div class="mb-stats__col">
+                    <h3 class="mb-section-title">Head to head</h3>
+                    <div class="mb-vs">
+                        <div class="mb-vs__head"><span><?= $esc($mbHomeName) ?></span><span><?= $esc($mbAwayName) ?></span></div>
+                        <?php foreach ($mbRows as [$vsLabel, $vsKey]):
+                            $ours = $mbCount[$vsKey][0]; $theirs = $mbCount[$vsKey][1];
+                            $homeV = $mbHomeIsUs ? $ours : $theirs; $awayV = $mbHomeIsUs ? $theirs : $ours;
+                            $sum = max(1, $homeV + $awayV);
+                            $ourSideHome = $mbHomeIsUs; ?>
+                            <div class="mb-vs__row">
+                                <strong class="mb-vs__v"><?= $homeV ?></strong>
+                                <div class="mb-vs__mid">
+                                    <span class="mb-vs__label"><?= $esc($vsLabel) ?></span>
+                                    <div class="mb-vs__bar">
+                                        <i class="mb-vs__home <?= $mbHomeIsUs ? 'is-us' : '' ?>" style="width:<?= round($homeV / $sum * 100, 1) ?>%"></i>
+                                        <i class="mb-vs__away <?= $mbHomeIsUs ? '' : 'is-us' ?>" style="width:<?= round($awayV / $sum * 100, 1) ?>%"></i>
+                                    </div>
+                                </div>
+                                <strong class="mb-vs__v"><?= $awayV ?></strong>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+
+                    <h3 class="mb-section-title mt-4">When it happened</h3>
+                    <?php $mbActive = array_filter($mbBandData, static fn($bd) => $bd['goals_us'] || $bd['goals_them'] || $bd['cards']); ?>
+                    <?php if (!$mbActive): ?><p class="mb-empty">No goals or cards recorded.</p><?php else: ?>
+                    <table class="mb-mini mb-mini--center">
+                        <thead><tr><th>Minutes</th><th>Goals <small>(us – them)</small></th><th>Cards</th></tr></thead>
+                        <tbody>
+                        <?php foreach ($mbActive as $bi => $bd): ?>
+                            <tr><th scope="row"><?= $mbBandLabels[$bi] ?><?= $bi < 5 ? '′' : '' ?></th>
+                                <td><?= ($bd['goals_us'] || $bd['goals_them']) ? '<strong>' . $bd['goals_us'] . ' – ' . $bd['goals_them'] . '</strong>' : '<span class="text-muted">–</span>' ?></td>
+                                <td><?= $bd['cards'] ? str_repeat('<i class="fa-solid fa-square mk-yellow" aria-hidden="true"></i> ', 0) . '<strong>' . $bd['cards'] . '</strong>' : '<span class="text-muted">–</span>' ?></td></tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                    <?php endif; ?>
+                </div>
+
+                <div class="mb-stats__col">
+                    <h3 class="mb-section-title">Minutes played · <?= $esc($mbClub) ?></h3>
+                    <?php if (!$mbPlayers): ?><p class="mb-empty">No line-up recorded, so minutes can't be worked out.</p><?php else: ?>
+                    <table class="mb-mins">
+                        <thead><tr><th>Player</th><th class="text-end">Minutes</th><th>Notes</th></tr></thead>
+                        <tbody>
+                        <?php foreach ($mbPlayers as $pl): $mins = $pl['end'] - $pl['start']; $marks = $mbMarks[$pl['key']] ?? [];
+                            $span = $mins >= $mbTotal ? 'Full match' : ($pl['start'] > 0 && $pl['end'] >= $mbTotal ? 'On ' . $pl['start'] . '′' : ($pl['start'] > 0 ? $pl['start'] . '′–' . $pl['end'] . '′' : 'Off ' . $pl['end'] . '′')); ?>
+                            <tr>
+                                <th scope="row"><?= $esc($pl['name']) ?><?= $pl['role'] === 'Sub' ? ' <small class="mb-subtag">Sub</small>' : '' ?></th>
+                                <td class="text-end"><strong><?= $mins ?>′</strong></td>
+                                <td><div class="mb-mins__notes">
+                                    <span class="mb-mins__span<?= str_starts_with($span, 'Off') ? ' is-part' : '' ?>"><?= $esc($span) ?></span>
+                                    <?php foreach ($marks as [$kind, $mm]): $icon = ['goal' => 'fa-futbol', 'assist' => 'fa-shoe-prints', 'yellow' => 'fa-square', 'red' => 'fa-square'][$kind]; $lab = ['goal' => 'Goal', 'assist' => 'Assist', 'yellow' => 'Yellow card', 'red' => 'Red card'][$kind]; ?>
+                                        <span class="mb-chipmk" title="<?= $lab ?> <?= $mm ?>′"><i class="fa-solid <?= $icon ?> mk-<?= $kind ?>" aria-hidden="true"></i><?= $mm ?>′</span>
+                                    <?php endforeach; ?>
+                                </div></td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                    <?php if ($mbUnused): ?><p class="mb-gantt__unused"><strong>Not used:</strong> <?= $esc(implode(', ', $mbUnused)) ?></p><?php endif; ?>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </section>
     <?php endif; ?>
+    </div>
+</div>
 </div>
 <div class="modal fade" id="playerStatDetailModal" tabindex="-1" aria-labelledby="playerStatDetailModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-scrollable modal-lg">
+    <div class="modal-dialog modal-dialog-scrollable modal-xl">
         <div class="modal-content">
             <div class="modal-header">
                 <h2 class="modal-title h5" id="playerStatDetailModalLabel">Player detail</h2>
-                <a class="btn btn-outline-secondary btn-sm me-2" id="playerStatDetailPdfLink" href="#" target="_blank" rel="noopener" hidden><i class="fa-solid fa-file-pdf me-1" aria-hidden="true"></i>Download as PDF</a>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
+            <div class="d-none"><a class="btn btn-outline-secondary btn-sm text-nowrap" id="playerStatDetailPdfLink" href="#" target="_blank" rel="noopener" hidden><i class="fa-solid fa-file-pdf me-1" aria-hidden="true"></i>Download as PDF</a></div>
             <div class="modal-body" id="playerStatDetailBody">
                 <p class="text-muted mb-0">Loading&hellip;</p>
             </div>
@@ -1068,7 +1861,7 @@ $badge = static fn(string $result): string => ['W' => 'success', 'D' => 'seconda
 window.STATS_PLAYER_FILTERS = <?= json_encode(
     $tab === 'compare'
         ? ['seasons' => $compareSeasonIds, 'competitions' => $selectedCompetitions, 'venue' => $venue]
-        : ['seasons' => $playersSeasonIds, 'competitions' => $playersCompetitions, 'venue' => $venue],
+        : ['seasons' => $playersSeasonIds, 'competitions' => $playersCompetitions ?: ['__none__'], 'venue' => $venue],
     JSON_UNESCAPED_SLASHES
 ) ?>;
 (function () {
@@ -1184,6 +1977,11 @@ window.STATS_PLAYER_FILTERS = <?= json_encode(
         });
     }
 
+    var shortComp = function (c) {
+        var t = c.replace(/\s*\(.*?\)/g, '').replace(/\b\d{2}\/\d{2}\b/g, '').replace(/West of Scotland Football League\s*/gi, 'WOSFL - ').replace(/West of Scotland/gi, 'WoS').replace(/Football League/gi, 'FL').replace(/Division/gi, 'Div').replace(/Challenge/gi, 'Chall.').replace(/Scottish/gi, 'Scot.').replace(/\s+/g, ' ').trim();
+        return t.length > 20 ? t.slice(0, 19).trim() + '…' : t;
+    };
+
     links.forEach(function (btn) {
         btn.addEventListener('click', function () {
             if (!modal) {
@@ -1234,7 +2032,8 @@ window.STATS_PLAYER_FILTERS = <?= json_encode(
                     } else {
                         summaryLine = data.total + ' total across ' + data.rows.length + ' match' + (data.rows.length === 1 ? '' : 'es') + '.';
                     }
-                    var html = '<p class="text-muted small">' + esc(summaryLine) + '</p>';
+                    var html = '<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2"><p class="text-muted small mb-0">' + esc(summaryLine) + '</p><span id="playerStatDetailPdfSlot"></span></div>'
+                        + '<div id="playerStatDetailToolbar"></div>';
                     html += '<div class="table-responsive"><table class="table table-sm table-hover align-middle mb-0 hub-data-table"><thead><tr>'
                         + '<th scope="col">Date</th><th scope="col">Opponent</th><th scope="col">Venue</th><th scope="col">Competition</th><th scope="col">Score</th><th scope="col">Detail</th>'
                         + '</tr></thead><tbody>';
@@ -1242,10 +2041,56 @@ window.STATS_PLAYER_FILTERS = <?= json_encode(
                         var d = new Date(row.date);
                         var dateStr = isNaN(d.getTime()) ? row.date : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
                         var detailHtml = String(row.detail || '').split('\n').map(esc).join('<br>');
-                        html += '<tr><td class="text-nowrap">' + esc(dateStr) + '</td><th scope="row">' + esc(row.opponent) + '</th><td>' + esc(row.venue) + '</td><td>' + esc(row.competition) + '</td><td class="text-nowrap">' + esc(row.score || '—') + '</td><td>' + detailHtml + '</td></tr>';
+                        var det = String(row.detail || '');
+                        var ev = [/Scored/.test(det) ? 'goal' : '', /\(pen\)/.test(det) ? 'pen' : '', /Yellow card/.test(det) ? 'yellow' : '', /Red card/.test(det) ? 'red' : '', /Clean sheet/.test(det) ? 'clean' : '', /Started/.test(det) ? 'start' : '', /Came on/.test(det) ? 'sub' : ''].filter(Boolean).join(' ');
+                        html += '<tr data-ev="' + ev + '" data-venue="' + esc(String(row.venue || '').toLowerCase()) + '" data-result="' + esc(row.result || '') + '" data-comp="' + esc(row.competition || '') + '"><td class="text-nowrap">' + esc(dateStr) + '</td><th scope="row">' + esc(row.opponent) + '</th><td>' + esc(row.venue) + '</td><td title="' + esc(row.competition) + '">' + esc(shortComp(String(row.competition || ''))) + '</td><td class="text-nowrap fw-semibold" style="color:' + ({ W: '#1e8e3e', D: '#e8710a', L: '#d12a2a' }[row.result] || 'inherit') + '">' + esc(row.score || '—') + '</td><td>' + detailHtml + '</td></tr>';
                     });
                     html += '</tbody></table></div>';
                     bodyEl.innerHTML = html;
+                    var slot = document.getElementById('playerStatDetailPdfSlot');
+                    if (slot && pdfLinkEl) slot.appendChild(pdfLinkEl);
+                    var trs = Array.prototype.slice.call(bodyEl.querySelectorAll('tbody tr'));
+                    var comps = [];
+                    trs.forEach(function (tr) { var c = tr.getAttribute('data-comp'); if (c && comps.indexOf(c) === -1) comps.push(c); });
+                    var hasEv = function (k) { return trs.some(function (tr) { return (' ' + tr.getAttribute('data-ev') + ' ').indexOf(' ' + k + ' ') !== -1; }); };
+                    var chip = function (type, name, value, icon, label, color, iconOnly, shown) {
+                        var id = 'psd-' + name + '-' + value.replace(/[^a-z0-9]/gi, '_');
+                        return '<input type="' + type + '" class="btn-check" name="psd-' + name + '" id="' + id + '" value="' + esc(value) + '" autocomplete="off"' + (type === 'radio' && value === '' ? ' checked' : '') + '>'
+                            + '<label class="btn btn-outline-primary btn-sm" for="' + id + '" title="' + esc(label) + '">' + (icon ? '<i class="fa-solid ' + icon + (iconOnly ? '' : ' me-1') + '"' + (color ? ' style="color:' + color + '"' : '') + ' aria-hidden="true"></i>' : '') + (iconOnly ? '<span class="visually-hidden">' + esc(label) + '</span>' : esc(shown || label)) + '</label>';
+                    };
+                    var group = function (title, inner) {
+                        return '<div class="col-md-4"><span class="form-label small d-block mb-1">' + title + '</span><div class="btn-group stats-scope stats-scope--' + title.toLowerCase() + ' flex-wrap" role="group">' + inner + '</div></div>';
+                    };
+                    var evDefs = [['goal', 'fa-futbol', 'Goals'], ['pen', 'fa-bullseye', 'Penalties'], ['yellow', 'fa-square', 'Yellow cards', '#f2c200'], ['red', 'fa-square', 'Red cards', '#d12a2a'], ['clean', 'fa-shield-halved', 'Clean sheets'], ['start', 'fa-shirt', 'Started'], ['sub', 'fa-arrow-right-arrow-left', 'Came on']].filter(function (d) { return hasEv(d[0]); });
+                    var bar = '<div class="row g-3 mb-2">';
+                    if (evDefs.length) bar += group('Events', evDefs.map(function (d) { return chip('checkbox', 'ev', d[0], d[1], d[2], d[3], true); }).join(''));
+                    bar += group('Venue', chip('radio', 'venue', '', 'fa-arrows-left-right', 'Home & away', '', true) + chip('radio', 'venue', 'home', 'fa-house', 'Home', '', true) + chip('radio', 'venue', 'away', 'fa-bus', 'Away', '', true));
+                    bar += group('Result', [['W', 'fa-circle-check', 'Won', '#1e8e3e'], ['D', 'fa-circle-minus', 'Drawn', '#e8710a'], ['L', 'fa-circle-xmark', 'Lost', '#d12a2a']].map(function (d) { return chip('checkbox', 'res', d[0], d[1], d[2], d[3], true); }).join(''));
+                    bar += '</div><div class="input-group mb-1"><span class="input-group-text"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i></span><input type="search" class="form-control" id="playerStatDetailSearch" placeholder="Search opponent, competition…" autocomplete="off"></div>'
+                        + '<div class="form-text mb-3" id="playerStatDetailCount" hidden></div>';
+                    var toolbar = document.getElementById('playerStatDetailToolbar');
+                    toolbar.innerHTML = bar;
+                    var countEl = document.getElementById('playerStatDetailCount');
+                    var checked = function (name) { return Array.prototype.map.call(toolbar.querySelectorAll('input[name="psd-' + name + '"]:checked'), function (i) { return i.value; }); };
+                    var apply = function () {
+                        var evs = checked('ev'), res = checked('res'), cmp = checked('comp'), ven = checked('venue')[0] || '';
+                        var terms = document.getElementById('playerStatDetailSearch').value.toLowerCase().split(/\s+/).filter(Boolean);
+                        var shown = 0;
+                        trs.forEach(function (tr) {
+                            var have = ' ' + tr.getAttribute('data-ev') + ' ';
+                            var ok = (!evs.length || evs.some(function (e) { return have.indexOf(' ' + e + ' ') !== -1; }))
+                                && (!ven || tr.getAttribute('data-venue') === ven)
+                                && (!res.length || res.indexOf(tr.getAttribute('data-result')) !== -1)
+                                && (!cmp.length || cmp.indexOf(tr.getAttribute('data-comp')) !== -1);
+                            if (ok && terms.length) { var t = tr.textContent.toLowerCase(); ok = terms.every(function (w) { return t.indexOf(w) !== -1; }); }
+                            tr.hidden = !ok;
+                            if (ok) shown++;
+                        });
+                        countEl.hidden = shown === trs.length;
+                        countEl.textContent = 'Showing ' + shown + ' of ' + trs.length + ' matches.';
+                    };
+                    toolbar.addEventListener('change', apply);
+                    toolbar.addEventListener('input', apply);
                 })
                 .catch(function () {
                     bodyEl.innerHTML = '<p class="text-danger mb-0">Something went wrong loading this detail.</p>';

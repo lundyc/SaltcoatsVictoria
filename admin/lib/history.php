@@ -74,6 +74,7 @@ function history_ensure_schema(PDO $pdo): void
         clean_sheets INT NOT NULL DEFAULT 0,
         yellows INT NOT NULL DEFAULT 0,
         reds INT NOT NULL DEFAULT 0,
+        seasons VARCHAR(255) NULL,
         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (id),
         UNIQUE KEY uq_history_stats_legacy (legacy_id),

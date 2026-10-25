@@ -3,8 +3,15 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/auth.php';
 
+// Where to go after signing in: only a path on this site (e.g. /scan/), never another host.
+$loginNext = (string) ($_POST['next'] ?? $_GET['next'] ?? '');
+if (!preg_match('#^/(?![/\\\\])[^\x00-\x1f\x7f]*$#', $loginNext)) {
+    $loginNext = '';
+}
+$loginDestination = $loginNext !== '' ? $loginNext : 'index.php';
+
 if (hub_auth_is_authenticated()) {
-    header('Location: index.php');
+    header('Location: ' . $loginDestination);
     exit;
 }
 
@@ -29,7 +36,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     } else {
         $result = hub_auth_attempt_login($email, $password);
         if ($result['ok']) {
-            header('Location: index.php');
+            header('Location: ' . $loginDestination);
             exit;
         }
         // Not a staff account. The same credentials may still be a valid
@@ -48,15 +55,18 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="manifest" href="/admin/manifest.webmanifest">
+    <link rel="apple-touch-icon" href="/admin/icon-192.png">
+    <script>if ('serviceWorker' in navigator) { window.addEventListener('load', function () { navigator.serviceWorker.register('/admin/sw.js', { scope: '/admin/', updateViaCache: 'none' }).catch(function () {}); }); }</script>
     <title>Login - <?= htmlspecialchars(APP_NAME, ENT_QUOTES, 'UTF-8') ?></title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/admin/assets/vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
     <link href="/admin/assets/css/style.css" rel="stylesheet">
     <link rel="stylesheet" href="/admin/assets/css/login.css">
 </head>
 <body>
     <div class="login-card">
         <img
-            src="Saltcoats Victoria FC -White_Transparent.png"
+            src="club-logo-white-360.png"
             alt="Saltcoats Victoria FC"
             class="login-card__logo"
             loading="eager"
@@ -70,6 +80,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             <div class="alert alert-danger" id="loginError" role="alert"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></div>
         <?php endif; ?>
         <form method="post" novalidate>
+        <input type="hidden" name="next" value="<?= htmlspecialchars($loginNext, ENT_QUOTES, 'UTF-8') ?>">
             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($loginCsrfToken, ENT_QUOTES, 'UTF-8') ?>">
             <div class="mb-3">
                 <label class="form-label" for="loginIdentifier">Email</label>

@@ -24,6 +24,81 @@
         font-weight: 800;
     }
 
+    /* One merged bar: season context on the first row, common actions on the second. */
+    .hub-index-page > .hub-context-bar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0;
+        margin-bottom: 0 !important;
+        padding: 0;
+        overflow: hidden;
+    }
+
+    .hub-index-bar__row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-065rem, 0.65rem) var(--space-3, 0.75rem);
+        padding: 0.7rem 1rem;
+    }
+
+    .hub-index-bar__row + .hub-index-bar__row {
+        border-top: 1px solid var(--hub-line, rgba(75, 8, 24, 0.09));
+    }
+
+    .hub-index-bar__intro {
+        display: grid;
+        gap: 0.15rem;
+        min-width: 0;
+    }
+
+    .hub-index-bar__intro p {
+        margin: 0;
+        color: var(--hub-muted, #675f62);
+        font-size: var(--fs-078);
+    }
+
+    /* Overview headings stand out from the body text. */
+    .hub-index-page h2 {
+        margin: 0;
+        padding-left: 0.7rem;
+        border-left: 4px solid var(--brand-warning);
+        color: var(--brand-primary);
+        font-size: 1.45rem;
+        font-weight: 800;
+        line-height: 1.2;
+        letter-spacing: -0.01em;
+    }
+
+    /* Section headings are a strip attached to the top of the card they introduce. */
+    .hub-index-page .hub-index-section__header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+        margin: 0;
+        padding: 0.65rem 1rem;
+        border-radius: var(--radius-1rem, 1rem) var(--radius-1rem, 1rem) 0 0;
+        background: var(--brand-primary);
+    }
+
+    .hub-index-page .hub-index-section__header h2 {
+        color: #fff;
+        font-size: 1.2rem;
+        border-left-color: var(--brand-warning);
+    }
+
+    .hub-index-page .hub-index-section__toggle {
+        color: #fff;
+    }
+
+    .hub-index-page .hub-index-section > .hub-index-section__header + * {
+        margin-top: 0 !important;
+        border-top-left-radius: 0;
+        border-top-right-radius: 0;
+    }
+
     /* Dense KPI strip: one continuous row of tiles, not two stacked grids. */
     .hub-index-page .hub-metric-card {
         min-height: 5.4rem;
@@ -424,9 +499,493 @@
     }
 
     .dashboard-birthdays__list {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        display: flex;
+        flex-wrap: wrap;
         gap: var(--space-065rem, 0.65rem);
+        width: 100%;
+    }
+
+    .dashboard-birthdays__list > .dashboard-birthdays__item {
+        flex: 1 1 260px;
+        min-width: 0;
+    }
+
+    .dashboard-birthdays__list > .dashboard-birthdays__item--all {
+        flex: 0 0 3.4rem;
+    }
+
+    /* "Needs attention" carries the same title strip as the other dashboard sections. */
+    .hub-index-page .dashboard-attention-score.hub-index-section__header span {
+        color: #fff;
+        font-size: 1.2rem;
+        font-weight: 800;
+        letter-spacing: 0;
+        text-transform: none;
+        border-left: 4px solid var(--brand-warning);
+        padding-left: 0.7rem;
+    }
+
+    .hub-index-page .dashboard-attention-score.hub-index-section__header strong {
+        background: var(--brand-warning);
+        color: var(--brand-primary);
+    }
+
+    /* Season overview: each card's title is its own strip, so no section heading sits above the cards. */
+    .hub-index-matchday > .card {
+        overflow: hidden;
+    }
+
+    .hub-index-matchday .hub-index-card__header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+        padding: 0.65rem 1rem;
+        background: var(--brand-primary);
+        color: #fff;
+    }
+
+    .hub-index-matchday .hub-index-card__header h3 {
+        color: #fff;
+        font-size: 1.1rem;
+        font-weight: 800;
+        padding-left: 0.7rem;
+        border-left: 4px solid var(--brand-warning);
+    }
+
+    /* ---- Dashboard cards: every card has the same shape and title strip, and cards in a row share a height ---- */
+    .hub-index-page .hub-dash-card {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        min-width: 0;
+        height: 100%;
+        padding: 0;
+        overflow: hidden;
+        border: 1px solid var(--hub-line, rgba(75, 8, 24, 0.13));
+        border-radius: var(--hub-radius, 0.72rem);
+        background: rgba(255, 253, 249, 0.98);
+        box-shadow: var(--hub-shadow-sm, 0 0.25rem 0.8rem rgba(31, 26, 29, 0.045));
+    }
+
+    .hub-index-page .hub-dash-card > .hub-index-section__header,
+    .hub-index-page .hub-dash-card > .hub-dash-head,
+    .hub-index-page .hub-dash-card > .hub-index-card__header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+        min-height: 3.1rem;
+        margin: 0;
+        padding: 0.7rem 1rem;
+        border-radius: 0;
+        background: var(--brand-primary);
+        color: #fff;
+    }
+
+    .hub-index-page .hub-dash-card > .hub-index-section__header h2,
+    .hub-index-page .hub-dash-card > .hub-dash-head h2,
+    .hub-index-page .hub-dash-card > .hub-index-card__header h3,
+    .hub-index-page .hub-dash-card > .hub-dash-head h3 {
+        margin: 0;
+        padding-left: 0.7rem;
+        border-left: 4px solid var(--brand-warning);
+        color: #fff;
+        font-size: 1.1rem;
+        font-weight: 800;
+        line-height: 1.2;
+        letter-spacing: 0;
+    }
+
+    /* A card's own inner container becomes its body, so the outer card carries the border and shadow. */
+    .hub-index-page .hub-dash-card > .card {
+        flex: 1 1 auto;
+        border: 0 !important;
+        border-radius: 0 !important;
+        overflow: visible;
+        background: transparent !important;
+        box-shadow: none !important;
+    }
+
+    .hub-index-page .hub-dash-card__body {
+        flex: 1 1 auto;
+        min-width: 0;
+        padding: 1rem;
+    }
+
+    /* Money row: payments, revenue chart and season income side by side, equal heights. */
+    .hub-index-page .hub-index-money {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: var(--space-11rem, 1.1rem);
+        align-items: stretch;
+    }
+
+    @media (max-width: 991.98px) {
+        .hub-index-page .hub-index-money,
+        .hub-index-page .dashboard-command-centre {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    /* Upcoming fixtures and needs attention share one row at equal height. */
+    .hub-index-page .dashboard-command-centre {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        align-items: stretch;
+    }
+
+    .hub-index-page .hub-index-matchday {
+        align-items: stretch;
+    }
+
+    /* Every clickable row on the dashboard uses the upcoming-fixture row style. */
+    .hub-index-page .dashboard-next-fixture,
+    .hub-index-page .dashboard-attention__item,
+    .hub-index-page .hub-index-money__metrics .hub-metric-card,
+    .hub-index-page .hub-index-money__stripe .list-group-item {
+        border: 1px solid rgba(75, 8, 24, 0.12);
+        border-radius: var(--radius-072rem, 0.72rem);
+        background: linear-gradient(135deg, rgba(246, 236, 222, 0.78), rgba(255, 255, 255, 0.92));
+        box-shadow: none;
+        color: var(--hub-ink, #1f1a1d);
+        text-decoration: none;
+        padding: var(--space-085rem, 0.85rem);
+        min-height: 0;
+    }
+
+    .hub-index-page .dashboard-next-fixture:hover,
+    .hub-index-page .dashboard-next-fixture:focus-visible,
+    .hub-index-page .dashboard-attention__item:hover,
+    .hub-index-page .dashboard-attention__item:focus-visible,
+    .hub-index-page .hub-index-money__metrics a.hub-metric-card:hover,
+    .hub-index-page .hub-index-money__metrics a.hub-metric-card:focus-visible,
+    .hub-index-page .hub-index-money__stripe .list-group-item-action:hover,
+    .hub-index-page .hub-index-money__stripe .list-group-item-action:focus-visible {
+        border-color: rgba(106, 32, 54, 0.32);
+        color: var(--brand-primary);
+        background: #fff;
+    }
+
+    .hub-index-page .hub-index-money__stripe .card-body {
+        padding: 1rem;
+    }
+
+    .hub-index-page .hub-index-money__stripe .list-group {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-065rem, 0.65rem);
+    }
+
+    /* Count badge sized to the title strip, so the strip keeps the same height as the others. */
+    .hub-index-page .dashboard-attention-score strong {
+        min-width: 1.6rem;
+        height: 1.6rem;
+        padding: 0 0.45rem;
+        font-size: 0.85rem;
+        line-height: 1;
+    }
+
+    /* Every title strip is the same fixed height, whatever it holds (count chip, collapse button). */
+    .hub-index-page .hub-dash-card > .hub-index-section__header,
+    .hub-index-page .hub-dash-card > .hub-dash-head,
+    .hub-index-page .hub-dash-card > .hub-index-card__header {
+        box-sizing: border-box;
+        height: 3.125rem;
+        min-height: 0;
+        overflow: hidden;
+    }
+
+    .hub-index-page .hub-dash-card > .hub-index-section__header h2 {
+        line-height: 1.2;
+    }
+
+    .hub-index-page .hub-index-section__toggle {
+        display: grid;
+        place-items: center;
+        width: 2rem;
+        height: 2rem;
+        padding: 0;
+        flex: 0 0 auto;
+    }
+
+    .hub-index-page .hub-index-money__stripe .list-group-item {
+        padding: var(--space-085rem, 0.85rem) !important;
+    }
+
+    /* ---- One row style across the dashboard: square, no gaps, filling the card body ---- */
+    .hub-index-page .dashboard-next-fixture,
+    .hub-index-page .dashboard-attention__item,
+    .hub-index-page .hub-index-money__metrics .hub-metric-card,
+    .hub-index-page .hub-index-money__stripe .list-group-item,
+    .hub-index-page .hub-index-matchday__fixtures .list-group-item {
+        flex: 1 1 auto;
+        margin: 0 !important;
+        padding: var(--space-085rem, 0.85rem) !important;
+        border: 1px solid rgba(75, 8, 24, 0.12) !important;
+        border-radius: 0 !important;
+        background: linear-gradient(135deg, rgba(246, 236, 222, 0.78), rgba(255, 255, 255, 0.92)) !important;
+        box-shadow: none !important;
+        color: var(--hub-ink, #1f1a1d);
+        text-decoration: none;
+    }
+
+    /* Rows share a single border line instead of stacking two. */
+    .hub-index-page .dashboard-next-fixture + .dashboard-next-fixture,
+    .hub-index-page .dashboard-attention__item + .dashboard-attention__item,
+    .hub-index-page .hub-index-money__metrics .hub-metric-card + .hub-metric-card,
+    .hub-index-page .hub-index-money__stripe .list-group-item + .list-group-item,
+    .hub-index-page .hub-index-matchday__fixtures .list-group-item + .list-group-item {
+        margin-top: -1px !important;
+    }
+
+    .hub-index-page .dashboard-next-fixture:hover,
+    .hub-index-page .dashboard-next-fixture:focus-visible,
+    .hub-index-page .dashboard-attention__item:hover,
+    .hub-index-page .dashboard-attention__item:focus-visible,
+    .hub-index-page .hub-index-money__metrics a.hub-metric-card:hover,
+    .hub-index-page .hub-index-money__metrics a.hub-metric-card:focus-visible,
+    .hub-index-page .hub-index-money__stripe .list-group-item-action:hover,
+    .hub-index-page .hub-index-money__stripe .list-group-item-action:focus-visible,
+    .hub-index-page .hub-index-matchday__fixtures .list-group-item-action:hover,
+    .hub-index-page .hub-index-matchday__fixtures .list-group-item-action:focus-visible {
+        background: #fff !important;
+        border-color: rgba(106, 32, 54, 0.32) !important;
+        color: var(--brand-primary);
+    }
+
+    /* Card bodies that hold rows drop their padding and stretch, so the rows reach every edge. */
+    .hub-index-page .hub-dash-card__body:has(> .dashboard-next-fixture),
+    .hub-index-page .hub-dash-card__body:has(> .dashboard-attention__list),
+    .hub-index-page .hub-dash-card__body:has(> .hub-metric-grid) {
+        display: flex;
+        flex-direction: column;
+        padding: 0;
+    }
+
+    .hub-index-page .dashboard-attention__list,
+    .hub-index-page .hub-index-money__metrics .hub-metric-grid,
+    .hub-index-page .hub-index-money__stripe .list-group,
+    .hub-index-page .hub-index-matchday__fixtures .list-group {
+        display: flex;
+        flex: 1 1 auto;
+        flex-direction: column;
+        gap: 0;
+        margin: 0;
+        padding: 0;
+    }
+
+    .hub-index-page .hub-index-money__stripe > .card-body,
+    .hub-index-page .hub-index-matchday__fixtures > .card-body {
+        display: flex;
+        flex: 1 1 auto;
+        flex-direction: column;
+        padding: 0 !important;
+    }
+
+    /* Club birthdays: tiles share the full width of the card body, with the narrow chevron tile at the end. */
+    .hub-index-page .dashboard-birthdays > .card-body {
+        padding: 0 !important;
+    }
+
+    .hub-index-page .dashboard-birthdays__list {
+        gap: 0;
+        width: 100%;
+    }
+
+    .hub-index-page .dashboard-birthdays__list > .dashboard-birthdays__item:not(.dashboard-birthdays__item--all) {
+        flex: 1 1 0;
+        min-width: 0;
+        border: 1px solid rgba(75, 8, 24, 0.12);
+        border-radius: 0;
+        background: linear-gradient(135deg, rgba(246, 236, 222, 0.78), rgba(255, 255, 255, 0.92));
+        padding: var(--space-085rem, 0.85rem);
+    }
+
+    .hub-index-page .dashboard-birthdays__list > .dashboard-birthdays__item:not(.dashboard-birthdays__item--all) + .dashboard-birthdays__item {
+        margin-left: -1px;
+    }
+
+    .hub-index-page .dashboard-birthdays__list > .dashboard-birthdays__item--all {
+        border-radius: 0 !important;
+        margin-left: -1px;
+    }
+
+    /* Birthday tiles hover the same way as the Recent payments rows. */
+    .hub-index-page .dashboard-birthdays__list > .dashboard-birthdays__item:not(.dashboard-birthdays__item--all):hover,
+    .hub-index-page .dashboard-birthdays__list > .dashboard-birthdays__item:not(.dashboard-birthdays__item--all):focus-visible {
+        background: #fff;
+        border-color: rgba(106, 32, 54, 0.32);
+        color: var(--brand-primary);
+    }
+
+    /* Square corners on every dashboard card, so the rows and the yellow chevron tile are not clipped at a rounded corner. */
+    .hub-index-page .hub-dash-card {
+        border-radius: 0 !important;
+    }
+
+    /* League position: three bands (position, played/points/GD, results) that fill the card body, styled as the other rows. */
+    .hub-index-page .hub-index-matchday__league > .card-body:has(.hub-index__band) {
+        display: flex;
+        flex: 1 1 auto;
+        flex-direction: column;
+        padding: 0 !important;
+    }
+
+    .hub-index-page .hub-index__band {
+        display: grid;
+        flex: 1 1 auto;
+        gap: 0;
+        margin: 0;
+    }
+
+    .hub-index-page .hub-index__band--3 {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .hub-index-page .hub-index__band--4 {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .hub-index-page .hub-index__league-card,
+    .hub-index-page .hub-index__band > .hub-index__fact {
+        display: flex;
+        align-items: center;
+        gap: var(--space-085rem, 0.85rem);
+        margin: 0;
+        padding: var(--space-085rem, 0.85rem);
+        border: 1px solid rgba(75, 8, 24, 0.12);
+        border-radius: 0;
+        background: linear-gradient(135deg, rgba(246, 236, 222, 0.78), rgba(255, 255, 255, 0.92));
+        box-shadow: none;
+        color: var(--hub-ink, #1f1a1d);
+        min-width: 0;
+    }
+
+    .hub-index-page .hub-index__league-card {
+        justify-content: flex-start;
+    }
+
+    .hub-index-page .hub-index__band > .hub-index__fact {
+        display: grid;
+        justify-items: center;
+        align-content: center;
+        text-align: center;
+    }
+
+    .hub-index-page .hub-index__band > * + * {
+        margin-left: -1px;
+    }
+
+    .hub-index-page .hub-index__band + .hub-index__band,
+    .hub-index-page .hub-index__league-card + .hub-index__band {
+        margin-top: -1px;
+    }
+
+    /* League tiles take their colour from the site's metric tones: a coloured edge and icon chip, on white. */
+    .hub-index-page .hub-index__band > .hub-index__fact {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        column-gap: 0.75rem;
+        row-gap: 0.1rem;
+        align-items: center;
+        justify-items: start;
+        align-content: center;
+        text-align: left;
+        background: #fff;
+        border-left: 3px solid var(--tone, var(--brand-primary));
+        padding: 0.8rem 0.9rem;
+    }
+
+    .hub-index-page .hub-index__fact-icon {
+        display: grid;
+        grid-row: 1 / span 2;
+        place-items: center;
+        width: 2.4rem;
+        height: 2.4rem;
+        border-radius: var(--radius-072rem, 0.72rem);
+        background: var(--tone-bg);
+        color: var(--tone);
+        font-size: var(--fs-088, 0.88rem);
+    }
+
+    .hub-index-page .hub-index__band > .hub-index__fact > .hub-index__fact-label {
+        grid-column: 2;
+        color: var(--hub-muted, #675f62);
+        font-size: var(--fs-062, 0.62rem);
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+
+    .hub-index-page .hub-index__band > .hub-index__fact > .hub-index__fact-value {
+        grid-column: 2;
+        color: var(--hub-ink, #1f1a1d);
+        font-size: 1.35rem;
+        font-weight: 800;
+        line-height: 1.1;
+    }
+
+    .hub-index-page .hub-index__fact--primary { --tone: #6a2036; --tone-bg: rgba(106, 32, 54, 0.11); }
+    .hub-index-page .hub-index__fact--success { --tone: #187e5b; --tone-bg: rgba(24, 126, 91, 0.12); }
+    .hub-index-page .hub-index__fact--warning { --tone: #8a6100; --tone-bg: rgba(183, 126, 0, 0.14); }
+    .hub-index-page .hub-index__fact--danger  { --tone: #a3313c; --tone-bg: rgba(176, 48, 62, 0.11); }
+    .hub-index-page .hub-index__fact--info    { --tone: #276884; --tone-bg: rgba(39, 104, 132, 0.12); }
+    .hub-index-page .hub-index__fact--neutral { --tone: #625956; --tone-bg: rgba(84, 75, 72, 0.1); }
+
+    /* League tiles sit in the same quiet row style as the rest of the dashboard. */
+    .hub-index-page .hub-index__band > .hub-index__fact {
+        background: linear-gradient(135deg, rgba(246, 236, 222, 0.78), rgba(255, 255, 255, 0.92));
+        border-left: 1px solid rgba(75, 8, 24, 0.12);
+    }
+
+    .hub-index-page .hub-index__fact-icon {
+        width: 2rem;
+        height: 2rem;
+        background: rgba(106, 32, 54, 0.08);
+        color: var(--brand-primary);
+        font-size: 0.8rem;
+    }
+
+    .hub-index-page .hub-index__band > .hub-index__fact > .hub-index__fact-value {
+        font-size: 1.4rem;
+    }
+
+    .hub-index-page .hub-index__band > .hub-index__fact {
+        padding: 0.6rem 0.9rem;
+    }
+
+    .hub-index-page .hub-index__fact-icon {
+        width: 2.4rem;
+        height: 2.4rem;
+        font-size: 0.95rem;
+    }
+
+    /* Each band of four becomes two columns, so the eight tiles fill the card body in four rows. */
+    .hub-index-page .hub-index-matchday__league .hub-index__band--4 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-auto-rows: 1fr;
+    }
+
+    .hub-index-page .hub-index-matchday__league .hub-index__band--4 > .hub-index__fact {
+        margin: 0;
+    }
+
+    .hub-index-page .hub-index-matchday__league .hub-index__band--4 > .hub-index__fact:nth-child(even) {
+        margin-left: -1px;
+    }
+
+    .hub-index-page .hub-index-matchday__league .hub-index__band--4 > .hub-index__fact:nth-child(n+3) {
+        margin-top: -1px;
+    }
+
+    /* Breathing room under the last card, so the page does not end abruptly. */
+    .hub-index-page {
+        padding-bottom: 2.5rem;
+    }
+
+    /* One card surface across the dashboard, including the payments card. */
+    .hub-index-page .hub-dash-card {
+        background: rgba(255, 253, 249, 0.98) !important;
     }
 
     .dashboard-birthdays__item {
@@ -500,6 +1059,37 @@
 
     .dashboard-birthdays__info small {
         color: var(--hub-muted, #675f62);
+    }
+
+    /* "View all" is a list row like the birthdays, with a yellow icon chip on the right. */
+    .dashboard-birthdays__item--all {
+        grid-template-columns: minmax(0, 1fr) auto;
+        color: var(--brand-primary);
+        font-weight: 700;
+    }
+
+    .dashboard-birthdays__item--all {
+        grid-template-columns: 1fr;
+        justify-items: center;
+        align-items: center;
+        justify-self: start;
+        width: 3.4rem;
+        padding: 0.65rem 0;
+        border-color: var(--brand-warning-hover);
+        background: var(--brand-warning);
+        color: var(--brand-primary);
+    }
+
+    .dashboard-birthdays__item--all:hover,
+    .dashboard-birthdays__item--all:focus-visible {
+        border-color: var(--brand-primary);
+        background: var(--brand-warning-hover);
+    }
+
+    .dashboard-birthdays__all-icon {
+        display: grid;
+        font-size: 1.25rem;
+        line-height: 1;
     }
 
     /* Chart.js sizes the canvas to its positioned wrapper. */

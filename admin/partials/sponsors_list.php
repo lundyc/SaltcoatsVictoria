@@ -14,7 +14,7 @@ function sponsorListFacebook(array $s, bool $locked, bool $mobile = false): void
 ?>
 <div id="sponsorsListNotice" class="alert" role="status" hidden></div>
 <div id="sponsorsListEmpty" class="alert alert-info" <?= $visibleSponsors ? 'hidden' : '' ?>>No sponsors match the current filters.</div>
-<div class="d-xl-none d-flex flex-column gap-2 mb-3">
+<div class="d-xl-none d-flex flex-column gap-2 mb-3 sponsors-mobile-list" data-list-limit="20" data-list-items=".sponsor-list-record" data-list-max-width="1199.98">
 <?php foreach ($visibleSponsors as $s): ?>
   <?php $state = sponsorPaymentState($s); $outstanding = max(0, (float)$s['total_amount'] - (float)$s['total_paid']); ?>
   <article class="sponsors-mobile-card hub-record-card sponsor-list-record" data-list-sponsor="<?= (int)$s['id'] ?>" data-sponsor-href="/admin/sponsor.php?id=<?= (int)$s['id'] ?>" tabindex="0" aria-label="View <?= h($s['name']) ?>">

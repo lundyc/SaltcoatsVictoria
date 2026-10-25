@@ -16,6 +16,7 @@ foreach ($albums as $a) {
     $byYear[$year][] = $a;
 }
 ?>
+<?php seo_breadcrumbs([['Gallery', url('gallery')]]); ?>
 <?php partial('page_hero', [
     'eyebrow' => 'Media',
     'title'   => 'Photo gallery',
@@ -28,14 +29,14 @@ foreach ($albums as $a) {
       <div class="emptystate"><p>Photo albums are being prepared.</p></div>
     <?php else: ?>
       <?php foreach ($byYear as $year => $list): ?>
-        <h2 class="squad-heading"><?= e($year) ?></h2>
+        <h2 class="year-heading"><?= e($year) ?></h2>
         <div class="gallery-grid">
           <?php foreach ($list as $a): ?>
             <?php $count = (int) ($a['real_count'] ?: $a['photo_count']); ?>
             <a class="gcard" href="<?= e(url('gallery/' . $a['slug'])) ?>">
               <span class="gcard__media">
                 <?php if ($a['cover_path']): ?>
-                  <img src="<?= e(uploads($a['cover_path'])) ?>" alt="" loading="lazy">
+                  <img src="<?= e(uploads($a['cover_path'])) ?>" alt="<?= e((string) $a['title']) ?>" <?= (($gcN = ($gcN ?? 0) + 1) <= 2) ? ($gcN === 1 ? 'fetchpriority="high"' : '') : 'loading="lazy"' ?>>
                 <?php endif; ?>
                 <span class="gcard__count"><?= $count ?> photo<?= $count === 1 ? '' : 's' ?></span>
               </span>

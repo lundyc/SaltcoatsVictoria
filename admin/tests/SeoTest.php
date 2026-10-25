@@ -9,7 +9,7 @@ declare(strict_types=1);
 
 require_once dirname(__DIR__, 2) . '/lib/seo.php';
 
-$seoBase = rtrim((string) (getenv('SEO_TEST_BASE') ?: 'https://myclubhub.co.uk'), '/');
+$seoBase = rtrim((string) (getenv('SEO_TEST_BASE') ?: 'https://saltcoatsvictoria.co.uk'), '/');
 
 $seoFetch = static function (string $path) use ($seoBase): array {
     $ch = curl_init($seoBase . $path);
@@ -45,8 +45,14 @@ $harness->test('homepage: canonical, robots, title, JSON-LD', function () use ($
 $harness->test('robots.txt disallows private areas and lists the sitemap', function () use ($harness, $seoFetch): void {
     $r = $seoFetch('/robots.txt');
     $harness->assertSame(200, $r['status']);
-    foreach (['Disallow: /admin/', 'Disallow: /shop/checkout', 'Sitemap: '] as $needle) {
+    foreach (['Disallow: /admin/', 'Disallow: /shop/order/', 'Disallow: /season-tickets/checkout', 'Sitemap: '] as $needle) {
         $harness->assertTrue(str_contains($r['body'], $needle), "robots.txt contains $needle");
+    }
+    // Pages that rely on noindex (basket/checkout) and the public sales landing pages
+    // must stay crawlable: Google can only obey a noindex it may fetch, and a blocked
+    // URL is reported in Search Console as "Blocked by robots.txt".
+    foreach (['Disallow: /shop/basket', 'Disallow: /shop/checkout', 'Disallow: /season-tickets/' . "\n", 'Disallow: /playersponsors/' . "\n"] as $needle) {
+        $harness->assertTrue(!str_contains($r['body'], $needle), "robots.txt must not contain $needle");
     }
 });
 

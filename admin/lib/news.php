@@ -418,19 +418,50 @@ function news_purify(string $html): string
         // CSS is limited to a short, safe property list (align + colour). No
         // <figure>/loading — not in HTMLPurifier's default (XHTML 1.0) doctype.
         $config->set('HTML.Allowed',
-            'p[style|class],br,strong,em,u,s,span[style],blockquote[style],pre,code,hr,'
-            . 'h2[style],h3[style],h4[style],'
-            . 'ul,ol,li[style],'
-            . 'a[href|title|rel|target],'
+            'p[style|class],br,strong,em,u,s,sub,sup,mark[class|style],span[style|class],'
+            . 'blockquote[style|class|cite],cite,pre[class|style],code,kbd,hr[class|style],'
+            . 'h1[style|class],h2[style|class],h3[style|class],h4[style|class],h5[style|class],h6[style|class],'
+            . 'ul[class|style],ol[class|style|start],li[style|class],'
+            . 'div[class|style],figure[class|style],figcaption[class],details[open|class|style],summary,'
+            . 'a[href|title|rel|target|class],'
             . 'img[src|alt|title|width|height|style|class],'
-            . 'table,thead,tbody,tr,th[style|colspan|rowspan],td[style|colspan|rowspan]');
+            . 'table[class|style],thead,tbody,tfoot,caption,tr[class|style],th[class|style|colspan|rowspan|scope],td[class|style|colspan|rowspan]');
+        // Inline CSS the block editor emits (alignment, colour, spacing, sizes).
         $config->set('CSS.AllowedProperties', [
-            'text-align', 'color', 'background-color',
-            'float', 'margin-left', 'margin-right', 'width', 'height',
+            'text-align', 'color', 'background-color', 'float',
+            'margin', 'margin-top', 'margin-bottom', 'margin-left', 'margin-right',
+            'padding', 'padding-top', 'padding-bottom', 'padding-left', 'padding-right',
+            'width', 'height',
+            'font-size', 'font-weight', 'font-style', 'line-height', 'letter-spacing', 'text-decoration', 'text-transform',
+            'border', 'border-top', 'border-bottom', 'border-left', 'border-right',
+            'border-color', 'border-style', 'border-width',
         ]);
+        $config->set('Attr.EnableID', false);
+        $config->set('HTML.DefinitionID', 'news-blocks');
+        $config->set('HTML.DefinitionRev', 2);
         $config->set('HTML.TargetBlank', true);
         $config->set('Attr.AllowedRel', ['noopener', 'noreferrer', 'nofollow']);
         $config->set('AutoFormat.RemoveEmpty', true);
+        // Keep empty classed <div>s (e.g. the Spacer block), but not empty paragraphs etc.
+        $config->set('AutoFormat.RemoveEmpty.Predicate', ['colgroup' => [], 'th' => [], 'td' => [], 'div' => ['class']]);
+        // Editor blocks: <details>/<summary> aren't in HTMLPurifier's XHTML 1.0 doctype.
+        if ($def = $config->maybeGetRawHTMLDefinition()) {
+            $def->addElement('details', 'Block', 'Flow', 'Common', ['open' => 'Bool#open']);
+            $def->addElement('summary', 'Block', 'Inline', 'Common');
+            $def->addElement('figure', 'Block', 'Flow', 'Common');
+            $def->addElement('figcaption', 'Inline', 'Flow', 'Common');
+            $def->addElement('mark', 'Inline', 'Inline', 'Common');
+        }
+        if ($css = $config->getCSSDefinition()) {
+            $len = new HTMLPurifier_AttrDef_CSS_Composite([new HTMLPurifier_AttrDef_CSS_Length(), new HTMLPurifier_AttrDef_CSS_Percentage()]);
+            $css->info['flex-basis'] = $len;
+            $css->info['gap'] = new HTMLPurifier_AttrDef_CSS_Length();
+            $css->info['aspect-ratio'] = new HTMLPurifier_AttrDef_Enum(['1', '1/1', '16/9', '4/3', '3/2', '9/16', '3/4', '2/3', '21/9', 'auto', '1 / 1', '16 / 9', '4 / 3', '3 / 2', '9 / 16', '3 / 4', '2 / 3', '21 / 9']);
+            $css->info['object-fit'] = new HTMLPurifier_AttrDef_Enum(['cover', 'contain', 'fill', 'none', 'scale-down']);
+            $css->info['min-height'] = $len;
+            $css->info['max-width'] = $len;
+            $css->info['border-radius'] = new HTMLPurifier_AttrDef_CSS_Multiple($len);
+        }
         $purifier = new HTMLPurifier($config);
     }
     return $purifier->purify($html);

@@ -152,6 +152,7 @@ set_meta([
         . '. End-of-season player award winners.',
 ]);
 ?>
+<?php seo_breadcrumbs([['Club', url('club/history')], ['Honours & awards', url('club/honours')]]); ?>
 <?php partial('page_hero', [
     'eyebrow' => 'The club',
     'title'   => 'Honours & awards',

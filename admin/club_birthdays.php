@@ -59,6 +59,33 @@ foreach ($allRows as $row) {
     $groups[birthdayGroup($row)][] = $row;
 }
 ?>
+<style>
+@media (max-width: 767.98px) {
+    .birthdays-table, .birthdays-table tbody { display: block; width: 100%; }
+    .table-responsive:has(.birthdays-table) { overflow: visible; }
+    .birthdays-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+    .birthdays-table tbody tr { display: grid; grid-template-columns: 1fr 1fr; gap: .45rem .75rem; margin-bottom: .7rem; padding: .8rem .9rem; border: 1px solid rgba(75, 8, 24, .12); border-radius: .75rem; background: #fff; }
+    .birthdays-table tbody tr.table-danger { background: #f8d7da; }
+    .birthdays-table tbody tr.table-warning { background: #fff3cd; }
+    .birthdays-table tbody tr.table-success { background: #d1e7dd; }
+    .birthdays-table tbody td { display: block; padding: 0; border: 0; background: transparent; box-shadow: none; text-align: left !important; }
+    .birthdays-table tbody td:nth-child(2) { grid-column: 1; grid-row: 1; font-size: 1.05rem; }
+    .birthdays-table tbody td:nth-child(1) { grid-column: 2; grid-row: 1; justify-self: end; }
+    .birthdays-table tbody td:nth-child(1)::before { content: "Verified "; font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: rgba(31, 26, 29, .6); margin-right: .35rem; }
+    .birthdays-table tbody td:nth-child(1) .form-check-input { width: 1.5rem; height: 1.5rem; vertical-align: middle; }
+    .birthdays-table tbody td:nth-child(3) { grid-column: 1 / -1; grid-row: 2; color: rgba(31, 26, 29, .7); margin-top: -.25rem; }
+    .birthdays-table tbody td:nth-child(n+4) { padding-top: .45rem; border-top: 1px solid rgba(75, 8, 24, .08); }
+    .birthdays-table tbody td:nth-child(n+4)::before { display: block; font-size: .66rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: rgba(31, 26, 29, .55); }
+    .birthdays-table tbody td:nth-child(4)::before { content: "Date of birth"; }
+    .birthdays-table tbody td:nth-child(5)::before { content: "Current age"; }
+    .birthdays-table tbody td:nth-child(6)::before { content: "Next birthday"; }
+    .birthdays-table tbody td:nth-child(7)::before { content: "Days until"; }
+    .birthdays-table tbody td:nth-child(4) { grid-column: 1; grid-row: 3; }
+    .birthdays-table tbody td:nth-child(5) { grid-column: 2; grid-row: 3; }
+    .birthdays-table tbody td:nth-child(6) { grid-column: 1; grid-row: 4; }
+    .birthdays-table tbody td:nth-child(7) { grid-column: 2; grid-row: 4; }
+}
+</style>
 <div>
     <div class="mb-3"><a href="/admin/index.php"><i class="fa-solid fa-arrow-left me-1" aria-hidden="true"></i>Back to dashboard</a></div>
     <div class="card shadow-sm border-0 hub-panel">

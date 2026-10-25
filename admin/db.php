@@ -43,7 +43,8 @@ function hub_connect_pdo(): array
     http_response_code(500);
     echo "<div style='padding:1rem;font-family:system-ui'>";
     echo "<h2>Database Connection Failed</h2>";
-    echo "<pre>" . htmlspecialchars($lastError?->getMessage() ?? 'Unknown database error', ENT_QUOTES, 'UTF-8') . "</pre>";
+    error_log("Database connection unavailable");
+    echo "<p>The service is temporarily unavailable. Please try again later.</p>";
     echo "</div>";
     exit;
 }

@@ -128,3 +128,32 @@ function season_ticket_stripe_handle_checkout_expired(PDO $pdo, array $session):
         }
     }
 }
+
+/**
+ * Refund a season-ticket payment to its original Stripe payment method.
+ * The caller records the successful provider refund in the commerce tables.
+ *
+ * @return array<string, mixed>
+ */
+function season_ticket_stripe_refund_order(PDO $pdo, array $order, float $amount, string $idempotencyKey): array
+{
+    if ((string) ($order['provider'] ?? '') !== 'stripe') {
+        throw new RuntimeException('This payment was not taken through Stripe and cannot be refunded automatically.');
+    }
+    $paymentIntentId = trim((string) ($order['provider_payment_id'] ?? ''));
+    if ($paymentIntentId === '') {
+        throw new RuntimeException('The Stripe payment reference is missing. No refund was attempted.');
+    }
+    if ($amount <= 0) {
+        throw new RuntimeException('Enter a refund amount greater than zero.');
+    }
+    if (!preg_match('/^[a-zA-Z0-9_-]{16,100}$/', $idempotencyKey)) {
+        throw new RuntimeException('The refund request could not be verified. Reload the page and try again.');
+    }
+
+    return stripe_request('POST', '/refunds', [
+        'payment_intent' => $paymentIntentId,
+        'amount' => stripe_amount_to_minor_units($amount, (string) ($order['payment_currency'] ?? $order['currency'] ?? 'GBP')),
+        '_idempotency_key' => 'season-order-' . (int) $order['id'] . '-' . $idempotencyKey,
+    ]);
+}

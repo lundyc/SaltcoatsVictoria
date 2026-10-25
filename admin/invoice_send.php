@@ -46,24 +46,12 @@ if (!invoices_has_source_access($pdo, $invoice)) {
 }
 
 try {
-    $items = invoices_get_items($pdo, $invoiceId);
-    $pdfBytes = invoice_pdf_render($pdo, $invoice, $items, false, true);
-
-    $subject = 'Invoice ' . (string) $invoice['invoice_number'];
-    $body = '<p>Please find attached invoice <strong>' . h((string) $invoice['invoice_number']) . '</strong>'
-        . ' for ' . h(gbp((float) $invoice['total'])) . '.</p>';
-
-    $sent = hub_send_mail_with_attachment($email, $subject, $body, [
-        'filename' => (string) $invoice['invoice_number'] . '.pdf',
-        'content' => $pdfBytes,
-        'mime' => 'application/pdf',
-    ]);
+    $sent = invoices_email_pdf($pdo, $invoice, $email);
 
     if (!$sent) {
         invoice_send_fail('Could not send the email. Check the address and mail settings.', 500);
     }
 
-    invoices_mark_sent($pdo, $invoiceId, $email);
     auditLog($pdo, 'invoice_emailed', 'Invoice ' . (string) $invoice['invoice_number'] . ' emailed to ' . $email);
 
     echo json_encode(['ok' => true]);

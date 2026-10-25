@@ -20,6 +20,7 @@ $route = current_route();
 $label = $labels[$route] ?? $labels[explode('/', $route)[0]] ?? 'Coming soon';
 set_meta(['title' => $label]);
 ?>
+<?php seo_breadcrumbs([[$label, url((string) $route)]]); ?>
 <?php partial('page_hero', [
     'eyebrow' => 'Coming soon',
     'title'   => $label,

@@ -27,6 +27,7 @@ function public_routes(): array
         'results'     => 'results',
         'table'       => 'table',
         'table/pdf'   => 'table_pdf',
+        'stats'       => 'stats',
         'match/{id}'  => 'match',
 
         // Club shop — presentation ported into the site design; all cart /
@@ -34,12 +35,39 @@ function public_routes(): array
         'shop'                  => 'shop_index',
         'shop/basket'           => 'shop_basket',
         'shop/checkout'         => 'shop_checkout',
+        'shop/shipping-quote'   => 'shop_shipping_quote',
         'shop/order/{token}'    => 'shop_order',
         'shop/p/{slug}'         => 'shop_product',
+
+        // Season tickets — step 1 (basket); checkout is still served by the Hub.
+        'commercial'              => 'commercial',
+        'sponsorship/thankyou/{checkout}' => 'sponsorship_thankyou',
+        'matchday-sponsorship'    => 'matchday_sponsorship',
+        'matchday-sponsorship/checkout' => 'matchday_sponsorship_checkout',
+        'matchday-sponsorship/thankyou' => 'matchday_sponsorship_thankyou',
+        'matchday-sponsorship/pay' => 'matchday_sponsorship_pay',
+        'hospitality'             => 'hospitality',
+        'hospitality/book'        => 'hospitality_book',
+        'hospitality/booking/{token}' => 'hospitality_booking',
+        'lottery'                 => 'lottery',
+        'pitchside-boards'        => 'pitchside_boards',
+        'season-tickets'          => 'season_tickets',
+        'season-tickets/checkout' => 'season_tickets_checkout',
+
+        // Player kit sponsorship shop.
+        'playersponsors'          => 'playersponsors',
+        'playersponsors/checkout' => 'playersponsors_checkout',
+        'playersponsors/thankyou' => 'playersponsors_thankyou',
+        'playersponsors/pay' => 'playersponsors_pay',
 
         // Match tickets — reuses lib/match_tickets.php (guest checkout).
         'tickets'               => 'tickets',
         'tickets/order/{token}' => 'ticket_order',
+
+        // Events (non-match ticketed occasions) — reuses admin/lib/events*.php. The order route must come first.
+        'events'                => 'events',
+        'events/order/{token}'  => 'event_order',
+        'events/{slug}'         => 'event',
 
         'team'        => 'team',
         'team/{slug}' => 'player',
@@ -54,11 +82,14 @@ function public_routes(): array
         'club/honours'         => 'honours',
         'club/player-awards'   => 'player_awards',
         'club/policies'        => 'policies',
+        'club/vacancies'       => 'vacancies',
         'club/results/{slug}'  => 'history_match',
         'club/results'         => 'history_results',
         'club/records'         => 'history_records',
+        'club/{group}/{slug}'  => 'club_page',
         'club/{slug}'          => 'club_page',
         'contact'     => 'contact',
+        'enquire/{dept}' => 'enquire',
         'privacy'     => 'privacy',
 
         'partners'    => 'partners',

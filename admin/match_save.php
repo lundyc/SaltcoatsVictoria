@@ -217,16 +217,37 @@ try {
                     recalculateMatchFixtureSponsorshipAmounts($pdo, $fixtureId);
           }
 
+          // COMET match address (used by Match report import > Fetch). Only touched when the field was on the form.
+          if ($fixtureId > 0 && array_key_exists('comet_url', $_POST)) {
+                    $cometRaw = trim((string)$_POST['comet_url']);
+                    if ($cometRaw === '') {
+                              $pdo->prepare('DELETE FROM fixture_comet_links WHERE fixture_id = ?')->execute([$fixtureId]);
+                    } else {
+                              if (preg_match('~^https://(?:www\.)?scottishfacomet\.co\.uk/mycomet/private/match/(\d{5,12})(?:[/?#].*)?$~i', $cometRaw, $cm)) { $cometMatchId = (int)$cm[1]; }
+                              elseif (preg_match('/^\d{5,12}$/', $cometRaw)) { $cometMatchId = (int)$cometRaw; }
+                              else { throw new InvalidArgumentException('The COMET match address should look like https://www.scottishfacomet.co.uk/mycomet/private/match/54097581'); }
+                              $dup = $pdo->prepare('SELECT fixture_id FROM fixture_comet_links WHERE comet_match_id = ? AND fixture_id <> ?');
+                              $dup->execute([$cometMatchId, $fixtureId]);
+                              if ($other = $dup->fetchColumn()) { throw new InvalidArgumentException("That COMET match is already linked to another fixture (#$other)."); }
+                              $pdo->prepare('INSERT INTO fixture_comet_links (fixture_id, comet_match_id, url) VALUES (?,?,?) ON DUPLICATE KEY UPDATE url = VALUES(url), last_fetched_at = IF(comet_match_id = VALUES(comet_match_id), last_fetched_at, NULL), comet_match_id = VALUES(comet_match_id)')
+                                        ->execute([$fixtureId, $cometMatchId, 'https://www.scottishfacomet.co.uk/mycomet/private/match/' . $cometMatchId]);
+                    }
+          }
+
           $pdo->commit();
 
           auditLog($pdo, $existingFixture ? 'match_updated' : 'match_created', ($existingFixture ? 'Updated' : 'Created') . ' fixture vs ' . $opponent . ' on ' . $matchDate);
 
           $savedFixture = getMatchFixtureById($pdo, $fixtureId);
+          $gcalFailed = '';
           if ($savedFixture) {
-                    match_google_calendar_sync_fixture($pdo, $savedFixture, 'upsert');
+                    $gcal = match_google_calendar_sync_fixture($pdo, $savedFixture, 'upsert');
+                    if (!($gcal['ok'] ?? false)) {
+                              $gcalFailed = '&gcal_failed=1';
+                    }
           }
 
-          header('Location: match.php?id=' . $fixtureId . '&season_id=' . $seasonId . '&saved=1');
+          header('Location: match.php?id=' . $fixtureId . '&season_id=' . $seasonId . '&saved=1' . $gcalFailed);
           exit;
 } catch (Throwable $e) {
           if ($pdo->inTransaction()) {

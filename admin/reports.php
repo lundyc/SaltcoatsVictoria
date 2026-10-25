@@ -2787,7 +2787,7 @@ $primaryPairwiseForChart = $seasonComparePairwise[0] ?? null;
 $chartRenewedCount = $primaryPairwiseForChart ? (int)$primaryPairwiseForChart['Renewed Holders'] : 0;
 $chartLapsedCount = $primaryPairwiseForChart ? (int)$primaryPairwiseForChart['Lapsed From Previous'] : 0;
 ?>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
+<script src="/admin/assets/vendor/chartjs/chart.umd.min.js"></script>
 <script>
 (function () {
     var brandFont = getComputedStyle(document.body).fontFamily;

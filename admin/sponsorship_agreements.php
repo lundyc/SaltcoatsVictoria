@@ -35,7 +35,7 @@ $formatUkDate=function(?string $value,string $fallback): string {
  <div><h2>Agreement directory</h2><p>Filter contracts by sponsor, package, season or status.</p></div>
  <div class="hub-local-actions"><a class="btn btn-outline-secondary btn-sm" href="sponsorship_packages.php">Packages</a><a class="btn btn-brand btn-sm" href="sponsorship_agreement.php?action=new"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Add agreement</a></div>
 </div>
-<form class="card hub-list-card hub-form-card mb-4" method="get" aria-label="Filter sponsorship agreements"><div class="card-body"><div class="row g-2">
+<form class="card hub-list-card hub-form-card mb-4" method="get" aria-label="Filter sponsorship agreements" data-filter-collapse><div class="card-body"><div class="row g-2">
  <div class="col-md-3"><label class="form-label" for="agreementStatus">Status</label><select class="form-select" id="agreementStatus" name="status"><option value="">All statuses</option><?php foreach(['active'=>'Active','scheduled'=>'Scheduled','expired'=>'Expired','cancelled'=>'Cancelled'] as $v=>$l): ?><option value="<?= $v ?>" <?= $filters['status']===$v?'selected':'' ?>><?= $l ?></option><?php endforeach; ?></select></div>
  <div class="col-md-3"><label class="form-label" for="agreementSponsor">Sponsor</label><select class="form-select" id="agreementSponsor" name="sponsor_id"><option value="">All sponsors</option><?php foreach($sponsors as $s): ?><option value="<?= (int)$s['id'] ?>" <?= $filters['sponsor_id']==(int)$s['id']?'selected':'' ?>><?= h((string)$s['name']) ?></option><?php endforeach; ?></select></div>
  <div class="col-md-3"><label class="form-label" for="agreementPackage">Package</label><select class="form-select" id="agreementPackage" name="package_id"><option value="">All packages</option><?php foreach($packages as $p): ?><option value="<?= (int)$p['id'] ?>" <?= $filters['package_id']==(int)$p['id']?'selected':'' ?>><?= h((string)$p['name']) ?></option><?php endforeach; ?></select></div>
@@ -53,7 +53,7 @@ $formatUkDate=function(?string $value,string $fallback): string {
   </div>
  </div>
 </div>
-<div class="card hub-list-card hub-table-card"><div class="card-body p-0"><div class="table-responsive"><table class="table align-middle hub-data-table hub-data-table--responsive"><caption class="visually-hidden">Filtered sponsorship agreements</caption>
+<div class="card hub-list-card hub-table-card" data-list-limit="20" data-list-items="tbody tr" data-list-max-width="991.98" data-list-search="Search sponsor, package or fixture"><div class="card-body p-0"><div class="table-responsive"><table class="table align-middle hub-data-table hub-data-table--responsive agreements-table"><caption class="visually-hidden">Filtered sponsorship agreements</caption>
  <thead><tr><th style="width:36px"><input type="checkbox" class="form-check-input" id="bulkSelectAllHeader" aria-label="Select all"></th><th>Sponsor</th><th>Package</th><th>Applies to</th><th>Dates</th><th>Value</th><th>Status</th><th></th></tr></thead><tbody>
  <?php foreach($agreements as $a): ?><?php $target=$a['season_name']?:'Club-wide'; if($a['fixture_id'])$target='Fixture #'.$a['fixture_id'].' · '.($a['fixture_opponent']??''); elseif($a['player_id'])$target=$a['player_name']??'Player'; ?>
  <tr><td><input type="checkbox" class="form-check-input agreement-bulk-checkbox" name="agreement_ids[]" value="<?= (int)$a['id'] ?>" aria-label="Select agreement #<?= (int)$a['id'] ?>"></td><td data-label="Sponsor" class="fw-semibold"><a href="sponsor.php?id=<?= (int)$a['sponsor_id'] ?>"><?= h((string)$a['sponsor_name']) ?></a></td><td data-label="Package"><div><?= h((string)$a['package_name']) ?></div><span class="badge text-bg-light"><?= h((string)$a['package_category']) ?></span></td><td data-label="Applies to"><?= h((string)$target) ?></td><td data-label="Dates" class="text-nowrap"><?= h($formatUkDate($a['start_date']??null,'Open')) ?> → <?= h($formatUkDate($a['end_date']??null,'Ongoing')) ?></td><td data-label="Value"><?php if(!empty($a['is_complimentary'])): ?><span class="badge hub-status text-bg-info">Complimentary</span><?php else: ?><?= gbp((float)$a['agreed_amount']) ?><div class="small text-muted"><?= gbp((float)$a['total_paid']) ?> paid</div><?php endif; ?></td><td data-label="Status"><span class="badge hub-status <?= $a['effective_status']==='active'?'text-bg-success':($a['effective_status']==='scheduled'?'text-bg-info':'text-bg-secondary') ?>"><?= h(ucfirst((string)$a['effective_status'])) ?></span></td><td data-label="Actions" class="text-end"><div class="hub-actions hub-actions--end"><a class="btn btn-sm btn-outline-primary" href="sponsorship_agreement.php?id=<?= (int)$a['id'] ?>">Manage</a></div></td></tr>
@@ -72,8 +72,10 @@ $formatUkDate=function(?string $value,string $fallback): string {
   cancelBtn.disabled=n===0;
   deleteBtn.disabled=n===0;
  };
- headerBox?.addEventListener('change',()=>{boxes().forEach(b=>b.checked=headerBox.checked);sync();});
+ headerBox?.addEventListener('change',()=>{boxes().forEach(b=>{const row=b.closest('tr');b.checked=headerBox.checked&&!(row&&row.hidden);});sync();});
+ document.addEventListener('hub-list-change',()=>{if(headerBox)headerBox.checked=false;});
  boxes().forEach(b=>b.addEventListener('change',sync));
  sync();
 })();</script>
+<script src="/admin/assets/js/hub_list_tools.js?v=<?= (int)@filemtime(__DIR__.'/assets/js/hub_list_tools.js') ?>" defer></script>
 <?php require_once __DIR__.'/footer.php'; ?>

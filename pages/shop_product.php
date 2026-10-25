@@ -31,7 +31,9 @@ if (!$product || (int) $product['is_active'] !== 1) {
 }
 
 $groups = shop_product_groups(db(), (int) $product['id'], true);
-$related = shop_related_products(db(), $product, 4);
+$related = shop_linked_products(db(), [(int) $product['id']], 'upsell', [(int) $product['id']], 4)
+    ?: shop_related_products(db(), $product, 4);
+$availability = shop_product_availability($product);
 $gallery = shop_product_gallery(db(), $product);
 $close = shop_product_preorder_close(db(), $product);
 $closed = $close !== null && new DateTimeImmutable('now') > $close;
@@ -90,7 +92,7 @@ pub_jsonld([
         '@type' => 'Offer',
         'url' => seo_absolute(url('shop/p/' . $product['slug'])),
         'priceCurrency' => 'GBP',
-        'price' => number_format((float) $product['price'], 2, '.', ''),
+        'price' => number_format(shop_product_price($product), 2, '.', ''),
         'availability' => $orderable
             ? ((int) ($product['is_preorder'] ?? 0) === 1 ? 'https://schema.org/PreOrder' : 'https://schema.org/InStock')
             : 'https://schema.org/OutOfStock',
@@ -128,14 +130,19 @@ pub_jsonld([
       <div class="pdp__panel">
         <span class="pdp__cat"><?= e((string) $product['category_name']) ?></span>
         <h1><?= e((string) $product['name']) ?></h1>
-        <div class="pdp__price"><?= e(gbp((float) $product['price'])) ?></div>
+        <div class="pdp__price"><?php if (shop_product_on_sale($product)): ?><s class="prodcard__was"><?= e(gbp((float) $product['price'])) ?></s> <?php endif; ?><?= e(gbp(shop_product_price($product))) ?></div>
         <?php if (($product['summary'] ?? '') !== ''): ?><p class="pdp__summary"><?= e((string) $product['summary']) ?></p><?php endif; ?>
 
         <?php if ((int) $product['is_preorder'] === 1): ?>
           <div class="notice notice--warn">
-            <strong><?= $closed ? 'Pre-orders are now closed.' : 'This is a pre-order.' ?></strong>
-            <?= e((string) ($product['preorder_message'] ?: $settings['preorder_intro'] ?? '')) ?>
+            <strong><?= $closed ? 'Pre-orders are now closed.' : 'Available to pre-order.' ?></strong>
+            <?= e(shop_preorder_notice(db(), $product)) ?>
           </div>
+        <?php endif; ?>
+        <?php if ($availability === 'onbackorder'): ?>
+          <div class="notice notice--warn"><strong>On backorder.</strong> You can still order this item — it will be ready once new stock arrives.</div>
+        <?php elseif ($availability === 'outofstock'): ?>
+          <p class="pdp__note"><strong>Out of stock.</strong></p>
         <?php endif; ?>
         <?php if ($error !== ''): ?><div class="notice notice--err"><?= e($error) ?></div><?php endif; ?>
 
@@ -183,7 +190,7 @@ pub_jsonld([
               </div>
               <button type="submit" class="btn">Add to basket</button>
             </div>
-            <p class="pdp__note">Maximum <?= (int) $product['max_per_order'] ?> per order. Collection only from
+            <p class="pdp__note"><?= (int) $product['max_per_order'] === 1 ? 'Limited to 1 per order. ' : '' ?>Collection only from
               <?= e((string) ($settings['collection_point'] ?? 'Campbell Park')) ?> — no delivery.</p>
           </form>
         <?php endif; ?>
@@ -194,6 +201,23 @@ pub_jsonld([
       <div class="pdp__desc prose">
         <h2>Product details</h2>
         <?= nl2br(e((string) $product['description'])) ?>
+      </div>
+    <?php endif; ?>
+
+    <?php
+    $dims = array_filter([(float) ($product['length'] ?? 0), (float) ($product['width'] ?? 0), (float) ($product['height'] ?? 0)]);
+    $hasWeight = (float) ($product['weight'] ?? 0) > 0;
+    $fmtNum = static fn(float $n): string => rtrim(rtrim(number_format($n, 2, '.', ''), '0'), '.');
+    ?>
+    <?php if ($hasWeight || $dims || trim((string) ($product['sku'] ?? '')) !== '' || trim((string) ($product['gtin'] ?? '')) !== ''): ?>
+      <div class="pdp__desc prose">
+        <h2>Additional information</h2>
+        <table class="pdp__specs">
+          <?php if (trim((string) ($product['sku'] ?? '')) !== ''): ?><tr><th>SKU</th><td><?= e((string) $product['sku']) ?></td></tr><?php endif; ?>
+          <?php if (trim((string) ($product['gtin'] ?? '')) !== ''): ?><tr><th>GTIN / EAN / ISBN</th><td><?= e((string) $product['gtin']) ?></td></tr><?php endif; ?>
+          <?php if ($hasWeight): ?><tr><th>Weight</th><td><?= e($fmtNum((float) $product['weight'])) ?> kg</td></tr><?php endif; ?>
+          <?php if ($dims): ?><tr><th>Dimensions</th><td><?= e($fmtNum((float) ($product['length'] ?? 0)) . ' × ' . $fmtNum((float) ($product['width'] ?? 0)) . ' × ' . $fmtNum((float) ($product['height'] ?? 0))) ?> cm</td></tr><?php endif; ?>
+        </table>
       </div>
     <?php endif; ?>
 
@@ -209,7 +233,7 @@ pub_jsonld([
               <div class="prodcard__body">
                 <span class="prodcard__cat"><?= e((string) $rp['category_name']) ?></span>
                 <span class="prodcard__name"><?= e((string) $rp['name']) ?></span>
-                <span class="prodcard__price"><?= e(gbp((float) $rp['price'])) ?></span>
+                <span class="prodcard__price"><?= e(gbp(shop_product_price($rp))) ?></span>
               </div>
             </a>
           <?php endforeach; ?>

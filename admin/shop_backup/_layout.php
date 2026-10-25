@@ -60,8 +60,8 @@ function shop_layout_top(array $opts = []): void
     <meta name="twitter:image:alt" content="<?= h($imageAlt) ?>">
     <link rel="canonical" href="<?= h($canonical) ?>">
     <link rel="icon" href="/Saltcoats Victoria FC -White_Transparent.png">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css" rel="stylesheet">
+    <link href="/admin/assets/vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
+    <link href="/admin/assets/vendor/fontawesome/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link href="/shop/assets/shop.css?v=<?= $cssVersion ?>" rel="stylesheet">
 </head>

@@ -1,12 +1,23 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/schema_guard.php';
+
 require_once __DIR__ . '/stripe.php';
 require_once __DIR__ . '/mailer.php';
 require_once __DIR__ . '/season_tickets.php';
 require_once __DIR__ . '/admissions.php';
 
 function ensureMatchTicketSchema(PDO $pdo): void
+{
+    if (schema_guard_done('ensureMatchTicketSchema')) {
+        return;
+    }
+    ensureMatchTicketSchema_run($pdo);
+    schema_guard_mark('ensureMatchTicketSchema');
+}
+
+function ensureMatchTicketSchema_run(PDO $pdo): void
 {
     static $done = false;
     if ($done) {
@@ -924,6 +935,7 @@ function getMatchTicketOrdersForMember(PDO $pdo, array $holder): array
         ) used_counts ON used_counts.order_id = o.id
         WHERE (:person_id > 0 AND o.person_id = :person_id)
            OR (:email != '' AND LOWER(o.customer_email) = LOWER(:email))
+        GROUP BY o.id
         ORDER BY f.match_date DESC, o.created_at DESC, o.id DESC");
     $stmt->execute([':person_id' => $personId, ':email' => $email]);
     return matchTicketRowsWithAccessTokens($pdo, $stmt->fetchAll(PDO::FETCH_ASSOC));
@@ -1158,6 +1170,9 @@ function match_ticket_public_order_url(array $order): string
     $scheme = (!empty($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off') ? 'https' : 'https';
     $token = (string) ($order['access_token'] ?? $order['group_token'] ?? '');
     $param = !empty($order['access_token']) ? 'access' : 'group';
+    if ($param === 'access') {
+        return $scheme . '://' . $host . '/tickets/order/' . rawurlencode($token);
+    }
     return $scheme . '://' . $host . '/ticket_order.php?' . $param . '=' . rawurlencode($token);
 }
 
@@ -1458,6 +1473,13 @@ function match_ticket_check_and_mark_attendance(PDO $pdo, int $fixtureId, string
         return ['found' => true, 'valid' => false, 'status' => 'fixture_not_admitting', 'message' => 'Tickets cannot be admitted for a postponed or cancelled fixture.', 'scan_log' => $log];
     }
 
+    // Season passes are admitted by the season-ticket path (season_ticket_check_and_mark_attendance). Admitting
+    // them here as well made the second attempt report "already scanned" to the phone after a successful check-in.
+    $peek = admissionsCredential($pdo, $scanInput);
+    if ($peek && (string) ($peek['entitlement_type'] ?? '') === 'season_pass') {
+        return ['found' => false];
+    }
+
     $result = recordAdmission($pdo, $fixtureId, $scanInput, $scannedByUserId, 'match_ticket_qr', $allowFixtureStatusOverride);
     if (empty($result['found'])) {
         $token = match_ticket_extract_token($scanInput);
@@ -1469,6 +1491,9 @@ function match_ticket_check_and_mark_attendance(PDO $pdo, int $fixtureId, string
         return ['found' => false];
     }
     $credential = $result['credential'] ?? [];
+    if (($credential['entitlement_type'] ?? '') === 'event_ticket') {
+        return ['found' => true, 'valid' => false, 'status' => (string) ($result['status'] ?? 'wrong_fixture'), 'message' => (string) ($result['message'] ?? 'This is an event ticket, not a match ticket.'), 'scan_log' => $result['scan_log'] ?? []];
+    }
     if (($credential['entitlement_type'] ?? '') !== 'match_ticket') {
         return ['found' => false];
     }

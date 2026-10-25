@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace MyClubHub\Api;
+namespace SaltcoatsApi\Api;
 
 // Do not load db.php/config.php: they start web sessions and perform schema DDL.
 require_once dirname(__DIR__, 2) . '/env.php';

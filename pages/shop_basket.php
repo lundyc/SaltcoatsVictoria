@@ -44,6 +44,7 @@ set_meta(['title' => 'Your basket']);
 ?>
 <?php partial('shop_bar', ['basketCount' => $summary['count']]); ?>
 
+<?php seo_breadcrumbs([['Club shop', url('shop')], ['Basket', url('shop/basket')]]); ?>
 <?php partial('page_hero', ['eyebrow' => 'Club shop', 'title' => 'Your basket']); ?>
 
 <div class="page">
@@ -105,7 +106,11 @@ set_meta(['title' => 'Your basket']);
           <?php if ((float) $summary['discount_total'] > 0): ?>
             <div class="osummary__row"><span>Discount (<?= e((string) $summary['discount_code']) ?>)</span><span>−<?= e(gbp((float) $summary['discount_total'])) ?></span></div>
           <?php endif; ?>
-          <div class="osummary__row"><span>Delivery</span><span><?= shop_delivery_enabled(db()) ? 'Available at checkout' : 'Collection only' ?></span></div>
+          <div class="osummary__row"><span>Delivery</span><span><?= shop_delivery_enabled(db()) ? 'Calculated at checkout' : 'Collection only' ?></span></div>
+          <?php $freeOverBasket = (float) shop_setting(db(), 'free_delivery_over', '0'); ?>
+          <?php if (shop_delivery_enabled(db()) && $freeOverBasket > 0): ?>
+            <p class="pdp__note">Free delivery on orders over <?= e(gbp($freeOverBasket)) ?><?= (float) $summary['total'] < $freeOverBasket ? ' — add ' . e(gbp($freeOverBasket - (float) $summary['total'])) . ' more to qualify' : ' — you qualify!' ?>.</p>
+          <?php endif; ?>
           <div class="osummary__row osummary__row--total"><span>Total</span><span><?= e(gbp((float) $summary['total'])) ?></span></div>
 
           <form method="post" class="osummary__promo">
@@ -124,6 +129,27 @@ set_meta(['title' => 'Your basket']);
           <p class="pdp__note">You'll pay securely via Stripe. Payment is taken in full today.</p>
         </aside>
       </div>
+      <?php
+      $inBasket = array_map(static fn(array $i): int => (int) $i['product_id'], $summary['items']);
+      $cross = shop_linked_products(db(), $inBasket, 'crosssell', $inBasket, 4);
+      ?>
+      <?php if ($cross): ?>
+        <div class="pdp__related">
+          <h2>You may also be interested in&hellip;</h2>
+          <div class="prodgrid">
+            <?php foreach ($cross as $rp): ?>
+              <?php $rimg = trim((string) ($rp['image_path'] ?? '')); ?>
+              <a class="prodcard" href="<?= e(url('shop/p/' . rawurlencode((string) $rp['slug']))) ?>">
+                <div class="prodcard__media<?= $rimg === '' ? ' is-placeholder' : '' ?>" <?= $rimg !== '' ? 'style="background-image:url(\'' . e($rimg) . '\')"' : '' ?>></div>
+                <div class="prodcard__body">
+                  <span class="prodcard__name"><?= e((string) $rp['name']) ?></span>
+                  <span class="prodcard__price"><?= e(gbp(shop_product_price($rp))) ?></span>
+                </div>
+              </a>
+            <?php endforeach; ?>
+          </div>
+        </div>
+      <?php endif; ?>
     <?php endif; ?>
   </div>
 </div>

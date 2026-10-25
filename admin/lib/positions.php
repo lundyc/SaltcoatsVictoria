@@ -21,6 +21,9 @@ const HUB_CAPABILITIES = [
     'finance_view' => 'Finance - view (reports, matchday income, Stripe dashboard, exports)',
     'finance_manage' => 'Finance - manage (record/edit payments, payment links, refunds, recalculate)',
     'tickets_ops' => 'Ticketing & gate operations (incl. POS)',
+    'events_view' => 'Events - view events, venues and sales',
+    'events_manage' => 'Events - create and edit events, venues and ticket types',
+    'events_refund' => 'Events - refund, cancel and change paid event tickets',
     'shop' => 'Club shop (orders, products, storefront settings)',
     'secretary_ops' => 'Secretary & club administration (discipline, registrations, correspondence, governance)',
     'publishing' => 'Publishing (league table, template packs)',
@@ -43,9 +46,15 @@ const HUB_PAGE_CAPABILITIES = [
     'pdf_importer.php' => ['matchday'], // Temporary historical importer.
     // Cross-club overview
     'club_reminders.php' => ['finance_view', 'matchday', 'club_setup', 'tickets_ops', 'secretary_ops'],
+    // Inbox (orders and enquiries): each type inside is gated by its own capability.
+    'orders_inbox.php' => ['shop', 'tickets_ops', 'sponsorship', 'finance_view'],
+    'inbox.php' => ['shop', 'tickets_ops', 'sponsorship', 'finance_view'],
+    'enquiry.php' => ['shop', 'tickets_ops', 'sponsorship', 'finance_view', 'content_social'],
 
     // Finance / Stripe (already gated)
     'stripe_dashboard.php' => ['finance_view'],
+    'payout_reconciliation.php' => ['finance_view'],
+    'payout_reconciliation_export.php' => ['finance_view'],
     'stripe_refund.php' => ['finance_manage'],
 
     // Content & social media tools (already gated)
@@ -111,12 +120,15 @@ const HUB_PAGE_CAPABILITIES = [
     'match_sponsorship_delete.php' => ['sponsorship'],
     'match_sponsorship_move.php' => ['sponsorship'],
     'playersponsors_orders.php' => ['sponsorship'],
+    'sponsor_orders.php' => ['sponsorship'],
+    'board_renewals.php' => ['sponsorship'],
     'sponsor.php' => ['sponsorship'],
     'sponsor_followups.php' => ['sponsorship'],
     'sponsors.php' => ['sponsorship'],
     'sponsorship_agreement.php' => ['sponsorship'],
     'sponsorship_agreement_bulk.php' => ['sponsorship'],
     'sponsorship_agreements.php' => ['sponsorship'],
+    'match_deals.php' => ['sponsorship'],
     'sponsorship_bundle.php' => ['sponsorship'],
     'sponsorship_bundles.php' => ['sponsorship'],
     'sponsorship_delete.php' => ['sponsorship'],
@@ -140,6 +152,17 @@ const HUB_PAGE_CAPABILITIES = [
     // the separate RBAC permission layer (lib/permissions.php); that layer
     // is retired in favour of this single capability, admin-only by default.
     'fixture_tickets.php' => ['tickets_ops'],
+    'events.php' => ['events_view'],
+    'event_edit.php' => ['events_view'],
+    'event_venues.php' => ['events_view'],
+    'event_tickets.php' => ['events_view'],
+    'event_settings.php' => ['events_view'],
+    'door_dashboard.php' => ['tickets_ops', 'events_view'],
+    'event_dashboard.php' => ['events_view'],
+    'event_attendees.php' => ['events_view'],
+    'event_attendees_export.php' => ['events_manage'],
+    'event_message.php' => ['events_view'],
+    'event_promos.php' => ['events_view'],
     'pos_overview.php' => ['tickets_ops'],
     'season_ticket_free_codes.php' => ['tickets_ops'],
     'season_ticket_order.php' => ['tickets_ops'],
@@ -154,11 +177,21 @@ const HUB_PAGE_CAPABILITIES = [
     'season_pass_rules.php' => ['tickets_ops'],
     'season_ticket_orders.php' => ['tickets_ops'],
     'ticket_orders.php' => ['tickets_ops'],
-    'match_ticket_scan.php' => ['tickets_ops'],
+    'hospitality.php' => ['tickets_ops'],
+    'hospitality_booking.php' => ['tickets_ops'],
+    'hospitality_settings.php' => ['tickets_ops'],
+    'match_ticket_scan.php' => ['tickets_scan'],
+    'scan_problem_report.php' => ['tickets_scan'],
+    'scan_problems.php' => ['tickets_ops'],
 
     // Club shop
     'shop_categories.php' => ['shop'],
     'shop_discount_codes.php' => ['shop'],
+    'shop_shipping_classes.php' => ['shop'],
+    'shop_shipping.php' => ['shop'],
+    'shop_email.php' => ['shop'],
+    'shop_email_preview.php' => ['shop'],
+    'shop_media_catalogue.php' => ['shop'],
     'shop_modifiers.php' => ['shop'],
     'shop_order.php' => ['shop'],
     'shop_order_new.php' => ['shop'],
@@ -178,8 +211,6 @@ const HUB_PAGE_CAPABILITIES = [
     'access_roles.php' => ['admin_settings'],
     'access_role_edit.php' => ['admin_settings'],
     'settings.php' => ['admin_settings'],
-    'user_edit.php' => ['admin_settings'],
-    'user_delete.php' => ['admin_settings'],
 
     // Public website — was admin-only by omission, now its own capability
     // (still admin-only by default; see access_template_capabilities seed data).
@@ -258,6 +289,8 @@ const HUB_PAGE_CAPABILITIES = [
  */
 const HUB_PAGE_GATE_EXEMPT = [
     'profile.php', // Signed-in users edit only the person linked to their own session.
+    'help.php', // Help Centre: every signed-in user; articles filter by capability themselves.
+    'help_edit.php', // Self-gates on hub_auth_is_admin().
     'index.php',
     'reports.php',
     'developer.php',
@@ -349,17 +382,19 @@ function saveHubPosition(PDO $pdo, ?int $id, array $data): int
     $accessRoleId = (int) ($data['access_role_id'] ?? 0);
     $accessRoleId = $accessRoleId > 0 ? $accessRoleId : null;
     $sortOrder = (int) ($data['sort_order'] ?? 0);
+    $vacancyHidden = !empty($data['vacancy_hidden']) ? 1 : 0;
+    $vacancyBlurb = trim((string) ($data['vacancy_blurb'] ?? ''));
 
     if ($id === null) {
-        $stmt = $pdo->prepare('INSERT INTO club_roles (name, department, access_template_id, sort_order) VALUES (:name, :department, :access_role_id, :sort_order)');
-        $stmt->execute([':name' => $name, ':department' => $department, ':access_role_id' => $accessRoleId, ':sort_order' => $sortOrder]);
+        $stmt = $pdo->prepare('INSERT INTO club_roles (name, department, access_template_id, sort_order, vacancy_hidden, vacancy_blurb) VALUES (:name, :department, :access_role_id, :sort_order, :vh, :vb)');
+        $stmt->execute([':name' => $name, ':department' => $department, ':access_role_id' => $accessRoleId, ':sort_order' => $sortOrder, ':vh' => $vacancyHidden, ':vb' => $vacancyBlurb !== '' ? $vacancyBlurb : null]);
         $newId = (int) $pdo->lastInsertId();
         auditLog($pdo, 'position_created', 'Created position #' . $newId . ' (' . $name . ')');
         return $newId;
     }
 
-    $stmt = $pdo->prepare('UPDATE club_roles SET name = :name, department = :department, access_template_id = :access_role_id, sort_order = :sort_order WHERE id = :id');
-    $stmt->execute([':name' => $name, ':department' => $department, ':access_role_id' => $accessRoleId, ':sort_order' => $sortOrder, ':id' => $id]);
+    $stmt = $pdo->prepare('UPDATE club_roles SET name = :name, department = :department, access_template_id = :access_role_id, sort_order = :sort_order, vacancy_hidden = :vh, vacancy_blurb = :vb WHERE id = :id');
+    $stmt->execute([':name' => $name, ':department' => $department, ':access_role_id' => $accessRoleId, ':sort_order' => $sortOrder, ':vh' => $vacancyHidden, ':vb' => $vacancyBlurb !== '' ? $vacancyBlurb : null, ':id' => $id]);
     auditLog($pdo, 'position_updated', 'Updated position #' . $id . ' (' . $name . ')');
     return $id;
 }

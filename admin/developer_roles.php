@@ -2,6 +2,19 @@
 // developer_roles.php — User Switcher (Impersonation)
 require_once __DIR__ . '/header.php';
 
+// Staff and admin mean: the holder's login has a non-member access template
+// (or Administrator). Read from the access model, not the stored holder role.
+$staffHolderSql = "EXISTS (SELECT 1 FROM identity_migration_map m
+        JOIN accounts a ON a.id = m.account_id
+        JOIN person_access_templates pat ON pat.person_id = a.person_id
+        JOIN access_templates t ON t.id = pat.template_id
+        WHERE m.old_holder_id = season_ticket_holders.id AND (t.bypass_all = 1 OR t.slug <> 'member'))";
+$holderRoleSql = "(CASE WHEN EXISTS (SELECT 1 FROM identity_migration_map m
+        JOIN accounts a ON a.id = m.account_id
+        JOIN person_access_templates pat ON pat.person_id = a.person_id
+        JOIN access_templates t ON t.id = pat.template_id
+        WHERE m.old_holder_id = season_ticket_holders.id AND t.bypass_all = 1) THEN 'admin' ELSE 'staff' END)";
+
 // Identifies "the developer" by email (HUB_DEVELOPER_EMAIL) rather than a
 // hardcoded users.id === 1 — that assumption broke once staff accounts
 // moved into season_ticket_holders under a different id space. Empty
@@ -9,7 +22,7 @@ require_once __DIR__ . '/header.php';
 // entirely (falls through to the same access-denied path).
 $developerAccount = null;
 if (DEVELOPER_EMAIL !== '') {
-    $stmt = $pdo->prepare("SELECT id FROM season_ticket_holders WHERE email_normalized = :email AND role IN ('staff','admin') LIMIT 1");
+    $stmt = $pdo->prepare("SELECT id FROM season_ticket_holders WHERE email_normalized = :email AND {$staffHolderSql} LIMIT 1");
     $stmt->execute([':email' => seasonTicketNormalizeEmail(DEVELOPER_EMAIL)]);
     $developerAccount = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
 }
@@ -29,7 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['switch_user'])) {
 
           // Load target account (staff/admin only — impersonation stays
           // scoped to staff, not arbitrary members, same as before).
-          $stmt = $pdo->prepare("SELECT id, name, username, role FROM season_ticket_holders WHERE id = :id AND role IN ('staff','admin') LIMIT 1");
+          $stmt = $pdo->prepare("SELECT id, name, username, {$holderRoleSql} AS role FROM season_ticket_holders WHERE id = :id AND {$staffHolderSql} LIMIT 1");
           $stmt->execute([':id' => $targetId]);
           $target = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -46,7 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['switch_user'])) {
 }
 
 // Fetch all staff/admin accounts for the dropdown
-$stmt = $pdo->query("SELECT id, name, username, role FROM season_ticket_holders WHERE role IN ('staff','admin') ORDER BY id ASC");
+$stmt = $pdo->query("SELECT id, name, username, {$holderRoleSql} AS role FROM season_ticket_holders WHERE {$staffHolderSql} ORDER BY id ASC");
 $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 

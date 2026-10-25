@@ -1,0 +1,15 @@
+{
+  "name": "Saltcoats Victoria Ticket Scanner",
+  "short_name": "Ticket Scanner",
+  "description": "Scan season tickets and match tickets at the gate.",
+  "start_url": "/scan/",
+  "scope": "/scan/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#4b0818",
+  "theme_color": "#4b0818",
+  "icons": [
+    { "src": "/scan/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/scan/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

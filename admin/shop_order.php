@@ -80,7 +80,7 @@ $pageHero = [
     'eyebrow' => 'Shop',
     'title' => 'Order',
     'subtitle' => 'Order detail and fulfilment.',
-    'actions' => [['label' => 'All orders', 'href' => '/shop_orders.php', 'class' => 'btn btn-outline-light btn-sm']],
+    'actions' => [],
 ];
 require_once __DIR__ . '/header.php';
 
@@ -92,6 +92,7 @@ if (!$order) {
     exit;
 }
 $items = shop_order_items($pdo, $id);
+$hasVsnItems = (bool) array_filter($items, static fn(array $it): bool => (int) ($it['is_vsn'] ?? 0) === 1);
 $settings = shop_get_settings($pdo);
 shop_order_event_schema($pdo);
 $eventQuery = $pdo->prepare('SELECT * FROM shop_order_events WHERE order_id = ? ORDER BY id DESC');
@@ -115,6 +116,7 @@ function shop_status_badge(string $status): string
 ?>
 <div class="shop-admin-page">
     <nav class="hub-breadcrumb" aria-label="Breadcrumb"><a href="/admin/shop_overview.php">Shop</a> <i class="fa-solid fa-chevron-right" aria-hidden="true"></i> <a href="/admin/shop_orders.php">Orders</a> <i class="fa-solid fa-chevron-right" aria-hidden="true"></i> <span aria-current="page"><?= h((string) $order['order_ref']) ?></span></nav>
+    <?php shop_render_toolbar([['label' => 'All orders', 'href' => '/admin/shop_orders.php', 'icon' => 'fa-arrow-left']]); ?>
 
     <?php if (isset($_GET['m'])): ?><div class="alert alert-success"><?= h((string) $_GET['m']) ?></div><?php endif; ?>
     <?php if (isset($_GET['e'])): ?><div class="alert alert-danger"><?= h((string) $_GET['e']) ?></div><?php endif; ?>
@@ -123,6 +125,7 @@ function shop_status_badge(string $status): string
         <h1 class="h4 fw-bold mb-0"><?= h((string) $order['order_ref']) ?></h1>
         <?= shop_status_badge((string) $order['status']) ?>
         <?php if ((int) $order['is_preorder'] === 1): ?><span class="badge text-bg-warning">Pre-order</span><?php endif; ?>
+        <?php if ($hasVsnItems): ?><span class="badge text-bg-info">VSN item<?= !empty($order['vsn_ordered_at']) ? ' · sent' : '' ?></span><?php endif; ?>
     </div>
 
     <div class="row g-3">
@@ -163,7 +166,7 @@ function shop_status_badge(string $status): string
                     <div class="col-sm-6"><dl class="row mb-0 small">
                         <dt class="col-6 text-muted">Placed</dt><dd class="col-6"><?= h($fmt($order['created_at'])) ?></dd>
                         <dt class="col-6 text-muted">Paid</dt><dd class="col-6"><?= h($fmt($order['paid_at'])) ?></dd>
-                        <dt class="col-6 text-muted">Sent to VSN</dt><dd class="col-6"><?= h($fmt($order['vsn_ordered_at'])) ?></dd>
+                        <?php if ($hasVsnItems): ?><dt class="col-6 text-muted">Sent to VSN</dt><dd class="col-6"><?= h($fmt($order['vsn_ordered_at'])) ?></dd><?php endif; ?>
                     </dl></div>
                     <div class="col-sm-6"><dl class="row mb-0 small">
                         <dt class="col-6 text-muted">Collected</dt><dd class="col-6"><?= h($fmt($order['collected_at'])) ?></dd>
@@ -177,7 +180,7 @@ function shop_status_badge(string $status): string
                     <form method="post" class="row g-2">
                         <?= csrf_field() ?><input type="hidden" name="action" value="update_dates">
                         <?php foreach (['created_at' => 'Placed', 'paid_at' => 'Paid', 'vsn_ordered_at' => 'Sent to VSN', 'collected_at' => 'Collected', 'cancelled_at' => 'Cancelled'] as $field => $label): ?>
-                            <?php if (!empty($order[$field])): ?><label class="col-sm-6"><?= h($label) ?><input class="form-control" type="datetime-local" name="<?= h($field) ?>" value="<?= h((new DateTimeImmutable($order[$field]))->format('Y-m-d\TH:i')) ?>" required></label><?php endif; ?>
+                            <?php if (!empty($order[$field]) && ($field !== 'vsn_ordered_at' || $hasVsnItems)): ?><label class="col-sm-6"><?= h($label) ?><input class="form-control" type="datetime-local" name="<?= h($field) ?>" value="<?= h((new DateTimeImmutable($order[$field]))->format('Y-m-d\TH:i')) ?>" required></label><?php endif; ?>
                         <?php endforeach; ?>
                         <div class="col-12"><button class="btn btn-outline-secondary">Save timeline dates</button></div>
                     </form>
@@ -213,13 +216,12 @@ function shop_status_badge(string $status): string
                 <hr>
                 <?php if ((string) ($order['fulfilment_method'] ?? 'collection') === 'delivery'): ?>
                     <p class="mb-1 small"><strong>Fulfilment:</strong> <span class="badge bg-info text-dark">Delivery</span> — fee charged: £<?= h(number_format((float) ($order['delivery_fee'] ?? 0), 2)) ?></p>
-                    <p class="mb-0 small"><strong>Delivery address:</strong><br><span style="white-space:pre-line"><?= h((string) ($order['delivery_address'] ?? '')) ?></span></p>
+                    <p class="mb-1 small"><strong>Method:</strong> <?= h(trim((string) ($order['shipping_zone'] ?? '')) !== '' ? $order['shipping_zone'] . ' — ' . $order['shipping_method'] : 'Delivery') ?></p>
+                    <p class="mb-0 small"><strong>Delivery address:</strong><br><span style="white-space:pre-line"><?= h((string) ($order['delivery_address'] ?? '')) ?></span><br>
+                        <?= h(trim((string) ($order['delivery_postcode'] ?? ''))) ?> <?= h((string) (shop_countries()[(string) ($order['delivery_country'] ?? '')] ?? '')) ?></p>
                 <?php else: ?>
                     <p class="mb-1 small"><strong>Fulfilment:</strong> Collection only</p>
                     <p class="mb-0 small"><strong>Collection point:</strong> <?= h((string) $order['collection_point']) ?></p>
-                <?php endif; ?>
-                <?php if (!empty($order['requested_date'])): ?>
-                    <p class="mb-0 small mt-1"><strong><?= (string) ($order['fulfilment_method'] ?? 'collection') === 'delivery' ? 'Requested delivery date' : 'Requested collection date' ?>:</strong> <?= h((new DateTimeImmutable((string) $order['requested_date']))->format('l j F Y')) ?></p>
                 <?php endif; ?>
                 <?php if (($order['batch_note'] ?? '') !== ''): ?><p class="mb-0 small text-muted mt-1"><?= h((string) $order['batch_note']) ?></p><?php endif; ?>
                 <p class="mt-2 mb-0 small"><a href="/shop/order/<?= h((string) $order['access_token']) ?>" target="_blank" rel="noopener">Customer confirmation page ↗</a></p>
@@ -247,16 +249,17 @@ function shop_status_badge(string $status): string
                     <?php endif; ?>
 
                     <?php if (in_array((string) $order['status'], ['pending_payment', 'paid', 'collected'], true)): ?>
-                        <?php if (empty($order['vsn_ordered_at'])): ?>
-                            <form method="post">
-                                <?= csrf_field() ?><input type="hidden" name="action" value="mark_vsn_ordered"><input type="hidden" name="id" value="<?= $id ?>">
-                                <button class="btn btn-outline-secondary w-100" type="submit">Flag as sent to VSN</button>
-                            </form>
-                        <?php endif; ?>
-                        <form method="post">
-                            <?= csrf_field() ?><input type="hidden" name="action" value="resend_email"><input type="hidden" name="id" value="<?= $id ?>">
-                            <button class="btn btn-outline-secondary w-100" type="submit"><?= $order['status'] === 'pending_payment' ? 'Email order summary (awaiting payment)' : 'Email payment confirmation' ?></button>
-                        </form>
+                        <div class="dropdown d-grid">
+                            <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">More actions</button>
+                            <ul class="dropdown-menu w-100">
+                                <li><form method="post"><?= csrf_field() ?><input type="hidden" name="action" value="resend_email"><input type="hidden" name="id" value="<?= $id ?>">
+                                    <button class="dropdown-item" type="submit"><i class="fa-solid fa-envelope me-2" aria-hidden="true"></i><?= $order['status'] === 'pending_payment' ? 'Email order summary (awaiting payment)' : 'Email payment confirmation' ?></button></form></li>
+                                <?php if ($hasVsnItems && empty($order['vsn_ordered_at'])): ?>
+                                    <li><form method="post"><?= csrf_field() ?><input type="hidden" name="action" value="mark_vsn_ordered"><input type="hidden" name="id" value="<?= $id ?>">
+                                        <button class="dropdown-item" type="submit"><i class="fa-solid fa-truck-ramp-box me-2" aria-hidden="true"></i>Flag as sent to VSN</button></form></li>
+                                <?php endif; ?>
+                            </ul>
+                        </div>
                     <?php endif; ?>
                 </div>
             </section>

@@ -220,11 +220,20 @@ $scoreRightName = $isHome ? $opponentName : $clubName;
                         </select>
                     </div>
 
-                    <div class="col-4">
+                    <div class="col-12" id="mreOutcomeRow" hidden>
+                        <label class="form-label small mb-0">Shootout penalty result</label>
+                        <select name="outcome" class="form-select form-select-sm">
+                            <option value="scored"<?= $editEvent && ($editEvent['outcome'] ?? '') === 'scored' ? ' selected' : '' ?>>Scored</option>
+                            <option value="missed"<?= $editEvent && ($editEvent['outcome'] ?? '') === 'missed' ? ' selected' : '' ?>>Missed or saved</option>
+                        </select>
+                        <div class="form-text">Shootout kicks are shown in kick order and never count as goals. Add them in the order they were taken.</div>
+                    </div>
+
+                    <div class="col-4" data-mre-minute>
                         <label class="form-label small mb-0">Minute</label>
                         <input type="number" name="minute" class="form-control form-control-sm" min="0" max="130" value="<?= $editEvent && $editEvent['minute'] !== null ? (int) $editEvent['minute'] : '' ?>">
                     </div>
-                    <div class="col-3">
+                    <div class="col-3" data-mre-minute>
                         <label class="form-label small mb-0">+</label>
                         <input type="number" name="minute_extra" class="form-control form-control-sm" min="0" max="20" value="<?= $editEvent ? (int) $editEvent['minute_extra'] : 0 ?>">
                     </div>
@@ -254,6 +263,22 @@ $scoreRightName = $isHome ? $opponentName : $clubName;
                         <?php endif; ?>
                     </div>
                 </form>
+                <script>
+                (function () {
+                    var form = document.querySelector('form[action="match_record_event_save.php"].row');
+                    if (!form) return;
+                    var type = form.querySelector('[name=type]');
+                    var row = document.getElementById('mreOutcomeRow');
+                    var mins = form.querySelectorAll('[data-mre-minute]');
+                    function sync() {
+                        var shoot = type.value === 'shootout_penalty';
+                        row.hidden = !shoot;
+                        mins.forEach(function (m) { m.hidden = shoot; });
+                    }
+                    type.addEventListener('change', sync);
+                    sync();
+                })();
+                </script>
                 <datalist id="mreSvfc">
                     <?php foreach (array_merge($lineupNames['svfc'], $lineupNames['opponent']) as $nm): ?>
                         <option value="<?= h($nm) ?>"></option>
@@ -278,10 +303,21 @@ $scoreRightName = $isHome ? $opponentName : $clubName;
                     <?php
                     $grouped = [];
                     foreach ($events as $e) {
+                        if ($e['type'] === 'shootout_penalty') {
+                            $key = '_shootout';
+                            $grouped[$key]['label'] = 'Penalty shootout (in kick order)';
+                            $grouped[$key]['events'][] = $e;
+                            continue;
+                        }
                         $p = mre_period_for_minute($periods, $e['minute'] === null ? null : (int) $e['minute']);
                         $key = $p['period_key'] ?? '_none';
                         $grouped[$key]['label'] = $p['label'] ?? 'Unassigned';
                         $grouped[$key]['events'][] = $e;
+                    }
+                    if (isset($grouped['_shootout'])) {
+                        $shoot = $grouped['_shootout'];
+                        unset($grouped['_shootout']);
+                        $grouped['_shootout'] = $shoot; // always last
                     }
                     ?>
                     <?php foreach ($grouped as $g): ?>
@@ -296,7 +332,11 @@ $scoreRightName = $isHome ? $opponentName : $clubName;
                                 ?>
                                 <li class="list-group-item px-0 d-flex align-items-start justify-content-between gap-2">
                                     <div>
+                                        <?php if ($e['type'] === 'shootout_penalty'): ?>
+                                            <span class="badge bg-<?= ($e['outcome'] ?? '') === 'scored' ? 'success' : 'danger' ?> me-1"><?= ($e['outcome'] ?? '') === 'scored' ? 'Scored' : 'Missed' ?></span>
+                                        <?php else: ?>
                                         <span class="badge bg-light text-dark border me-1"><?= $min === '' ? '—' : h($min) . "'" ?></span>
+                                        <?php endif; ?>
                                         <span class="badge bg-<?= $sideBadge ?> <?= $sideBadge === 'light' ? 'text-dark border' : '' ?> me-1"><?= h($sideLabel) ?></span>
                                         <strong><?= h($meta['label']) ?></strong>
                                         <?php if ((int) $e['own_goal'] === 1): ?><span class="badge bg-warning text-dark ms-1">OG</span><?php endif; ?>

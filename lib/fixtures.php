@@ -26,12 +26,13 @@ function pub_fixture_select(): string
 {
     return 'SELECT f.id, f.match_date, f.kickoff_time, f.opponent, f.competition,
                    f.competition_stage, f.is_home, f.venue, f.status,
-                   f.full_time_home_score, f.full_time_away_score,
+                   f.full_time_home_score, f.full_time_away_score, f.notes,
                    f.half_time_home_score, f.half_time_away_score, f.veo_url,
                    f.home_penalties, f.away_penalties,
                    o.clubname      AS opponent_name,
                    o.logo_path     AS opponent_logo,
-                   o.ground_location AS opponent_ground
+                   o.ground_location AS opponent_ground,
+                   o.venue_id      AS opponent_venue_id
             FROM match_fixtures f
             LEFT JOIN match_opponents o ON o.id = f.opponent_id';
 }
@@ -285,7 +286,7 @@ function pub_fixtures(array $opts = []): array
         $conds[] = '(f.status = "played" OR f.full_time_home_score IS NOT NULL)';
         $order = ' ORDER BY f.match_date DESC, f.kickoff_time DESC';
     } elseif ($type === 'upcoming') {
-        $conds[] = '(f.status IS NULL OR f.status <> "played") AND f.full_time_home_score IS NULL';
+        $conds[] = '(f.status IS NULL OR f.status <> "played") AND f.full_time_home_score IS NULL AND f.match_date >= CURDATE()';
         $order = ' ORDER BY f.match_date ASC, f.kickoff_time ASC';
     } else {
         $order = ' ORDER BY f.match_date ASC, f.kickoff_time ASC';
@@ -431,7 +432,7 @@ function pub_match_record(int $fixtureId): ?array
 
         $es = db()->prepare(
             'SELECT minute, minute_extra, side, type, player_name, secondary_player_name,
-                    own_goal, card_type
+                    own_goal, card_type, outcome
                FROM matchday_events
               WHERE fixture_id = :f
               ORDER BY minute ASC, minute_extra ASC, sequence ASC, id ASC'
@@ -462,8 +463,29 @@ function pub_match_record(int $fixtureId): ?array
     }
 
     $events = [];
+    $shootout = ['us' => [], 'opp' => []];
+    $shirtOf = [];
+    foreach ($lineups as $sideKey => $rows) {
+        foreach ($rows as $p) {
+            $shirtOf[$sideKey . '|' . mb_strtolower(trim($p['name']), 'UTF-8')] = $p['number'];
+        }
+    }
     foreach ($eventRows as $r) {
         $type = (string) $r['type'];
+        if ($type === 'shootout_penalty') {
+            // Penalty-shootout kicks are shown apart from the match timeline and never count as goals.
+            $sk = $key((string) $r['side']);
+            if (isset($shootout[$sk])) {
+                $kname = (string) $r['player_name'];
+                $shootout[$sk][] = [
+                    'n' => count($shootout[$sk]) + 1,
+                    'name' => $kname,
+                    'number' => $shirtOf[$sk . '|' . mb_strtolower(trim($kname), 'UTF-8')] ?? null,
+                    'scored' => (string) $r['outcome'] === 'scored',
+                ];
+            }
+            continue;
+        }
         $isOG = (bool) $r['own_goal'] || $type === 'own_goal';
         $min = $r['minute'] !== null ? (string) (int) $r['minute'] : '';
         if ($min !== '' && (int) $r['minute_extra'] > 0) {
@@ -489,7 +511,7 @@ function pub_match_record(int $fixtureId): ?array
         ];
     }
 
-    return $cache[$fixtureId] = ['lineups' => $lineups, 'captain' => $captain, 'events' => $events];
+    return $cache[$fixtureId] = ['lineups' => $lineups, 'captain' => $captain, 'events' => $events, 'shootout' => $shootout];
 }
 
 /** Match photos for a fixture (from the Hub match_photos table). */
@@ -678,20 +700,43 @@ function pub_place_candidates(array $fixture): array
     if ($opp !== '') {
         $out[] = $opp;
     }
+    // Town-level guess from the venue, e.g. "Meadow Park Irvine" -> "Irvine".
+    $bare = preg_split('/\s+/', trim((string) preg_replace('/\b(park|stadium|ground|field|stad|complex|centre|arena)\b/i', '', $venue))) ?: [];
+    if (count(array_filter($bare)) > 1) {
+        $out[] = (string) end($bare);
+    }
+    // Last resort: the full venue name.
+    if ($venue !== '') {
+        $out[] = $venue;
+    }
     return array_values(array_unique($out));
 }
 
 /** {lat,lon,label} for a fixture's venue, or null. Cached in the Hub cache dir. */
 function pub_venue_coords(array $fixture): ?array
 {
+    // A pin saved on the venue record (Admin > Venues > Quick find) always wins.
+    $saved = pub_saved_venue_pin($fixture);
+    if ($saved !== null) {
+        return $saved;
+    }
     $isHome = (bool) $fixture['is_home'];
+    if ($isHome) {
+        return null; // our ground has no pin saved yet
+    }
     $opp = trim((string) ($fixture['opponent_name'] ?? $fixture['opponent'] ?? ''));
     $file = pub_pref_cache_dir() . '/pub_venue_coords.json';
     $store = is_file($file) ? (json_decode((string) @file_get_contents($file), true) ?: []) : [];
     if (!is_array($store)) {
         $store = [];
     }
-    $key = $isHome ? 'home' : ('opp:' . pub_norm_club($opp));
+    // Away grounds are keyed by opponent, or by venue when the opponent is not recorded,
+    // so two fixtures with no opponent never share one cached location.
+    $awayName = $opp !== '' ? $opp : trim((string) ($fixture['venue'] ?? ''));
+    if ($awayName === '') {
+        return null;
+    }
+    $key = 'away:' . pub_norm_club($awayName);
 
     if (isset($store[$key]['lat'], $store[$key]['lon'])) {
         return ['lat' => (float) $store[$key]['lat'], 'lon' => (float) $store[$key]['lon'], 'label' => (string) ($store[$key]['label'] ?? '')];
@@ -700,25 +745,8 @@ function pub_venue_coords(array $fixture): ?array
         return null; // don't re-hammer geocoders for a week
     }
 
-    $hit = null;
-    if (!$isHome) {
-        $hit = pub_known_venue_coords()[pub_norm_club($opp)] ?? null;
-    }
-    if ($hit === null && $isHome) {
-        if (preg_match('/([A-Za-z]{1,2}\d[A-Za-z\d]?)\s*(\d[A-Za-z]{2})/', (string) club('ground_address'), $m)) {
-            $j = pub_http_json('https://api.postcodes.io/postcodes/' . rawurlencode($m[1] . ' ' . $m[2]));
-            if (isset($j['result']['latitude'])) {
-                $ward = trim((string) ($j['result']['admin_ward'] ?? ''));
-                $town = $ward !== '' ? trim((string) preg_split('/\s+(and|&|,)\s+/i', $ward)[0]) : '';
-                $hit = [
-                    'lat' => (float) $j['result']['latitude'],
-                    'lon' => (float) $j['result']['longitude'],
-                    'label' => $town !== '' ? $town : (string) ($j['result']['admin_district'] ?? club('ground_name')),
-                ];
-            }
-        }
-    }
-    if ($hit === null && !$isHome) {
+    $hit = pub_known_venue_coords()[pub_norm_club($opp)] ?? null;
+    if ($hit === null) {
         foreach (pub_place_candidates($fixture) as $cand) {
             $j = pub_http_json('https://api.postcodes.io/places?limit=5&q=' . rawurlencode($cand));
             foreach ((array) ($j['result'] ?? []) as $r) {
@@ -739,6 +767,45 @@ function pub_venue_coords(array $fixture): ?array
     $store[$key] = $hit ? ($hit + ['ts' => time()]) : ['miss' => time()];
     @file_put_contents($file, json_encode($store, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES), LOCK_EX);
     return $hit ? ['lat' => $hit['lat'], 'lon' => $hit['lon'], 'label' => $hit['label']] : null;
+}
+
+/**
+ * The pin saved on a venue record (match_venues.latitude/longitude).
+ * Home fixtures use our ground by name; away fixtures use the opponent's venue,
+ * falling back to a venue whose name matches the fixture's venue text.
+ */
+function pub_saved_venue_pin(array $fixture): ?array
+{
+    $venueName = trim((string) ($fixture['venue'] ?? ''));
+    $select = 'SELECT latitude, longitude, COALESCE(NULLIF(town, \'\'), name) AS label
+               FROM match_venues
+               WHERE latitude IS NOT NULL AND longitude IS NOT NULL';
+    $fetch = static function (string $where, array $params) use ($select): ?array {
+        $stmt = db()->prepare($select . ' AND ' . $where . ' LIMIT 1');
+        $stmt->execute($params);
+        return $stmt->fetch() ?: null;
+    };
+    try {
+        $row = null;
+        if (!empty($fixture['is_home'])) {
+            if ($venueName !== '') {
+                $row = $fetch('LOWER(TRIM(name)) = LOWER(?)', [$venueName]);
+            }
+        } else {
+            if (!empty($fixture['opponent_venue_id'])) {
+                $row = $fetch('id = ?', [(int) $fixture['opponent_venue_id']]);
+            }
+            if (!$row && $venueName !== '') {
+                $row = $fetch('LOWER(TRIM(name)) = LOWER(?)', [$venueName]);
+            }
+        }
+    } catch (Throwable) {
+        return null; // the venue table is optional for the public site
+    }
+    if (!$row) {
+        return null;
+    }
+    return ['lat' => (float) $row['latitude'], 'lon' => (float) $row['longitude'], 'label' => (string) $row['label']];
 }
 
 /** WMO weather code -> short label + emoji. */
@@ -779,7 +846,9 @@ function pub_weather_forecast(array $fixture): ?array
         return null;
     }
 
-    $coords = pub_venue_coords($fixture);
+    // A forecast only needs town-level accuracy, so home games fall back to the club's town.
+    $coords = pub_venue_coords($fixture)
+        ?? ($fixture['is_home'] ? pub_known_venue_coords()['saltcoatsvictoria'] : null);
     if ($coords === null) {
         return null;
     }
@@ -887,3 +956,30 @@ function pub_fixture_link_label(array $f): string
         : 'v';
     return format_date($f['match_date'], 'j M Y') . ' · ' . $t['home'] . ' ' . $mid . ' ' . $t['away'];
 }
+
+/** Short competition label for tight spaces: "McBookie.com West of Scotland League Two" becomes "WoSFL League Two". */
+function pub_competition_short(string $name): string
+{
+    $name = trim($name);
+    $name = (string) preg_replace('/^McBookie\.com\s+/i', '', $name);
+    $name = (string) preg_replace('/West of Scotland (?:Football )?League/i', 'WoSFL', $name);
+    return $name !== '' ? $name : 'Fixture';
+}
+
+/** Ticket page URL for a home fixture that really has tickets on sale, or '' otherwise. */
+function pub_fixture_tickets_url(array $fixture): string
+{
+    if (empty($fixture['is_home'])) {
+        return '';
+    }
+    try {
+        require_once HUB_ROOT . '/lib/match_tickets.php';
+        if (getFixtureTicketPackages(db(), (int) $fixture['id'], true) !== []) {
+            return url('tickets') . '?fixture_id=' . (int) $fixture['id'];
+        }
+    } catch (Throwable $e) {
+        // the match page must still work if ticketing is unavailable
+    }
+    return '';
+}
+

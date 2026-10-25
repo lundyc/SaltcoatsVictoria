@@ -11,6 +11,7 @@ require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/lib/functions.php'; // for recalc + helpers
 require_once __DIR__ . '/lib/player_birthdays.php';
+require_once __DIR__ . '/lib/birthday_calendar.php';
 require_once __DIR__ . '/lib/season.php';
 require_once __DIR__ . '/lib/sponsorship_catalog.php';
 require_once __DIR__ . '/sync_social_directory.php';
@@ -56,6 +57,7 @@ try {
                               $stmt = $pdo->prepare("UPDATE players SET $field = :val WHERE id = :id");
                               $stmt->execute([':val' => $value, ':id' => $id]);
                               auditLog($pdo, 'player_field_updated', "Updated {$field} for player #{$id}");
+                              birthday_calendar_queue_sync($pdo);
                               player_sponsors_sync_social_directory();
                               $response['success'] = true;
                     }
@@ -252,6 +254,7 @@ try {
                                         ':id' => $playerId,
                               ]);
 
+                              birthday_calendar_queue_sync($pdo);
                               if (in_array($status, ['left', 'retired'], true)) {
                                         $assignmentsStmt = $pdo->prepare(
                                                   'SELECT id, slot FROM sponsorships WHERE player_id = :player_id AND season_id = :season_id AND ended_at IS NULL'

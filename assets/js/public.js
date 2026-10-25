@@ -44,6 +44,47 @@
   var deskMq = window.matchMedia("(min-width: 1025px)");
   var scrimTimer;
 
+  /* Desktop hover intent: one panel is "active" (.is-hover). Opening from nothing waits briefly; switching to
+     another item needs the pointer to stop on it, and closing waits briefly, so a pointer sweeping across the bar
+     on its way into the open panel keeps it. */
+  var hoverActive = null, hoverPending = null, hoverTimer = null;
+  var hoverSet = function (item) {
+    if (hoverActive) hoverActive.classList.remove("is-hover");
+    hoverActive = item;
+    if (item) item.classList.add("is-hover");
+  };
+  var hoverCancel = function () { clearTimeout(hoverTimer); hoverTimer = null; hoverPending = null; };
+  var hoverX = 0, hoverY = 0;
+  doc.addEventListener("mousemove", function (e) { hoverX = e.clientX; hoverY = e.clientY; }, { passive: true });
+  /* Opening/switching waits until the pointer has (nearly) stopped, like hoverIntent: a pointer sweeping across
+     the bar towards the open panel keeps moving, so it never "stops" on the neighbouring item. Closing is timed. */
+  var hoverSchedule = function (target, delay, needStill) {
+    hoverCancel();
+    hoverPending = target;
+    var started = Date.now(), lx = hoverX, ly = hoverY;
+    var check = function () {
+      var still = !needStill || (Math.abs(hoverX - lx) + Math.abs(hoverY - ly) <= 5);
+      if (still && Date.now() - started >= delay) { hoverTimer = null; hoverPending = null; hoverSet(target); return; }
+      lx = hoverX; ly = hoverY;
+      hoverTimer = setTimeout(check, 70);
+    };
+    hoverTimer = setTimeout(check, 70);
+  };
+  Array.prototype.forEach.call(doc.querySelectorAll(".primary-nav .nav-item"), function (item) {
+    var target = item.classList.contains("has-sub") ? item : null;
+    item.addEventListener("mouseenter", function () {
+      if (!deskMq.matches) return;
+      if (item === hoverActive) { hoverCancel(); return; }
+      if (target === null && hoverActive === null) return;
+      hoverSchedule(target, hoverActive ? 200 : 80, true);
+    });
+    item.addEventListener("mouseleave", function () {
+      if (!deskMq.matches) return;
+      if (hoverPending === target) hoverCancel();
+      if (hoverActive && hoverTimer === null && !hoverActive.matches(":hover")) hoverSchedule(null, 300, false);
+    });
+  });
+
   var closePanels = function () {
     Array.prototype.forEach.call(doc.querySelectorAll(".primary-nav .subnav.is-open"), function (sub) {
       sub.classList.remove("is-open");
@@ -78,6 +119,14 @@
 
     /* tapping a real destination link closes the drawer */
     nav.addEventListener("click", function (e) {
+      /* mobile: tapping a parent item's name expands its sub-menu instead of navigating */
+      var parentLink = e.target.closest(".nav-item.has-sub > .nav-item__link");
+      if (parentLink && !deskMq.matches) {
+        e.preventDefault();
+        var t = parentLink.parentElement.querySelector(".nav-item__toggle");
+        if (t) t.click();
+        return;
+      }
       if (e.target.closest("a") && nav.classList.contains("is-open")) closeDrawer();
     });
 
@@ -94,6 +143,38 @@
         btn.setAttribute("aria-expanded", willOpen ? "true" : "false");
       });
     });
+
+    /* second-level groups (e.g. Club > Policies) */
+    Array.prototype.forEach.call(doc.querySelectorAll(".subnav__grouptoggle"), function (btn) {
+      btn.addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        var grp = btn.closest(".subnav__group");
+        if (!grp) return;
+        var willOpen = !grp.classList.contains("is-open");
+        Array.prototype.forEach.call(grp.parentElement.querySelectorAll(".subnav__group.is-open"), function (g) {
+          g.classList.remove("is-open");
+          var gb = g.querySelector(".subnav__grouptoggle");
+          if (gb) gb.setAttribute("aria-expanded", "false");
+        });
+        grp.classList.toggle("is-open", willOpen);
+        btn.setAttribute("aria-expanded", willOpen ? "true" : "false");
+      });
+    });
+
+    /* sub-links that point at a #section on the current page: only the one matching the hash is current */
+    function markHashLinks() {
+      var here = window.location.pathname.replace(/\/+$/, "");
+      Array.prototype.forEach.call(doc.querySelectorAll('.subnav__sublink[href*="#"]'), function (a) {
+        var u;
+        try { u = new URL(a.getAttribute("href"), window.location.href); } catch (err) { return; }
+        var on = u.pathname.replace(/\/+$/, "") === here && u.hash !== "" && u.hash === window.location.hash;
+        if (on) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
+      });
+    }
+    markHashLinks();
+    window.addEventListener("hashchange", markHashLinks);
+    window.markNavHashLinks = markHashLinks;
 
     /* desktop: click outside any nav item closes open panels */
     doc.addEventListener("click", function (e) {
@@ -157,7 +238,10 @@
       t.className = "lightbox__thumb";
       t.setAttribute("aria-label", "Show image " + (i + 1));
       var tImg = doc.createElement("img");
-      tImg.src = innerImg ? innerImg.getAttribute("src") : it.getAttribute("data-full");
+      // The lightbox strip is hidden until opened: load its thumbnails lazily, and reuse the
+      // copy the page already chose (currentSrc) so photos are not downloaded a second time.
+      tImg.loading = "lazy";
+      tImg.src = innerImg ? (innerImg.currentSrc || innerImg.getAttribute("src")) : it.getAttribute("data-full");
       tImg.alt = "";
       t.appendChild(tImg);
       t.addEventListener("click", function () { show(i); });
@@ -288,7 +372,7 @@
       tab.addEventListener("click", function (e) {
         e.preventDefault();
         var id = tab.getAttribute("href").slice(1);
-        if (window.history && history.pushState) history.pushState(null, "", "#" + id);
+        if (window.history && history.pushState) { history.pushState(null, "", "#" + id); if (window.markNavHashLinks) window.markNavHashLinks(); }
         else location.hash = id;
         pActivate(id, true);
         if (window.matchMedia("(max-width: 820px)").matches) {
@@ -469,4 +553,241 @@
     };
     window.addEventListener("scroll", onScroll2, { passive: true });
   })();
+})();
+
+/* Player profile: About / Stats tabs and the "Select a player" strip arrows. */
+(function () {
+  "use strict";
+  var tabs = document.querySelector("[data-pf-tabs]");
+  if (tabs) {
+    var buttons = tabs.querySelectorAll("[data-pf-tab]");
+    var panels = tabs.querySelectorAll("[data-pf-panel]");
+    var show = function (name) {
+      buttons.forEach(function (b) {
+        var on = b.getAttribute("data-pf-tab") === name;
+        b.classList.toggle("is-active", on);
+        b.setAttribute("aria-selected", on ? "true" : "false");
+        b.tabIndex = on ? 0 : -1;
+      });
+      panels.forEach(function (p) { p.hidden = p.getAttribute("data-pf-panel") !== name; });
+    };
+    buttons.forEach(function (b) {
+      b.addEventListener("click", function () { show(b.getAttribute("data-pf-tab")); });
+    });
+  }
+  var track = document.querySelector("[data-pf-track]");
+  if (track) {
+    var step = function (dir) { track.scrollBy({ left: dir * Math.max(track.clientWidth * 0.8, 160), behavior: "smooth" }); };
+    var prev = document.querySelector("[data-pf-prev]");
+    var next = document.querySelector("[data-pf-next]");
+    if (prev) prev.addEventListener("click", function () { step(-1); });
+    if (next) next.addEventListener("click", function () { step(1); });
+    var cur = track.querySelector(".is-current");
+    if (cur) track.scrollLeft = Math.max(0, cur.offsetLeft - 16);
+  }
+})();
+
+/* Home hero carousel (phones): dots that follow the swipe. */
+(function () {
+  "use strict";
+  var grid = document.querySelector(".hfeature__grid");
+  if (!grid) return;
+  var cards = grid.querySelectorAll(".hcard");
+  if (cards.length < 2) return;
+  var dots = document.createElement("div");
+  dots.className = "hfeature__dots";
+  dots.setAttribute("aria-hidden", "true");
+  cards.forEach(function () { dots.appendChild(document.createElement("span")); });
+  grid.parentNode.appendChild(dots);
+  var update = function () {
+    var step = cards[1].offsetLeft - cards[0].offsetLeft || 1;
+    var idx = Math.min(cards.length - 1, Math.max(0, Math.round(grid.scrollLeft / step)));
+    Array.prototype.forEach.call(dots.children, function (d, i) { d.classList.toggle("is-active", i === idx); });
+  };
+  grid.addEventListener("scroll", function () { window.requestAnimationFrame(update); }, { passive: true });
+  window.addEventListener("resize", update);
+  update();
+})();
+
+/* Club partners: one row of logos that travels left to right. Each logo slows to a stop in the
+   middle, grows and shows in colour for a few seconds, then the row moves on. Pauses on hover,
+   keyboard focus and when off screen. With "reduce motion" switched on nothing moves and the
+   row can be scrolled by hand instead. */
+(function () {
+  "use strict";
+  var box = document.querySelector("[data-marquee]");
+  if (!box) return;
+  var track = box.querySelector("[data-marquee-track]");
+  if (!track || track.children.length < 4) return;
+
+  var SPEED = 140;      /* px per second between logos */
+  var DWELL = 2800;     /* ms each logo stays in the middle */
+  var SCALE = 1.4;      /* size of the logo in the middle */
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (reduce) { box.classList.add("is-scroll"); return; }   /* no automatic movement: a row to scroll by hand */
+
+  /* The row travels to the right, so the logo nearest the middle on the left is next to arrive.
+     Lay the row out in reverse so the spotlight still steps through the partners in order. */
+  var originals = Array.prototype.slice.call(track.children).reverse();
+  originals.forEach(function (el) { track.appendChild(el); });
+  var n = originals.length;
+  originals.forEach(function (el) {
+    var copy = el.cloneNode(true);
+    copy.setAttribute("aria-hidden", "true");
+    copy.setAttribute("tabindex", "-1");
+    copy.querySelectorAll("a, img").forEach(function (x) { x.setAttribute("tabindex", "-1"); if (x.tagName === "IMG") x.setAttribute("alt", ""); });
+    track.appendChild(copy);
+  });
+  box.classList.add("is-marquee");
+  var items = Array.prototype.slice.call(track.children);
+
+  var period = 0, centres = [], widths = [], offset = 0;
+  var measure = function () {
+    var p = items[n].offsetLeft - items[0].offsetLeft;
+    if (p <= 0) return;
+    var first = period === 0;
+    var ratio = period > 0 ? offset / period : 0;   /* keep our place when the size changes */
+    period = p;
+    centres = items.map(function (el) { return el.offsetLeft + el.offsetWidth / 2; });
+    widths = items.map(function (el) { return el.offsetWidth; });
+    if (first) {
+      /* start with the first partner just left of the middle, about to arrive */
+      offset = box.clientWidth / 2 - centres[n - 1] - 110;
+    } else {
+      offset = ratio * period;
+    }
+    while (offset >= 0) offset -= period;
+    while (offset < -period) offset += period;
+  };
+  measure();
+  window.addEventListener("load", measure);
+  window.addEventListener("resize", measure);
+
+  var hover = false, focus = false, inView = true;
+  var holdUntil = 0, travelled = 1e9, last = 0, scaled = [], spot = -1, held = -1;
+
+  box.addEventListener("pointerenter", function (e) { if (e.pointerType === "mouse") hover = true; });
+  box.addEventListener("pointerleave", function (e) { if (e.pointerType === "mouse") hover = false; });
+  box.addEventListener("focusin", function () { focus = true; });
+  box.addEventListener("focusout", function () { focus = false; });
+  if ("IntersectionObserver" in window) {
+    new IntersectionObserver(function (entries) { inView = entries[0].isIntersecting; }).observe(box);
+  }
+
+  var render = function () {
+    track.style.transform = "translate3d(" + offset.toFixed(2) + "px,0,0)";
+    var mid = box.clientWidth / 2;
+    var next = [], bestSpot = -1, bestD = 1e9;
+    for (var i = 0; i < items.length; i++) {
+      var signed = offset + centres[i] - mid;   /* negative = still arriving, positive = already leaving */
+      var d = Math.abs(signed);
+      var reach = widths[i] * 1.25;
+      if (d < reach) {
+        var s = 1 + (SCALE - 1) * (0.5 + 0.5 * Math.cos(Math.PI * d / reach));
+        items[i].style.transform = "scale(" + s.toFixed(3) + ")";
+        /* stacking: the logo in the middle on top, the one arriving over the one leaving */
+        items[i].style.zIndex = d < 6 ? "4" : (signed < 0 ? "3" : "2");
+        next.push(i);
+        if (d < bestD) { bestD = d; bestSpot = i; }
+      }
+    }
+    scaled.forEach(function (i) { if (next.indexOf(i) < 0) { items[i].style.transform = ""; items[i].style.zIndex = ""; } });
+    scaled = next;
+    var want = bestD < 6 ? bestSpot : -1;
+    if (want !== spot) {
+      if (spot >= 0) items[spot].classList.remove("is-spot");
+      if (want >= 0) items[want].classList.add("is-spot");
+      spot = want;
+    }
+  };
+
+  var frame = function (t) {
+    var dt = last ? Math.min(0.05, (t - last) / 1000) : 0;
+    last = t;
+    var running = !hover && !focus && inView && !document.hidden;
+    if (running && t >= holdUntil && period > 0) {
+      var mid = box.clientWidth / 2;
+      var dx = 1e9, target = -1;   /* distance until the next logo reaches the middle */
+      for (var i = 0; i < items.length; i++) {
+        var gap = mid - (offset + centres[i]);
+        if (i === held) { if (gap < -3) held = -1; continue; }   /* the logo we just showed */
+        if (gap >= 0 && gap < dx) { dx = gap; target = i; }
+      }
+      var factor = Math.min(1, 0.22 + dx / 170, 0.22 + travelled / 140);
+      var step = SPEED * factor * dt;
+      if (target >= 0 && step >= dx) { step = dx; holdUntil = t + DWELL; travelled = 0; held = target; }
+      else { travelled += step; }
+      offset += step;
+      if (offset >= 0) offset -= period;
+    } else if (running && t < holdUntil) {
+      /* holding in the middle */
+    }
+    render();
+    window.requestAnimationFrame(frame);
+  };
+  render();
+  window.requestAnimationFrame(frame);
+})();
+
+
+
+/* Pitchside boards banner: once in view, show a random board photo every 10s with a different pan each time. */
+(function () {
+  var el = document.querySelector(".boardscta");
+  if (!el) return;
+  var photos = [];
+  try { photos = JSON.parse(el.getAttribute("data-board-photos") || "[]"); } catch (e) {}
+  var host = el.querySelector(".boardscta__slides");
+  if (!photos.length || !host) return;
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var bag = [], last = "", lastMove = 0, timer = null;
+  var pick = function () {
+    if (!bag.length) {
+      bag = photos.slice();
+      for (var i = bag.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = bag[i]; bag[i] = bag[j]; bag[j] = t; }
+      if (bag.length > 1 && bag[bag.length - 1] === last) bag.unshift(bag.pop());
+    }
+    last = bag.pop();
+    return last;
+  };
+  var move = function () { var m; do { m = 1 + Math.floor(Math.random() * 8); } while (m === lastMove && photos.length > 1); lastMove = m; return m; };
+  var show = function () {
+    var src = pick(), img = new Image();
+    img.onload = function () {
+      var d = document.createElement("div");
+      d.className = "bslide m" + move() + (img.naturalWidth > img.naturalHeight ? " bslide--landscape" : "");
+      d.style.backgroundImage = 'url("' + src + '")';
+      host.appendChild(d);
+      void d.offsetWidth;
+      d.classList.add("is-on");
+      var old = host.querySelectorAll(".bslide.is-on");
+      Array.prototype.forEach.call(old, function (o) {
+        if (o === d) return;
+        o.classList.remove("is-on");
+        setTimeout(function () { if (o.parentNode) o.parentNode.removeChild(o); }, 2200);
+      });
+    };
+    img.src = src;
+  };
+  var start = function () {
+    show();
+    if (!reduce) timer = setInterval(function () { if (!document.hidden) show(); }, 10000);
+  };
+  if (!("IntersectionObserver" in window)) { start(); return; }
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) { if (e.isIntersecting) { start(); io.disconnect(); } });
+  }, { threshold: 0.15 });
+  io.observe(el);
+})();
+
+
+/* Sponsor-a-player band: trigger its attention animation when it scrolls into view. */
+(function () {
+  var el = document.querySelector(".sponsorband");
+  if (!el) return;
+  if (!("IntersectionObserver" in window)) { el.classList.add("is-inview"); return; }
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) { if (e.isIntersecting) { el.classList.add("is-inview"); io.disconnect(); } });
+  }, { threshold: 0.3 });
+  io.observe(el);
 })();

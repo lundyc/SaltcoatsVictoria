@@ -98,14 +98,13 @@ function app_render_primary_nav(string $currentPage, ?string $brandLabel = null)
         ['key' => 'settings', 'label' => 'Settings', 'href' => '/settings.php'],
     ];
     if (auth_is_admin()) {
-        $moreLinks[] = ['key' => 'admin_users', 'label' => 'People & Users', 'href' => '/club_people.php'];
+        $moreLinks[] = ['key' => 'admin_users', 'label' => 'Users', 'href' => '/club_people.php'];
     }
 
     ?>
-    <a class="hub-skip-link" href="#hubMainContent">Skip to main content</a>
     <nav class="legacy-toolbar" aria-label="Primary navigation">
         <a class="legacy-toolbar__brand" href="/admin/index.php" aria-label="<?= safe($brandLabel) ?> home">
-            <img src="/admin/Saltcoats Victoria FC -White_Transparent.png" alt="" width="38" height="38">
+            <img src="/admin/club-logo-white-120.png" alt="" width="38" height="38">
             <span><?= safe($brandLabel) ?></span>
         </a>
         <div class="legacy-toolbar__links">

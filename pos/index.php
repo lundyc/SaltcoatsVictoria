@@ -59,8 +59,8 @@ $canViewFinancials = pos_actor_is_manager($pdo);
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#4b0818">
     <title>POS - Hub</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.3.1/css/all.min.css" rel="stylesheet">
     <style>
         :root { --brand:#4b0818; --brand-2:#8a1538; --gold:#ba8f2a; --paper:#f7efe4; --ink:#24151a; }
         * { box-sizing:border-box; }

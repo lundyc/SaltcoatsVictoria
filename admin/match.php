@@ -205,6 +205,9 @@ $staffingStatuses = matchday_staffing_statuses();
 <?php if (isset($_GET['saved'])): ?>
           <div class="alert alert-success">Fixture saved.</div>
 <?php endif; ?>
+<?php if (isset($_GET['gcal_failed'])): ?>
+          <div class="alert alert-warning">The fixture was saved, but it could not be updated on Google Calendar. Reconnect Google Calendar in Settings, then save the fixture again.</div>
+<?php endif; ?>
 <?php if (isset($_GET['opponent_added'])): ?>
           <div class="alert alert-success">Opponent added and selected.</div>
 <?php endif; ?>
@@ -393,6 +396,16 @@ $staffingStatuses = matchday_staffing_statuses();
                                                             <label class="form-label">VEO footage link</label>
                                                             <input type="url" form="fixtureSaveForm" name="veo_url" class="form-control" placeholder="https://app.veo.co/matches/..." value="<?= h((string)($fixture['veo_url'] ?? '')) ?>">
                                                             <div class="form-text">Shown to season ticket holders on this match's summary page.</div>
+                                                  </div>
+                                                  <?php
+                                                  $cometLinkRow = null;
+                                                  try { $cl = $pdo->prepare('SELECT url, last_fetched_at FROM fixture_comet_links WHERE fixture_id = ?'); $cl->execute([(int)$fixture['id']]); $cometLinkRow = $cl->fetch(PDO::FETCH_ASSOC) ?: null; } catch (Throwable $e) { $cometLinkRow = null; }
+                                                  ?>
+                                                  <div class="col-12 mt-2">
+                                                            <label class="form-label">COMET match address</label>
+                                                            <input type="text" form="fixtureSaveForm" name="comet_url" class="form-control" placeholder="https://www.scottishfacomet.co.uk/mycomet/private/match/..." value="<?= h((string)($cometLinkRow['url'] ?? '')) ?>">
+                                                            <div class="form-text">Paste the match page address from COMET (you can add it before the game). It is used to fetch the match report afterwards &mdash;
+                                                                      <a href="/admin/match_report_import.php?fixture_id=<?= (int)$fixture['id'] ?>&amp;season_id=<?= (int)($fixture['season_id'] ?? 0) ?>">fetch the match report</a><?= !empty($cometLinkRow['last_fetched_at']) ? ' (last fetched ' . h(date('j M Y H:i', strtotime((string)$cometLinkRow['last_fetched_at']))) . ')' : '' ?>.</div>
                                                   </div>
                                         </div>
                                         <?php endif; ?>

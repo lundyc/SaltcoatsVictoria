@@ -4,6 +4,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/season_tickets.php';
 require_once __DIR__ . '/season.php';
 require_once __DIR__ . '/audit.php';
+require_once __DIR__ . '/birthday_calendar.php';
 
 function ensurePersonPositionsDateSchema(PDO $pdo): void
 {
@@ -243,6 +244,7 @@ function identityAuditLog(PDO $pdo, string $action, string $details = ''): void
 
 function createPerson(PDO $pdo, array $data): int
 {
+    birthday_calendar_queue_sync($pdo);
     $displayName = trim((string) ($data['display_name'] ?? $data['name'] ?? ''));
     if ($displayName === '') {
         throw new InvalidArgumentException('Display name is required.');
@@ -308,8 +310,9 @@ function getPeopleDirectory(PDO $pdo, array $filters = []): array
         $where[] = 'pp.club_role_id = :position_id';
         $params[':position_id'] = (int) $filters['position_id'];
     }
+    $roleCodesSql = accountRoleCodesSql();
     if (!empty($filters['role'])) {
-        $where[] = 'r.code = :role';
+        $where[] = 'FIND_IN_SET(:role, ' . $roleCodesSql . ') > 0';
         $params[':role'] = (string) $filters['role'];
     }
     if (($filters['login'] ?? '') === 'never') {
@@ -329,13 +332,14 @@ function getPeopleDirectory(PDO $pdo, array $filters = []): array
     $sql = "SELECT p.*, m.old_holder_id, a.id AS account_id, a.email AS account_email, a.is_active AS account_is_active,
                a.last_login_at,
                GROUP_CONCAT(DISTINCT hp.name ORDER BY hp.name SEPARATOR ', ') AS position_names,
-               GROUP_CONCAT(DISTINCT r.code ORDER BY r.code SEPARATOR ',') AS role_codes,
+               {$roleCodesSql} AS role_codes,
+               (SELECT t.id FROM person_access_templates pat JOIN access_templates t ON t.id = pat.template_id WHERE pat.person_id = p.id ORDER BY t.bypass_all DESC, t.sort_order, t.id LIMIT 1) AS access_role_id,
+               (SELECT t.name FROM person_access_templates pat JOIN access_templates t ON t.id = pat.template_id WHERE pat.person_id = p.id ORDER BY t.bypass_all DESC, t.sort_order, t.id LIMIT 1) AS access_role_name,
+               (SELECT t.slug FROM person_access_templates pat JOIN access_templates t ON t.id = pat.template_id WHERE pat.person_id = p.id ORDER BY t.bypass_all DESC, t.sort_order, t.id LIMIT 1) AS access_role_slug,
                COUNT(DISTINCT pr.dependent_person_id) AS dependents_count
         FROM people p
         LEFT JOIN identity_migration_map m ON m.person_id = p.id
         LEFT JOIN accounts a ON a.person_id = p.id
-        LEFT JOIN account_roles ar ON ar.account_id = a.id
-        LEFT JOIN roles r ON r.id = ar.role_id
         LEFT JOIN person_club_roles pp ON pp.person_id = p.id
             AND pp.start_date <= CURDATE()
             AND (pp.end_date IS NULL OR pp.end_date >= CURDATE())
@@ -351,6 +355,7 @@ function getPeopleDirectory(PDO $pdo, array $filters = []): array
 
 function updatePerson(PDO $pdo, int $personId, array $data, bool $syncLegacyHolder = true): void
 {
+    birthday_calendar_queue_sync($pdo);
     $email = trim((string) ($data['email'] ?? ''));
     $params = [
         ':id' => $personId,
@@ -374,7 +379,7 @@ function updatePerson(PDO $pdo, int $personId, array $data, bool $syncLegacyHold
     $accountStmt = $pdo->prepare('SELECT id FROM accounts WHERE person_id = ?');
     $accountStmt->execute([$personId]);
     $accountId = $accountStmt->fetchColumn();
-    if ($accountId && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+    if ($accountId && $email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
         throw new InvalidArgumentException('A valid email is required for a person with a login account.');
     }
     $ownsTransaction = !$pdo->inTransaction();
@@ -382,12 +387,6 @@ function updatePerson(PDO $pdo, int $personId, array $data, bool $syncLegacyHold
         $pdo->beginTransaction();
     }
     try {
-        if ($accountId) {
-            $pdo->prepare('UPDATE accounts SET email = ?, email_normalized = ? WHERE id = ?')
-                ->execute([$email, people_normalize_email($email), $accountId]);
-            $pdo->prepare('UPDATE season_ticket_holders h JOIN identity_migration_map m ON m.old_holder_id = h.id SET h.email = ?, h.email_normalized = ? WHERE m.person_id = ?')
-                ->execute([$email, people_normalize_email($email), $personId]);
-        }
         $pdo->prepare('UPDATE people
             SET display_name = :display_name, date_of_birth = :date_of_birth, email = :email,
                 email_normalized = :email_normalized, phone = :phone, address_line1 = :address_line1,
@@ -437,13 +436,28 @@ function updatePerson(PDO $pdo, int $personId, array $data, bool $syncLegacyHold
 
 function archivePerson(PDO $pdo, int $personId): void
 {
-    $pdo->prepare('UPDATE people SET is_active = 0 WHERE id = :id')->execute([':id' => $personId]);
-    $pdo->prepare('UPDATE accounts SET is_active = 0 WHERE person_id = :id')->execute([':id' => $personId]);
-    $holderId = getLegacyHolderIdForPerson($pdo, $personId);
-    if ($holderId !== null) {
-        deleteSeasonTicketHolder($pdo, $holderId);
+    birthday_calendar_queue_sync($pdo);
+    $ownsTransaction = !$pdo->inTransaction();
+    if ($ownsTransaction) {
+        $pdo->beginTransaction();
     }
-    identityAuditLog($pdo, 'person_archived', 'Archived person #' . $personId);
+    try {
+        $pdo->prepare('UPDATE people SET is_active = 0 WHERE id = :id')->execute([':id' => $personId]);
+        $pdo->prepare('UPDATE accounts SET is_active = 0, auth_version = auth_version + 1, reset_token_hash = NULL, reset_token_expires_at = NULL WHERE person_id = :id')->execute([':id' => $personId]);
+        $holderId = getLegacyHolderIdForPerson($pdo, $personId);
+        if ($holderId !== null) {
+            deleteSeasonTicketHolder($pdo, $holderId);
+        }
+        identityAuditLog($pdo, 'person_archived', 'Archived person #' . $personId);
+        if ($ownsTransaction) {
+            $pdo->commit();
+        }
+    } catch (Throwable $e) {
+        if ($ownsTransaction && $pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        throw $e;
+    }
 }
 
 /**
@@ -573,11 +587,10 @@ function addPersonPosition(PDO $pdo, int $personId, int $positionId, int $season
     ]);
     $rowId = (int) $pdo->lastInsertId();
     identityAuditLog($pdo, 'person_position_added', "Added position #{$positionId} for person #{$personId}, season #{$seasonId}");
-    syncAccountRoleForPerson($pdo, $personId);
     return $rowId;
 }
 
-function updatePersonPosition(PDO $pdo, int $rowId, int $positionId, int $seasonId = 0, ?string $notes = null, ?string $startDate = null, ?string $endDate = null): void
+function updatePersonPosition(PDO $pdo, int $rowId, int $positionId, int $seasonId = 0, ?string $notes = null, ?string $startDate = null, ?string $endDate = null, ?int $expectedPersonId = null): void
 {
     ensurePersonPositionsDateSchema($pdo);
     $stmt = $pdo->prepare('SELECT person_id FROM person_club_roles WHERE id = :id');
@@ -585,6 +598,9 @@ function updatePersonPosition(PDO $pdo, int $rowId, int $positionId, int $season
     $personId = (int) $stmt->fetchColumn();
     if ($personId <= 0) {
         throw new RuntimeException('Position assignment not found.');
+    }
+    if ($expectedPersonId !== null && $personId !== $expectedPersonId) {
+        throw new RuntimeException('Position assignment does not belong to this person.');
     }
 
     $startDate = trim((string) $startDate);
@@ -607,10 +623,9 @@ function updatePersonPosition(PDO $pdo, int $rowId, int $positionId, int $season
             ':id' => $rowId,
         ]);
     identityAuditLog($pdo, 'person_position_updated', "Updated position assignment #{$rowId} for person #{$personId}");
-    syncAccountRoleForPerson($pdo, $personId);
 }
 
-function deletePersonPosition(PDO $pdo, int $rowId): void
+function deletePersonPosition(PDO $pdo, int $rowId, ?int $expectedPersonId = null): void
 {
     ensurePersonPositionsDateSchema($pdo);
     $stmt = $pdo->prepare('SELECT person_id FROM person_club_roles WHERE id = :id');
@@ -619,10 +634,12 @@ function deletePersonPosition(PDO $pdo, int $rowId): void
     if ($personId <= 0) {
         throw new RuntimeException('Position assignment not found.');
     }
+    if ($expectedPersonId !== null && $personId !== $expectedPersonId) {
+        throw new RuntimeException('Position assignment does not belong to this person.');
+    }
 
     $pdo->prepare('DELETE FROM person_club_roles WHERE id = :id')->execute([':id' => $rowId]);
     identityAuditLog($pdo, 'person_position_removed', "Removed position assignment #{$rowId} for person #{$personId}");
-    syncAccountRoleForPerson($pdo, $personId);
 }
 
 function personRelationshipExists(PDO $pdo, int $managerPersonId, int $dependentPersonId): bool
@@ -658,13 +675,16 @@ function addPersonRelationship(PDO $pdo, int $managerPersonId, int $dependentPer
     return $relationshipId;
 }
 
-function removePersonRelationship(PDO $pdo, int $relationshipId): void
+function removePersonRelationship(PDO $pdo, int $relationshipId, ?int $expectedManagerPersonId = null): void
 {
     $stmt = $pdo->prepare('SELECT * FROM person_relationships WHERE id = :id LIMIT 1');
     $stmt->execute([':id' => $relationshipId]);
     $relationship = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$relationship) {
         return;
+    }
+    if ($expectedManagerPersonId !== null && (int) $relationship['manager_person_id'] !== $expectedManagerPersonId) {
+        throw new RuntimeException('Relationship does not belong to this person.');
     }
     $pdo->prepare('DELETE FROM person_relationships WHERE id = :id')->execute([':id' => $relationshipId]);
     $dependentHolderId = getLegacyHolderIdForPerson($pdo, (int) $relationship['dependent_person_id']);

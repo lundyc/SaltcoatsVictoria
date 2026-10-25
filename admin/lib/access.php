@@ -36,6 +36,8 @@ const ACCESS_IMPLIES = [
     'sponsorship_payments' => ['sponsorship'],
     'tickets_refund_comp' => ['tickets_ops'],
     'tickets_ops' => ['tickets_scan'],
+    'events_manage' => ['events_view'],
+    'events_refund' => ['events_manage'],
 ];
 
 /**

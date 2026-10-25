@@ -149,41 +149,84 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  const seasonSelect = document.getElementById("hubSeasonSelect");
-  if (seasonSelect) {
+  // Each season picker (the menu's copy on phones, the top-row copy on desktop) submits itself on change.
+  document.querySelectorAll("select[data-season-select]").forEach((seasonSelect) => {
     seasonSelect.addEventListener("change", () => {
       seasonSelect.closest("form").submit();
       seasonSelect.disabled = true;
     });
-  }
+  });
 
-  const desktopNavToggle = document.getElementById("hubDesktopNavToggle");
-  if (desktopNavToggle) {
-    const updateDesktopNavToggle = () => {
-      const collapsed = document.documentElement.classList.contains("hub-nav-collapsed");
-      const label = collapsed ? "Show side navigation" : "Hide side navigation";
-
-      desktopNavToggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
-      desktopNavToggle.setAttribute("aria-label", label);
-      desktopNavToggle.setAttribute("title", label);
-      desktopNavToggle.innerHTML = '<i class="fa-solid fa-chevron-' + (collapsed ? "right" : "left") + '" aria-hidden="true"></i>';
+  // The top-row calendar icon opens the season picker. Clicking outside it, or pressing Escape, closes it.
+  const seasonTool = document.getElementById("hubSeasonToolButton");
+  const seasonPopover = document.getElementById("hubSeasonPopover");
+  if (seasonTool && seasonPopover) {
+    const setSeasonOpen = (open) => {
+      seasonPopover.hidden = !open;
+      seasonTool.setAttribute("aria-expanded", open ? "true" : "false");
     };
-
-    desktopNavToggle.addEventListener("click", () => {
-      document.documentElement.classList.toggle("hub-nav-collapsed");
-      try {
-        window.localStorage.setItem(
-          "hubDesktopNavCollapsed",
-          document.documentElement.classList.contains("hub-nav-collapsed") ? "true" : "false"
-        );
-      } catch (error) {
-        // The visual state still changes if storage is unavailable.
-      }
-      updateDesktopNavToggle();
+    seasonTool.addEventListener("click", (event) => {
+      event.stopPropagation();
+      setSeasonOpen(seasonPopover.hidden);
     });
-
-    updateDesktopNavToggle();
+    document.addEventListener("click", (event) => {
+      if (!seasonPopover.hidden && !event.target.closest("#hubSeasonPopover, #hubSeasonToolButton")) {
+        setSeasonOpen(false);
+      }
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !seasonPopover.hidden) {
+        setSeasonOpen(false);
+        seasonTool.focus();
+      }
+    });
   }
+
+  // The menu's Hide button, the rail's Show button and the rail's section icons all use one setter.
+  // Tooltips on these controls close first, because Bootstrap leaves a tooltip on screen when its element is hidden.
+  const sidebarButtons = [
+    document.getElementById("hubDesktopNavHide"),
+    document.getElementById("hubDesktopNavToggle"),
+  ].filter(Boolean);
+
+  const closeSidebarTooltips = () => {
+    document.querySelectorAll(".hub-desktop-nav-hide, .hub-desktop-nav-toggle, .hub-sidebar-tool, .hub-sidebar-rail button, .hub-sidebar-rail a")
+      .forEach((control) => window.bootstrap?.Tooltip?.getInstance(control)?.hide());
+  };
+
+  const updateSidebarButtons = () => {
+    const collapsed = document.documentElement.classList.contains("hub-nav-collapsed");
+    sidebarButtons.forEach((button) => {
+      button.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    });
+  };
+
+  const setSidebarCollapsed = (collapsed) => {
+    closeSidebarTooltips();
+    document.documentElement.classList.toggle("hub-nav-collapsed", collapsed);
+    try {
+      window.localStorage.setItem("hubDesktopNavCollapsed", collapsed ? "true" : "false");
+    } catch (error) {
+      // The visual state still changes if storage is unavailable.
+    }
+    updateSidebarButtons();
+  };
+
+  sidebarButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      setSidebarCollapsed(!document.documentElement.classList.contains("hub-nav-collapsed"));
+    });
+  });
+
+  // Each rail icon opens the menu and scrolls to its section.
+  document.querySelectorAll("[data-nav-target]").forEach((item) => {
+    item.addEventListener("click", () => {
+      setSidebarCollapsed(false);
+      document.getElementById(item.dataset.navTarget)?.scrollIntoView({ block: "start" });
+    });
+  });
+
+  updateSidebarButtons();
 
   document.querySelectorAll('.alert-success, .alert-danger, .alert-warning, .alert-info').forEach(alert => {
     if (!alert.hasAttribute("role")) {
@@ -341,55 +384,10 @@ document.querySelectorAll('form[data-warn-unsaved]').forEach(function (form) {
   });
 });
 
-// Sidebar sections — personalisation. Every collapse/expand the user makes is
-// remembered per browser (localStorage "hubNavSections") and reapplied on
-// every page. The one exception: the section that contains the current page
-// is revealed on load so you can always see where you are — but that reveal
-// is transient and does NOT change the stored preference, so it collapses
-// again as soon as you navigate elsewhere.
-(function () {
-  const KEY = "hubNavSections";
-  const toggles = document.querySelectorAll(".nav-section-toggle[data-nav-section]");
-  if (!toggles.length) return;
-
-  let store = {};
-  try {
-    store = JSON.parse(window.localStorage.getItem(KEY) || "{}") || {};
-  } catch (error) {
-    store = {};
-  }
-  const save = () => {
-    try {
-      window.localStorage.setItem(KEY, JSON.stringify(store));
-    } catch (error) {
-      /* storage unavailable (private mode) — preference just won't persist */
-    }
-  };
-
-  const setOpen = (btn, panel, open) => {
-    panel.classList.toggle("show", open);
-    btn.setAttribute("aria-expanded", open ? "true" : "false");
-  };
-
-  toggles.forEach((btn) => {
-    const key = btn.getAttribute("data-nav-section");
-    const target = btn.getAttribute("data-bs-target");
-    const panel = target ? document.querySelector(target) : null;
-    if (!panel) return;
-
-    // 1. Apply the remembered preference (falls back to the server render).
-    if (Object.prototype.hasOwnProperty.call(store, key)) {
-      setOpen(btn, panel, store[key] === 1);
-    }
-    // 2. Always reveal the section you're currently in — without recording it.
-    if (panel.querySelector(".nav-link.active") && !panel.classList.contains("show")) {
-      setOpen(btn, panel, true);
-    }
-    // 3. Any deliberate toggle from here on is the preference.
-    panel.addEventListener("shown.bs.collapse", () => { store[key] = 1; save(); });
-    panel.addEventListener("hidden.bs.collapse", () => { store[key] = 0; save(); });
-  });
-})();
+// Sidebar sections behave as an accordion (data-bs-parent in header.php): the
+// section containing the current page is rendered open by the server and
+// opening another closes it. Nothing is stored per browser any more.
+try { window.localStorage.removeItem("hubNavSections"); } catch (error) { /* storage unavailable */ }
 
 // Dashboard sections — same idea as the sidebar above, but for the index.php
 // widgets (Stripe activity, snapshot, operations, club business, match day).
@@ -544,3 +542,50 @@ document.addEventListener('DOMContentLoaded', function () {
     window.initHubSortableTable(table, { storageKey: table.getAttribute('data-hub-sortable') || null });
   });
 });
+
+// WordPress-style flyout: submenus of non-current items open beside the sidebar on hover/focus.
+(function () {
+  var menu = document.getElementById("hubNavSections");
+  if (!menu || !window.matchMedia) return;
+  var desktop = window.matchMedia("(min-width: 1200px)");
+  var closeTimer = null;
+  var openItem = null;
+
+  function close() {
+    if (openItem) openItem.classList.remove("is-open");
+    openItem = null;
+  }
+  function open(item) {
+    clearTimeout(closeTimer);
+    if (openItem === item) return;
+    close();
+    var sub = item.querySelector(":scope > .wp-submenu");
+    if (!sub) return;
+    var rect = item.getBoundingClientRect();
+    item.classList.add("is-open");
+    sub.style.left = rect.right + "px";
+    sub.style.top = rect.top + "px";
+    var overflow = sub.getBoundingClientRect().bottom - window.innerHeight + 8;
+    if (overflow > 0) sub.style.top = Math.max(8, rect.top - overflow) + "px";
+    openItem = item;
+  }
+  function targetItem(event) {
+    var item = event.target.closest ? event.target.closest(".wp-has-sub") : null;
+    return item && !item.classList.contains("wp-current") && menu.contains(item) ? item : null;
+  }
+
+  menu.addEventListener("mouseover", function (event) {
+    if (!desktop.matches) return;
+    var item = targetItem(event);
+    if (item) open(item); else if (openItem) { closeTimer = setTimeout(close, 150); }
+  });
+  menu.addEventListener("mouseleave", function () { closeTimer = setTimeout(close, 150); });
+  menu.addEventListener("focusin", function (event) {
+    if (!desktop.matches) return;
+    var item = targetItem(event);
+    if (item) open(item); else close();
+  });
+  document.addEventListener("keydown", function (event) { if (event.key === "Escape") close(); });
+  window.addEventListener("scroll", close, true);
+  window.addEventListener("resize", close);
+})();

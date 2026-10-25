@@ -6,10 +6,24 @@ $main = pub_main_sponsors();
 $others = pub_other_sponsors();
 $contactEmail = club('contact_email');
 
+// Opening hours, keyed by sponsor id.
+$partnerHours = [
+    207 => '9am – 12am, every day',
+];
+
+// Short write-ups for the principal partners, keyed by sponsor id.
+$partnerBlurbs = [
+    207 => "A friendly, lively pub with a great atmosphere, just a short walk from Saltcoats train station. There's a licensed beer garden for the warmer days, and every bit of sport that can legally be shown goes up on the big screens. With entertainment from Thursday to Sunday, it's no surprise that Saturday nights happen here.",
+    182 => "Great coffee, homemade treats and soups, all in one welcoming spot. Café Del Greco's is the perfect place to relax, catch up with friends and enjoy really good food.",
+    176 => "Sports, events and commercial photographer, capturing the moments that matter. Many of the photos you'll see around Campbell Park and on our channels are the work of Jazza McG.",
+    225 => "Licensed insolvency practitioners with 30 years of experience, offering tailored solutions that help you breathe easy again. If money worries are getting on top of you, McLenan Corporate are on hand with friendly, practical advice.",
+];
+
 set_meta([
     'title' => club('club_name') . ' Sponsors & Partners',
     'description' => 'The businesses and supporters backing ' . club('club_name') . '.',
 ]);
+seo_breadcrumbs([['Commercial', url('commercial')], ['Our partners', url('partners')]]);
 ?>
 <?php partial('page_hero', [
     'eyebrow' => 'Commercial',
@@ -18,38 +32,59 @@ set_meta([
 ]); ?>
 
 <?php if ($main): ?>
-<section class="band">
+<div class="pl-intro">
   <div class="container">
-    <div class="band__head"><div><span class="eyebrow">Principal partners</span><h2>Leading the way</h2></div></div>
-    <div class="partner-lead">
-      <?php foreach ($main as $s): ?>
-        <?php
-        $logo = trim((string) $s['logo_path']);
-        $link = pub_sponsor_link($s);
-        $addr = trim((string) ($s['address'] ?? ''));
-        $phone = trim((string) ($s['contact_phone'] ?? ''));
-        ?>
-        <div class="partner-lead__card">
-          <div class="partner-lead__logo">
-            <?php if ($logo !== ''): ?>
-              <img src="<?= e(uploads('sponsors/' . $logo)) ?>" alt="<?= e($s['name']) ?>" loading="lazy">
-            <?php else: ?>
-              <span><?= e($s['name']) ?></span>
-            <?php endif; ?>
-          </div>
-          <div class="partner-lead__body">
-            <h3><?= e($s['name']) ?></h3>
-            <?php if ($addr !== ''): ?><p class="partner-lead__meta"><?= e($addr) ?></p><?php endif; ?>
-            <?php if ($phone !== ''): ?><p class="partner-lead__meta"><?= e($phone) ?></p><?php endif; ?>
-            <?php if ($link !== ''): ?>
-              <a class="linkarrow" href="<?= e($link) ?>" target="_blank" rel="noopener">Visit</a>
-            <?php endif; ?>
-          </div>
-        </div>
-      <?php endforeach; ?>
-    </div>
+    <span class="eyebrow">Principal partners</span>
+    <h2>Leading the way</h2>
+    <p>Our principal partners are the businesses and supporters who stand shoulder to shoulder with the Vics. Their backing helps keep football at Campbell Park going, and we are proud to have them with us.</p>
   </div>
-</section>
+</div>
+<?php foreach (array_values($main) as $i => $s): ?>
+  <?php
+  $logo = trim((string) $s['logo_path']);
+  $addr = trim((string) ($s['address'] ?? ''));
+  $phone = trim((string) ($s['contact_phone'] ?? ''));
+  $hours = $partnerHours[(int) $s['id']] ?? '';
+  $links = array_filter([
+      'Website'   => trim((string) ($s['website_url'] ?? '')),
+      'Facebook'  => trim((string) ($s['facebook_page_url'] ?? '')),
+      'Instagram' => trim((string) ($s['instagram_url'] ?? '')),
+      'X'         => trim((string) ($s['twitter_url'] ?? '')),
+  ]);
+  ?>
+  <section class="pl-feature<?= $i % 2 === 0 ? ' pl-feature--right' : '' ?>">
+    <div class="container">
+      <div class="pl-feature__inner">
+        <div class="pl-feature__logo">
+          <?php if ($logo !== ''): ?>
+            <img src="<?= e(uploads('sponsors/' . $logo)) ?>" alt="<?= e($s['name']) ?>" <?= $i < 2 ? 'fetchpriority="high"' : 'loading="lazy"' ?>>
+          <?php else: ?>
+            <span><?= e($s['name']) ?></span>
+          <?php endif; ?>
+        </div>
+        <div class="pl-feature__body">
+          <span class="pl-feature__tag">Principal partner</span>
+          <h3><?= e($s['name']) ?></h3>
+          <p class="pl-feature__lead"><?= e($partnerBlurbs[(int) $s['id']] ?? ('Proud principal partner of ' . club('club_name') . '.')) ?></p>
+          <?php if ($addr !== '' || $phone !== '' || $hours !== ''): ?>
+            <ul class="pl-feature__info">
+              <?php if ($addr !== ''): ?><li><b>Find them</b><?= e($addr) ?></li><?php endif; ?>
+              <?php if ($hours !== ''): ?><li><b>Open</b><?= e($hours) ?></li><?php endif; ?>
+              <?php if ($phone !== ''): ?><li><b>Call</b><a href="tel:<?= e(preg_replace('~\s+~', '', $phone)) ?>"><?= e($phone) ?></a></li><?php endif; ?>
+            </ul>
+          <?php endif; ?>
+          <?php if ($links): ?>
+            <div class="pl-feature__links">
+              <?php $first = true; foreach ($links as $label => $href): ?>
+                <a class="btn <?= $first ? 'btn--gold' : 'btn--ghost' ?>" href="<?= e($href) ?>" target="_blank" rel="noopener"><?= $first ? 'Visit ' . e($label) : e($label) ?></a>
+              <?php $first = false; endforeach; ?>
+            </div>
+          <?php endif; ?>
+        </div>
+      </div>
+    </div>
+  </section>
+<?php endforeach; ?>
 <?php endif; ?>
 
 <?php if ($others): ?>
@@ -62,7 +97,7 @@ set_meta([
         $logo = trim((string) $s['logo_path']);
         $link = pub_sponsor_link($s);
         $inner = $logo !== ''
-            ? '<img src="' . e(uploads('sponsors/' . $logo)) . '" alt="' . e($s['name']) . '" loading="lazy">'
+            ? '<img src="' . e(uploads('sponsors/' . $logo)) . '" alt="' . e($s['name']) . '" loading="lazy" data-sz="150">'
             : '<span class="partners__name">' . e($s['name']) . '</span>';
         ?>
         <?php if ($link !== ''): ?>

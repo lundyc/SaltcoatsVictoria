@@ -35,24 +35,6 @@ const ACCOUNT_ROLES = [ACCOUNT_ROLE_PUBLIC, ACCOUNT_ROLE_VOLUNTEER, ACCOUNT_ROLE
 const ACCOUNT_STAFF_ROLES = [ACCOUNT_ROLE_VOLUNTEER, ACCOUNT_ROLE_STAFF, ACCOUNT_ROLE_ADMIN];
 
 /**
- * The only code path allowed to change an account's role — deliberately not
- * reachable from saveSeasonTicketHolder(), so legacy ticketing compatibility
- * writes can never change a member's account role.
- */
-function account_auth_set_role(PDO $pdo, int $accountId, string $role): void
-{
-    if (!in_array($role, ACCOUNT_ROLES, true)) {
-        throw new InvalidArgumentException("Invalid role: {$role}");
-    }
-    $account = getAccountByLegacyHolderId($pdo, $accountId) ?: getAccount($pdo, $accountId);
-    if ($account) {
-        setAccountRole($pdo, (int) $account['id'], $role);
-    }
-    $pdo->prepare('UPDATE season_ticket_holders SET role = :role WHERE id = :id')
-        ->execute([':role' => $role, ':id' => $accountId]);
-}
-
-/**
  * The only code path allowed to change an account's committee position —
  * mirrors account_auth_set_role() above. $positionId is nullable (an
  * account can be staff/volunteer with no position assigned yet).
@@ -85,7 +67,7 @@ const HUB_AUTH_USER_ID_KEY = 'hub_user_id';
 const HUB_AUTH_ACCOUNT_ID_KEY = 'hub_account_id';
 const HUB_AUTH_PERSON_ID_KEY = 'hub_person_id';
 const HUB_AUTH_CSRF_KEY = 'hub_csrf_token';
-const HUB_AUTH_COOKIE_LIFETIME = 2592000;
+const HUB_AUTH_COOKIE_LIFETIME = 15552000;
 // A hash of the password hash in force when this session was issued. Bound
 // into the session at login and re-checked on every request in
 // hub_auth_current_user(), so a session survives only as long as the
@@ -93,6 +75,17 @@ const HUB_AUTH_COOKIE_LIFETIME = 2592000;
 // session for that account without needing a server-side session store.
 // Mirrors the credential binding already used by admin/lib/mobile_api/Auth.php.
 const HUB_AUTH_CREDENTIAL_KEY = 'hub_credential_hash';
+const HUB_AUTH_VERSION_KEY = 'hub_auth_version';
+
+function hub_auth_account_has_hub_access(PDO $pdo, array $account): bool
+{
+    $personId = (int) ($account['person_id'] ?? 0);
+    if ($personId <= 0) {
+        return false;
+    }
+    $effective = access_effective($pdo, $personId, false);
+    return $effective['bypass'] || $effective['capabilities'] !== [];
+}
 
 function hub_auth_start_session(): void
 {
@@ -160,15 +153,19 @@ function hub_auth_current_user(): ?array
     if ($account) {
         $sessionCredential = (string) ($_SESSION[HUB_AUTH_CREDENTIAL_KEY] ?? '');
         $currentCredential = hash('sha256', (string) ($account['password_hash'] ?? ''));
-        if ($sessionCredential === '' || !hash_equals($currentCredential, $sessionCredential)) {
+        $sessionAuthVersion = (int) ($_SESSION[HUB_AUTH_VERSION_KEY] ?? 0);
+        if ($sessionCredential === '' || !hash_equals($currentCredential, $sessionCredential)
+            || $sessionAuthVersion !== (int) ($account['auth_version'] ?? 1)) {
             // Password changed (or reset) since this session was issued, or
             // this session predates credential binding — treat it as
             // revoked rather than silently trusting a stale identity.
-            unset($_SESSION[HUB_AUTH_ACCOUNT_ID_KEY], $_SESSION[HUB_AUTH_USER_ID_KEY], $_SESSION[HUB_AUTH_PERSON_ID_KEY], $_SESSION[HUB_AUTH_CREDENTIAL_KEY]);
+            unset($_SESSION[HUB_AUTH_ACCOUNT_ID_KEY], $_SESSION[HUB_AUTH_USER_ID_KEY], $_SESSION[HUB_AUTH_PERSON_ID_KEY], $_SESSION[HUB_AUTH_CREDENTIAL_KEY], $_SESSION[HUB_AUTH_VERSION_KEY]);
             return null;
         }
         $role = accountPrimaryRole($pdo, (int) $account['id']);
-        if (!in_array($role, ACCOUNT_STAFF_ROLES, true) || (int) ($account['is_active'] ?? 0) !== 1 || (int) ($account['person_is_active'] ?? 0) !== 1) {
+        if ((int) ($account['is_active'] ?? 0) !== 1
+            || (int) ($account['person_is_active'] ?? 0) !== 1
+            || !hub_auth_account_has_hub_access($pdo, $account)) {
             return null;
         }
         $holderId = (int) ($account['old_holder_id'] ?? 0);
@@ -188,32 +185,12 @@ function hub_auth_current_user(): ?array
         ];
     }
 
-    if ($legacyHolderId <= 0) {
-        return null;
-    }
-
-    $stmt = $pdo->prepare("
-        SELECT id, username, email, name AS display_name, role, position_id, is_active, last_login_at, password_hash
-        FROM season_ticket_holders
-        WHERE id = :id AND role IN ('volunteer','staff','admin')
-        LIMIT 1
-    ");
-    $stmt->execute([':id' => $legacyHolderId]);
-    $user = $stmt->fetch();
-
-    if (!$user || (int) ($user['is_active'] ?? 0) !== 1) {
-        return null;
-    }
-
-    $sessionCredential = (string) ($_SESSION[HUB_AUTH_CREDENTIAL_KEY] ?? '');
-    $currentCredential = hash('sha256', (string) ($user['password_hash'] ?? ''));
-    if ($sessionCredential === '' || !hash_equals($currentCredential, $sessionCredential)) {
-        unset($_SESSION[HUB_AUTH_ACCOUNT_ID_KEY], $_SESSION[HUB_AUTH_USER_ID_KEY], $_SESSION[HUB_AUTH_PERSON_ID_KEY], $_SESSION[HUB_AUTH_CREDENTIAL_KEY]);
-        return null;
-    }
-    unset($user['password_hash']);
-
-    return $user;
+    // Legacy holder-only Hub sessions are intentionally no longer accepted.
+    // Administrative access requires an active account plus an authoritative
+    // capability-bearing primary role. Member-area legacy compatibility is
+    // separate and remains available while ticketing is being retired.
+    unset($_SESSION[HUB_AUTH_USER_ID_KEY], $_SESSION['user_id'], $_SESSION['username'], $_SESSION['role']);
+    return null;
 }
 
 function hub_auth_is_authenticated(): bool
@@ -243,7 +220,7 @@ function hub_auth_is_developer(): bool
     }
     static $developerHolderId = null;
     if ($developerHolderId === null) {
-        $stmt = $pdo->prepare("SELECT id FROM season_ticket_holders WHERE email_normalized = :email AND role IN ('staff','admin') LIMIT 1");
+        $stmt = $pdo->prepare("SELECT id FROM season_ticket_holders WHERE email_normalized = :email LIMIT 1");
         $stmt->execute([':email' => seasonTicketNormalizeEmail(DEVELOPER_EMAIL)]);
         $developerHolderId = (int) ($stmt->fetchColumn() ?: 0);
     }
@@ -474,7 +451,7 @@ function hub_auth_attempt_login(string $email, string $password): array
     }
 
     $account = authenticateAccount($pdo, $identifier, $password);
-    if (!$account || !in_array((string) $account['role'], ACCOUNT_STAFF_ROLES, true)) {
+    if (!$account || !hub_auth_account_has_hub_access($pdo, $account)) {
         return ['ok' => false, 'error' => 'Invalid email or password.'];
     }
 
@@ -483,9 +460,9 @@ function hub_auth_attempt_login(string $email, string $password): array
     $_SESSION[HUB_AUTH_PERSON_ID_KEY] = (string) $account['person_id'];
     $_SESSION[HUB_AUTH_USER_ID_KEY] = (string) ((int) ($account['old_holder_id'] ?? 0));
     $_SESSION[HUB_AUTH_CREDENTIAL_KEY] = hash('sha256', (string) ($account['password_hash'] ?? ''));
+    $_SESSION[HUB_AUTH_VERSION_KEY] = (string) ((int) ($account['auth_version'] ?? 1));
     $_SESSION['user_id'] = (int) ($account['old_holder_id'] ?? 0);
     $_SESSION['username'] = (string) ($account['display_name'] ?? $account['email'] ?? '');
-    $_SESSION['role'] = (string) $account['role'];
 
     return ['ok' => true, 'username' => (string) ($account['display_name'] ?? $account['email'] ?? '')];
 }
@@ -530,7 +507,8 @@ const MEMBER_AUTH_CSRF_KEY = 'member_csrf_token';
 // every member_auth_current_account_id() call so a password change/reset
 // revokes every other member session for that account.
 const MEMBER_AUTH_CREDENTIAL_KEY = 'member_credential_hash';
-const MEMBER_AUTH_COOKIE_LIFETIME = 2592000;
+const MEMBER_AUTH_VERSION_KEY = 'member_auth_version';
+const MEMBER_AUTH_COOKIE_LIFETIME = 15552000;
 const MEMBER_RESET_TOKEN_TTL = 3600;
 const MEMBER_AUTH_THROTTLE_WINDOW_SECONDS = 900;
 const MEMBER_AUTH_THROTTLE_MAX_ATTEMPTS = 5;
@@ -669,11 +647,15 @@ function member_auth_current_account_id(): ?int
 
     $sessionCredential = (string) ($_SESSION[MEMBER_AUTH_CREDENTIAL_KEY] ?? '');
     $currentCredential = hash('sha256', (string) ($account['password_hash'] ?? ''));
-    if ($sessionCredential === '' || !hash_equals($currentCredential, $sessionCredential)) {
+    $sessionAuthVersion = (int) ($_SESSION[MEMBER_AUTH_VERSION_KEY] ?? 0);
+    if ($sessionCredential === '' || !hash_equals($currentCredential, $sessionCredential)
+        || $sessionAuthVersion !== (int) ($account['auth_version'] ?? 1)
+        || (int) ($account['is_active'] ?? 0) !== 1
+        || (int) ($account['person_is_active'] ?? 0) !== 1) {
         // Password changed (or reset) since this session was issued, or this
         // session predates credential binding — treat it as revoked rather
         // than silently trusting a stale identity.
-        unset($_SESSION[MEMBER_AUTH_ACCOUNT_ID_KEY], $_SESSION[MEMBER_AUTH_PERSON_ID_KEY], $_SESSION[MEMBER_AUTH_HOLDER_ID_KEY], $_SESSION[MEMBER_AUTH_CREDENTIAL_KEY]);
+        unset($_SESSION[MEMBER_AUTH_ACCOUNT_ID_KEY], $_SESSION[MEMBER_AUTH_PERSON_ID_KEY], $_SESSION[MEMBER_AUTH_HOLDER_ID_KEY], $_SESSION[MEMBER_AUTH_CREDENTIAL_KEY], $_SESSION[MEMBER_AUTH_VERSION_KEY]);
         return null;
     }
 
@@ -882,6 +864,8 @@ function member_auth_attempt_login(string $email, string $password): array
     return ['ok' => true];
 }
 
+require_once __DIR__ . '/lib/member_hint.php';
+
 function member_auth_login_account(int $accountId, int $personId, int $holderId): void
 {
     member_auth_start_session();
@@ -893,6 +877,8 @@ function member_auth_login_account(int $accountId, int $personId, int $holderId)
     }
     $account = getAccount($GLOBALS['pdo'], $accountId);
     $_SESSION[MEMBER_AUTH_CREDENTIAL_KEY] = hash('sha256', (string) ($account['password_hash'] ?? ''));
+    $_SESSION[MEMBER_AUTH_VERSION_KEY] = (string) ((int) ($account['auth_version'] ?? 1));
+    member_hint_set($personId);
 }
 
 /**
@@ -911,11 +897,14 @@ function member_auth_login_session(int $holderId): void
         $_SESSION[MEMBER_AUTH_ACCOUNT_ID_KEY] = (string) $account['id'];
         $_SESSION[MEMBER_AUTH_PERSON_ID_KEY] = (string) $account['person_id'];
         $_SESSION[MEMBER_AUTH_CREDENTIAL_KEY] = hash('sha256', (string) ($account['password_hash'] ?? ''));
+        $_SESSION[MEMBER_AUTH_VERSION_KEY] = (string) ((int) ($account['auth_version'] ?? 1));
+        member_hint_set((int) $account['person_id']);
     }
 }
 
 function member_auth_logout(): void
 {
+    member_hint_clear();
     member_auth_start_session();
     $_SESSION = [];
     if (ini_get('session.use_cookies')) {

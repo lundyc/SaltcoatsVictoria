@@ -114,7 +114,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         if (!$errors) {
             try {
                 $pdo->beginTransaction();
-                updateAccountLogin($pdo, (int) $account['id'], $contactEmail, (int) ($account['is_active'] ?? 1) === 1, accountPrimaryRole($pdo, (int) $account['id']));
+                updateAccountLogin($pdo, (int) $account['id'], $contactEmail, (int) ($account['is_active'] ?? 1) === 1);
                 updatePerson($pdo, (int) $person['id'], [
                     'display_name' => $name,
                     'date_of_birth' => $dob,

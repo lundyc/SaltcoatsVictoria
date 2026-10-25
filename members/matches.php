@@ -1,124 +1,106 @@
 <?php
 require_once __DIR__ . '/header.php';
-require_once __DIR__ . '/../admin/lib/member_matches.php';
 
-$currentSeason = getCurrentSeason($pdo);
-$fixtures = $currentSeason ? member_matches_for_season($pdo, (int) $currentSeason['id']) : [];
-$today = date('Y-m-d');
-$upcoming = [];
-$results = [];
-foreach ($fixtures as $fixture) {
-    $played = (string) ($fixture['status'] ?? '') === 'played'
-        || ($fixture['full_time_home_score'] !== null && $fixture['full_time_away_score'] !== null);
-    if ($played) {
-        $results[] = $fixture;
-    } else {
-        $upcoming[] = $fixture;
-    }
-}
-$nextFixture = null;
-foreach ($upcoming as $fixture) {
-    if ((string) ($fixture['match_date'] ?? '') >= $today) {
-        $nextFixture = $fixture;
+// Fixtures & results for members. Uses the same data and row design as the public
+// /fixtures and /results pages, but each row opens the members match centre.
+$view = (string) ($_GET['view'] ?? 'fixtures') === 'results' ? 'results' : 'fixtures';
+$seasons = pub_seasons();
+$seasonId = (int) ($_GET['season'] ?? 0) ?: pub_current_season_id();
+$validSeason = false;
+foreach ($seasons as $s) {
+    if ((int) $s['id'] === $seasonId) {
+        $validSeason = true;
         break;
     }
 }
-
-function member_match_scoreline(array $fixture): string
-{
-    if ($fixture['full_time_home_score'] === null || $fixture['full_time_away_score'] === null) {
-        return ucfirst((string) ($fixture['status'] ?? 'scheduled'));
-    }
-    return (int) $fixture['full_time_home_score'] . ' - ' . (int) $fixture['full_time_away_score'];
+if (!$validSeason) {
+    $seasonId = pub_current_season_id();
 }
-?>
+$seasonName = '';
+foreach ($seasons as $s) {
+    if ((int) $s['id'] === $seasonId) {
+        $seasonName = (string) $s['name'];
+    }
+}
+$competitions = pub_competitions_in_season($seasonId);
+$competition = (string) ($_GET['competition'] ?? '');
+if ($competition !== '' && !in_array($competition, $competitions, true)) {
+    $competition = '';
+}
 
+$mode = $view === 'results' ? 'results' : 'upcoming';
+$rows = pub_fixtures(['season_id' => $seasonId, 'competition' => $competition ?: null, 'type' => $mode]);
+$byMonth = pub_fixtures_by_month($rows);
+
+$upcomingAll = pub_fixtures(['season_id' => $seasonId, 'type' => 'upcoming']);
+$resultsAll = pub_fixtures(['season_id' => $seasonId, 'type' => 'results']);
+$nextFixture = $upcomingAll[0] ?? null;
+
+$qs = static function (array $extra) use ($seasonId, $competition): string {
+    $params = array_filter(['season' => $seasonId, 'competition' => $competition] + $extra, static fn ($v) => $v !== '' && $v !== null);
+    return '?' . http_build_query($params);
+};
+$memberRowHref = static fn (array $f): string => '/members/match.php?id=' . (int) $f['id'];
+?>
 <div class="member-page">
     <section class="member-hero">
         <div class="member-hero__content">
-            <div class="member-hero__eyebrow">Fixtures & Results</div>
-            <h1><?= $currentSeason ? h((string) $currentSeason['name']) : 'Matches' ?></h1>
-            <p>Follow upcoming fixtures and catch up on results from the current Saltcoats Victoria season.</p>
+            <div class="member-hero__eyebrow">Matches</div>
+            <h1>Fixtures &amp; Results</h1>
+            <p>Every Saltcoats Victoria game<?= $seasonName !== '' ? ' in ' . h($seasonName) : '' ?>. Open a match for line-ups, stats and the Player of the Match vote.</p>
         </div>
     </section>
 
-    <?php if ($nextFixture): ?>
-        <section class="member-card mb-3">
-            <div class="member-card__body d-flex justify-content-between align-items-center flex-wrap gap-3">
-                <div>
-                    <div class="text-muted small text-uppercase fw-bold">Next Match</div>
-                    <h2 class="mb-1">
-                        <?= (int) $nextFixture['is_home'] === 1 ? 'Saltcoats Victoria vs ' . h((string) $nextFixture['opponent']) : h((string) $nextFixture['opponent']) . ' vs Saltcoats Victoria' ?>
-                    </h2>
-                    <div class="text-muted">
-                        <?= h(member_format_date((string) $nextFixture['match_date'])) ?>
-                        <?= !empty($nextFixture['kickoff_time']) ? ' at ' . h(member_format_time((string) $nextFixture['kickoff_time'])) : '' ?>
-                        <?= !empty($nextFixture['competition']) ? ' · ' . h((string) $nextFixture['competition']) : '' ?>
-                    </div>
-                </div>
-                <a class="btn btn-brand" href="match.php?id=<?= (int) $nextFixture['id'] ?>">View Match</a>
-            </div>
-        </section>
-    <?php endif; ?>
-
-    <?php if (!$fixtures): ?>
-        <div class="member-card"><div class="member-card__body text-center text-muted py-4">No fixtures found for this season.</div></div>
-    <?php else: ?>
-        <div class="member-grid member-grid--2">
-            <section class="member-card">
-                <div class="member-card__header">
-                    <h2>Upcoming Fixtures</h2>
-                    <span class="member-badge"><?= count($upcoming) ?> open</span>
-                </div>
-                <div class="member-card__body">
-                    <?php if (!$upcoming): ?>
-                        <p class="text-muted mb-0">No upcoming fixtures are listed yet.</p>
-                    <?php else: ?>
-                        <div class="member-list">
-                            <?php foreach ($upcoming as $fixture): ?>
-                                <a class="member-row" href="match.php?id=<?= (int) $fixture['id'] ?>">
-                                    <div>
-                                        <div class="member-row__title"><?= (int) $fixture['is_home'] === 1 ? 'vs' : '@' ?> <?= h((string) $fixture['opponent']) ?></div>
-                                        <div class="member-row__meta">
-                                            <?= h(member_format_date((string) $fixture['match_date'])) ?>
-                                            <?= !empty($fixture['kickoff_time']) ? ' · ' . h(member_format_time((string) $fixture['kickoff_time'])) : '' ?>
-                                            <?= !empty($fixture['competition']) ? ' · ' . h((string) $fixture['competition']) : '' ?>
-                                        </div>
-                                    </div>
-                                    <span class="member-badge"><?= (int) $fixture['is_home'] === 1 ? 'Home' : 'Away' ?></span>
-                                </a>
-                            <?php endforeach; ?>
-                        </div>
-                    <?php endif; ?>
-                </div>
-            </section>
-
-            <section class="member-card">
-                <div class="member-card__header">
-                    <h2>Results</h2>
-                    <span class="member-badge"><?= count($results) ?> played</span>
-                </div>
-                <div class="member-card__body">
-                    <?php if (!$results): ?>
-                        <p class="text-muted mb-0">Results will appear here once matches have been played.</p>
-                    <?php else: ?>
-                        <div class="member-list">
-                            <?php foreach ($results as $fixture): ?>
-                                <a class="member-row" href="match.php?id=<?= (int) $fixture['id'] ?>">
-                                    <div>
-                                        <div class="member-row__title"><?= (int) $fixture['is_home'] === 1 ? 'vs' : '@' ?> <?= h((string) $fixture['opponent']) ?></div>
-                                        <div class="member-row__meta"><?= h(member_format_date((string) $fixture['match_date'])) ?><?= !empty($fixture['competition']) ? ' · ' . h((string) $fixture['competition']) : '' ?></div>
-                                    </div>
-                                    <span class="badge text-bg-light fs-6"><?= h(member_match_scoreline($fixture)) ?></span>
-                                </a>
-                            <?php endforeach; ?>
-                        </div>
-                    <?php endif; ?>
-                </div>
-            </section>
+    <?php if ($nextFixture && $view === 'fixtures'): ?>
+        <div class="mmatch-next">
+            <span class="mmatch-next__label">Next match</span>
+            <?php partial('fixture_row', ['fixture' => $nextFixture, 'rowHref' => $memberRowHref($nextFixture)]); ?>
         </div>
-
     <?php endif; ?>
+
+    <div class="fxtabs">
+        <a class="fxtabs__tab <?= $view === 'fixtures' ? 'is-active' : '' ?>" href="<?= e($qs(['view' => 'fixtures'])) ?>">Fixtures <span class="mmatch-count"><?= count($upcomingAll) ?></span></a>
+        <a class="fxtabs__tab <?= $view === 'results' ? 'is-active' : '' ?>" href="<?= e($qs(['view' => 'results'])) ?>">Results <span class="mmatch-count"><?= count($resultsAll) ?></span></a>
+    </div>
+
+    <form class="fxfilters" method="get" action="matches.php">
+        <input type="hidden" name="view" value="<?= e($view) ?>">
+        <label>
+            <span>Season</span>
+            <select name="season" onchange="this.form.submit()">
+                <?php foreach ($seasons as $s): ?>
+                    <option value="<?= (int) $s['id'] ?>" <?= (int) $s['id'] === $seasonId ? 'selected' : '' ?>><?= e($s['name']) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </label>
+        <?php if ($competitions): ?>
+            <label>
+                <span>Competition</span>
+                <select name="competition" onchange="this.form.submit()">
+                    <option value="">All competitions</option>
+                    <?php foreach ($competitions as $c): ?>
+                        <option value="<?= e($c) ?>" <?= $c === $competition ? 'selected' : '' ?>><?= e($c) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </label>
+        <?php endif; ?>
+        <noscript><button type="submit">Go</button></noscript>
+    </form>
+
+    <?php if ($rows === []): ?>
+        <div class="emptystate"><p>No <?= $view === 'results' ? 'results' : 'fixtures' ?> to show for this selection.</p></div>
+    <?php else: ?>
+        <?php foreach ($byMonth as $month => $monthRows): ?>
+            <h2 class="fxmonth"><?= e($month) ?></h2>
+            <div class="fxlist">
+                <?php foreach ($monthRows as $fixture): ?>
+                    <?php partial('fixture_row', ['fixture' => $fixture, 'rowHref' => $memberRowHref($fixture)]); ?>
+                <?php endforeach; ?>
+            </div>
+        <?php endforeach; ?>
+    <?php endif; ?>
+
+    <p class="fxnote"><a class="linkarrow" href="table.php">League table</a></p>
 </div>
 
 <?php require_once __DIR__ . '/footer.php'; ?>

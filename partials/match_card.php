@@ -17,15 +17,15 @@ $awayScore = $played ? (int) $fixture['full_time_away_score'] : null;
 $href = url('match/' . (int) $fixture['id']);
 ?>
 <a class="matchcard" href="<?= e($href) ?>">
-  <span class="matchcard__comp" title="<?= e($fixture['competition'] ?: 'Fixture') ?>"><?= e($fixture['competition'] ?: 'Fixture') ?></span>
+  <span class="matchcard__comp" title="<?= e($fixture['competition'] ?: 'Fixture') ?>"><?= e(pub_competition_short((string) ($fixture['competition'] ?: 'Fixture'))) ?></span>
 
   <div class="matchcard__row">
-    <?php if ($homeCrest !== ''): ?><img src="<?= e($homeCrest) ?>" alt=""><?php endif; ?>
+    <?php if ($homeCrest !== ''): ?><img src="<?= e($homeCrest) ?>" alt="" width="26" height="26"><?php endif; ?>
     <span><?= e($homeName) ?></span>
     <?php if ($played): ?><b><?= $homeScore ?></b><?php endif; ?>
   </div>
   <div class="matchcard__row">
-    <?php if ($awayCrest !== ''): ?><img src="<?= e($awayCrest) ?>" alt=""><?php endif; ?>
+    <?php if ($awayCrest !== ''): ?><img src="<?= e($awayCrest) ?>" alt="" width="26" height="26"><?php endif; ?>
     <span><?= e($awayName) ?></span>
     <?php if ($played): ?><b><?= $awayScore ?></b><?php endif; ?>
   </div>

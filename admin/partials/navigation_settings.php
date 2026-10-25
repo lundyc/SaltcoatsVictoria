@@ -35,7 +35,7 @@ $navigationDefinitions = hub_navigation_definitions();
                                     <?php $key = $groupKey . '.' . $itemKey; ?>
                                     <div class="form-check form-switch">
                                         <input class="form-check-input" type="checkbox" role="switch" id="navItem-<?= htmlspecialchars($key, ENT_QUOTES, 'UTF-8') ?>" name="nav_items[<?= htmlspecialchars($key, ENT_QUOTES, 'UTF-8') ?>]" value="1" <?= hub_navigation_item_enabled($key, $navigationPreferences) ? 'checked' : '' ?>>
-                                        <label class="form-check-label" for="navItem-<?= htmlspecialchars($key, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?><?php if ($key === 'finance.matchday_finance'): ?><span class="d-block small text-muted">The separate Match Day link has its own switch.</span><?php endif; ?><?php if (!empty($item['developer_only'])): ?><span class="small text-muted">(developers only)</span><?php endif; ?></label>
+                                        <label class="form-check-label" for="navItem-<?= htmlspecialchars($key, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?><?php if (!empty($item['developer_only'])): ?><span class="small text-muted">(developers only)</span><?php endif; ?></label>
                                     </div>
                                 <?php endforeach; ?>
                             </div>

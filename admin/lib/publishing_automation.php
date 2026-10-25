@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/publishing_history.php';
 require_once dirname(__DIR__) . '/social_post_settings.php';
 require_once __DIR__ . '/match_sponsorship.php';
+require_once __DIR__ . '/next_match_graphic.php';
 
 /** @return array{prepared: int, skipped: int} */
 function hub_publishing_prepare_match_drafts(PDO $pdo): array
@@ -31,6 +32,19 @@ function hub_publishing_prepare_match_drafts(PDO $pdo): array
             $types[] = 'starting_xi';
         }
         foreach ($types as $postType) {
+            if ($postType === 'next_match' && (($preferences['automation']['next_match']['mode'] ?? 'off') !== 'off')) {
+                // Pick the player photo (kept once chosen, so the draft does not change under you) and
+                // build the PNG now; the page re-renders it again at the moment of posting.
+                try {
+                    next_match_graphic_choose_photo($pdo, $fixtureId, true);
+                    $render = next_match_graphic_render($pdo, $fixtureId);
+                    if (!$render['ok']) {
+                        error_log('[next-match-graphic] fixture ' . $fixtureId . ': ' . $render['error']);
+                    }
+                } catch (Throwable $e) {
+                    error_log('[next-match-graphic] fixture ' . $fixtureId . ': ' . $e->getMessage());
+                }
+            }
             $rule = $preferences['automation'][$postType] ?? ['mode' => 'off', 'minutes_before' => 0];
             if (($rule['mode'] ?? 'off') === 'off') {
                 $skipped++;

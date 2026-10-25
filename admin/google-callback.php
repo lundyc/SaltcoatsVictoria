@@ -15,7 +15,7 @@ if (!hub_auth_is_authenticated()) {
 $currentUser = hub_auth_current_user();
 if (!hub_auth_has_capability('content_social')) {
     http_response_code(403);
-    echo '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Google Callback</title><link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"><link href="/admin/assets/css/style.css" rel="stylesheet"></head><body class="hub-shell"><main class="hub-main"><div class="container-fluid"><div class="alert alert-danger mb-0">You do not have permission to manage Google Calendar sync.</div></div></main></body></html>';
+    echo '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Google Callback</title><link href="/admin/assets/vendor/bootstrap/bootstrap.min.css" rel="stylesheet"><link href="/admin/assets/css/style.css" rel="stylesheet"></head><body class="hub-shell"><main class="hub-main"><div class="container-fluid"><div class="alert alert-danger mb-0">You do not have permission to manage Google Calendar sync.</div></div></main></body></html>';
     exit;
 }
 
@@ -174,6 +174,8 @@ $authorizeUrl = 'https://accounts.google.com/o/oauth2/v2/auth?' . http_build_que
     'scope' => $calendarScope,
     'access_type' => 'offline',
     'prompt' => 'consent',
+    // Pre-select the calendar's own Google account (when the calendar ID is an email address).
+    'login_hint' => filter_var($calendarId, FILTER_VALIDATE_EMAIL) ? $calendarId : null,
     'include_granted_scopes' => 'true',
     'state' => $stateToken,
 ], '', '&', PHP_QUERY_RFC3986);

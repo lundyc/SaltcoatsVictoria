@@ -1,0 +1,23 @@
+# Run from this folder:  /root/phpstan-tool/vendor/bin/phpstan analyse -c phpstan.neon
+# (PHPStan is installed outside the web root on purpose.)
+includes:
+    - phpstan-baseline.neon
+parameters:
+    level: 0
+    phpVersion: 80400
+    paths:
+        - index.php
+        - bootstrap.php
+        - helpers.php
+        - router.php
+        - config.php
+        - lib
+        - pages
+        - partials
+    scanDirectories:
+        - admin/lib
+    scanFiles:
+        - admin/db.php
+        - admin/config.php
+        - admin/member_auth.php
+        - admin/account_auth.php

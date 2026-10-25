@@ -5,6 +5,7 @@ declare(strict_types=1);
 
 require_once HUB_ROOT . '/lib/match_tickets.php';
 ensureMatchTicketSchema(db());
+require_once HUB_ROOT . '/lib/google_wallet.php';
 
 $accessToken = match_ticket_extract_token((string) ($token ?? ''));
 $order = $accessToken !== '' ? getMatchTicketOrderByAccessToken(db(), $accessToken) : null;
@@ -18,10 +19,26 @@ if (!$order) {
 
 $items = getMatchTicketOrderItems(db(), (int) $order['id']);
 $tickets = getMatchTicketsForOrder(db(), (int) $order['id']);
-$accessParam = 'access=' . rawurlencode((string) $order['access_token']);
-$statusUrl = '/admin/ticket_order_status.php?' . $accessParam; // Hub endpoint (absolute)
+if (isset($_GET['status'])) { // polled by this page so a ticket turns green once it has been scanned
+    header('Content-Type: application/json');
+    header('Cache-Control: no-store');
+    echo json_encode(['ok' => true, 'tickets' => array_map(static fn (array $t): array => [
+        'token' => (string) $t['ticket_token'], 'checked_in' => !empty($t['checked_in_at']),
+    ], $tickets)]);
+    exit;
+}
+$accessPath = 'tickets/order/' . rawurlencode((string) $order['access_token']);
+$statusUrl = url($accessPath) . '?status=1';
+$selectedToken = match_ticket_extract_token((string) ($_GET['ticket'] ?? ''));
+$initialIndex = 0;
+foreach ($tickets as $k => $t) {
+    if ($selectedToken !== '' && hash_equals((string) $t['ticket_token'], $selectedToken)) { $initialIndex = $k; break; }
+}
+$walletOn = wallet_is_configured(db());
+$walletCfg = $walletOn ? wallet_config(db()) : [];
 
 set_meta(['title' => 'Tickets — ' . club('club_short_name') . ' v ' . (string) $order['opponent']]);
+seo_breadcrumbs([['Match tickets', url('tickets')], ['Your order', url('tickets')]]);
 ?>
 <section class="mc-hero">
   <div class="container">
@@ -39,29 +56,35 @@ set_meta(['title' => 'Tickets — ' . club('club_short_name') . ' v ' . (string)
     <?php if (isset($_GET['saved'])): ?><div class="notice notice--ok"><p>Your ticket order has been saved.</p></div><?php endif; ?>
     <?php if ((int) $order['paid'] !== 1): ?><div class="notice notice--warn"><p>This order is not marked as paid yet. The QR codes will scan only once payment is confirmed.</p></div><?php endif; ?>
 
-    <div class="mc-panel">
-      <h2>Order summary</h2>
-      <?php foreach ($items as $item): ?>
-        <div class="kv"><span><?= e((string) $item['package_name']) ?> ×<?= (int) $item['quantity'] ?></span><span><?= e(gbp((float) $item['unit_price'] * (int) $item['quantity'])) ?></span></div>
-      <?php endforeach; ?>
-      <div class="kv kv--total"><span>Total</span><span><?= e(gbp((float) $order['total_amount'])) ?></span></div>
-    </div>
-
     <h2>Your tickets</h2>
     <div class="tcarousel-shell">
       <div class="tcarousel-viewport">
-        <div class="tcarousel" data-ticket-carousel>
+        <div class="tcarousel" data-ticket-carousel data-initial-index="<?= (int) $initialIndex ?>">
           <?php foreach ($tickets as $index => $ticket): ?>
-            <?php $ticketUrl = current_url_origin() . url('tickets/order/' . $accessParam) . '&ticket=' . rawurlencode((string) $ticket['ticket_token']); ?>
-            <article class="tcard<?= !empty($ticket['checked_in_at']) ? ' is-used' : '' ?>" data-ticket-token="<?= e((string) $ticket['ticket_token']) ?>">
-              <div class="tcard__eyebrow">Ticket <?= $index + 1 ?> of <?= count($tickets) ?></div>
-              <h3><?= e((string) $ticket['ticket_label']) ?></h3>
-              <div class="tcard__qr" data-qr data-qr-url="<?= e($ticketUrl) ?>"></div>
-              <div class="tcard__manual">Manual code</div>
-              <div class="tcard__code"><?= e((string) $ticket['manual_code']) ?>
-                <button type="button" class="copybtn" data-copy="<?= e((string) $ticket['manual_code']) ?>" data-copy-type="ticket_manual_code">Copy</button>
+            <?php $ticketUrl = current_url_origin() . url($accessPath) . '?ticket=' . rawurlencode((string) $ticket['ticket_token']); ?>
+            <?php $tkLabel = strtolower((string) $ticket['ticket_label']); $tkKind = str_contains($tkLabel, 'child') ? 'child' : (str_contains($tkLabel, 'concession') ? 'concession' : 'adult'); ?>
+            <?php $tkDone = !empty($ticket['checked_in_at']); ?>
+            <article class="tk tk--<?= $tkKind ?> tk-slide<?= $tkDone ? ' is-used' : '' ?>" data-ticket-token="<?= e((string) $ticket['ticket_token']) ?>">
+              <div class="tk-top">
+                <span class="tk-type"><?= e((string) $ticket['ticket_label']) ?></span>
+                <span class="tk-num">Ticket <?= $index + 1 ?> of <?= count($tickets) ?></span>
               </div>
-              <div class="tcard__used<?= !empty($ticket['checked_in_at']) ? '' : ' is-hidden' ?>" data-ticket-used-label>✓ Checked in</div>
+              <div class="tk-scan">
+                <div class="tk-qr" data-qr data-qr-url="<?= e($ticketUrl) ?>"></div>
+                <div class="tk-hint">Scan at the turnstile</div>
+              </div>
+              <div class="tk-perf" aria-hidden="true"></div>
+              <div class="tk-stub">
+                <div class="tk-stub-label">Entry code</div>
+                <div class="tk-code"><?= e((string) $ticket['manual_code']) ?></div>
+                <div class="tk-used<?= $tkDone ? '' : ' is-hidden' ?>" data-ticket-used-label>&#10003; Checked in</div>
+              </div>
+              <?php if ($walletOn && (int) $order['paid'] === 1 && !$tkDone): ?>
+                <div class="tk-extra">
+                  <?php try { $walletUrl = wallet_save_url(wallet_build_match_jwt($walletCfg, $order, $ticket, $ticketUrl, club('club_short_name'), club('ground_name'), current_url_origin() . '/scan/icon-512.png')); } catch (Throwable) { $walletUrl = ''; } ?>
+                  <?php if ($walletUrl !== ''): ?><?= wallet_button_html($walletUrl) ?><?php endif; ?>
+                </div>
+              <?php endif; ?>
             </article>
           <?php endforeach; ?>
         </div>
@@ -74,6 +97,14 @@ set_meta(['title' => 'Tickets — ' . club('club_short_name') . ' v ' . (string)
         </div>
       <?php endif; ?>
     </div>
+
+    <div class="mc-panel" style="margin-top:1.5rem">
+      <h2>Order summary</h2>
+      <?php foreach ($items as $item): ?>
+        <div class="kv"><span><?= e((string) $item['package_name']) ?> ×<?= (int) $item['quantity'] ?></span><span><?= e(gbp((float) $item['unit_price'] * (int) $item['quantity'])) ?></span></div>
+      <?php endforeach; ?>
+      <div class="kv kv--total"><span>Total</span><span><?= e(gbp((float) $order['total_amount'])) ?></span></div>
+    </div>
   </div>
 </div>
 
@@ -85,11 +116,11 @@ set_meta(['title' => 'Tickets — ' . club('club_short_name') . ' v ' . (string)
   });
   var carousel = document.querySelector('[data-ticket-carousel]');
   if (carousel) {
-    var slides = Array.prototype.slice.call(carousel.querySelectorAll('.tcard'));
+    var slides = Array.prototype.slice.call(carousel.querySelectorAll('.tk-slide'));
     var prev = document.querySelector('[data-ticket-prev]');
     var next = document.querySelector('[data-ticket-next]');
     var count = document.querySelector('[data-ticket-count]');
-    var i = 0;
+    var i = Math.max(0, Math.min(slides.length - 1, Number(carousel.dataset.initialIndex || 0)));
     var width = function () { return carousel.clientWidth || 1; };
     var update = function () {
       i = Math.max(0, Math.min(slides.length - 1, Math.round(carousel.scrollLeft / width())));
@@ -102,7 +133,7 @@ set_meta(['title' => 'Tickets — ' . club('club_short_name') . ' v ' . (string)
     if (next) next.addEventListener('click', function () { go(i + 1); });
     carousel.addEventListener('scroll', function () { window.requestAnimationFrame(update); }, { passive: true });
     window.addEventListener('resize', function () { go(i); });
-    update();
+    carousel.style.scrollBehavior = 'auto'; carousel.scrollLeft = i * width(); carousel.style.scrollBehavior = ''; update();
   }
   var statusUrl = <?= json_encode($statusUrl, JSON_UNESCAPED_SLASHES) ?>;
   var seen = new Set();
@@ -113,7 +144,7 @@ set_meta(['title' => 'Tickets — ' . club('club_short_name') . ' v ' . (string)
         if (!t.checked_in || seen.has(t.token)) return;
         seen.add(t.token);
         var card = document.querySelector('[data-ticket-token="' + (window.CSS && CSS.escape ? CSS.escape(t.token) : t.token) + '"]');
-        if (card) { card.classList.add('is-used'); var l = card.querySelector('[data-ticket-used-label]'); if (l) l.classList.remove('is-hidden'); }
+        if (card) { card.classList.add('is-used'); var l = card.querySelector('[data-ticket-used-label]'); if (l) l.classList.remove('is-hidden'); var wb = card.querySelector('.tk-extra'); if (wb) wb.style.display = 'none'; }
       });
     }).catch(function () {});
   };

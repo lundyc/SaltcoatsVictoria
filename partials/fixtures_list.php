@@ -45,50 +45,87 @@ $qs = static function (array $overrides) use ($seasonId, $seasonAll, $competitio
     ] + $overrides, static fn ($v) => $v !== '' && $v !== null);
     return $params ? '?' . http_build_query($params) : '';
 };
+// Upcoming list: the very next game (not postponed) gets the big banner and is left out of the month lists.
+$nextFx = null;
+if ($mode === 'upcoming') {
+    foreach ($rows as $i => $row) {
+        if ($row['status'] !== 'postponed') {
+            $nextFx = $row;
+            unset($rows[$i]);
+            break;
+        }
+    }
+    $rows = array_values($rows);
+    $byMonth = pub_fixtures_by_month($rows);
+}
+$otherMode = $mode === 'results' ? 'fixtures' : 'results';
 ?>
-<?php partial('page_hero', ['eyebrow' => 'Matches', 'title' => club('club_short_name', club('club_name')) . ($mode === 'results' ? ' Results' : ' Fixtures'), 'sub' => $mode === 'results' ? 'Every result, filterable by season and competition.' : 'Upcoming games, kick-off times and match tickets.']); ?>
+<?php partial('page_hero', ['eyebrow' => 'Matches', 'title' => 'First team']); ?>
 
-<div class="page">
-  <div class="container">
-    <?php partial('fixtures_tabs', ['active' => $mode === 'results' ? 'results' : 'fixtures', 'suffix' => $qs([])]); ?>
+<div class="page mfx">
+  <div class="mfx-wrap">
+    <div class="mfx-top">
+      <h2><?= $mode === 'results' ? 'Results' : 'Fixtures' ?></h2>
+      <div class="mfx-top__right">
+        <form class="mfx-filters" method="get" action="<?= e($base) ?>">
+          <label><span class="sr-only">Season</span>
+            <select name="season" onchange="this.form.submit()" aria-label="Season">
+              <option value="all" <?= $seasonAll ? 'selected' : '' ?>>All seasons</option>
+              <?php foreach ($seasons as $s): ?>
+                <option value="<?= (int) $s['id'] ?>" <?= !$seasonAll && (int) $s['id'] === $seasonId ? 'selected' : '' ?>><?= e($s['name']) ?></option>
+              <?php endforeach; ?>
+            </select>
+          </label>
+          <?php if ($competitions): ?>
+          <label><span class="sr-only">Competition</span>
+            <select name="competition" onchange="this.form.submit()" aria-label="Competition">
+              <option value="">All competitions</option>
+              <?php foreach ($competitions as $c): ?>
+                <option value="<?= e($c) ?>" <?= $c === $competition ? 'selected' : '' ?>><?= e($c) ?></option>
+              <?php endforeach; ?>
+            </select>
+          </label>
+          <?php endif; ?>
+          <noscript><button type="submit">Go</button></noscript>
+        </form>
+        <a class="mfx-viewlink" href="<?= e(url($otherMode) . $qs([])) ?>">View <?= e($otherMode) ?></a>
+        <a class="mfx-viewlink" href="<?= e(url('table')) ?>">League table</a>
+        <a class="mfx-viewlink" href="<?= e(url('club/records')) ?>">Records</a>
+      </div>
+    </div>
 
-    <form class="fxfilters" method="get" action="<?= e($base) ?>">
-      <label>
-        <span>Season</span>
-        <select name="season" onchange="this.form.submit()">
-          <option value="all" <?= $seasonAll ? 'selected' : '' ?>>All seasons</option>
-          <?php foreach ($seasons as $s): ?>
-            <option value="<?= (int) $s['id'] ?>" <?= !$seasonAll && (int) $s['id'] === $seasonId ? 'selected' : '' ?>><?= e($s['name']) ?></option>
-          <?php endforeach; ?>
-        </select>
-      </label>
-      <?php if ($competitions): ?>
-      <label>
-        <span>Competition</span>
-        <select name="competition" onchange="this.form.submit()">
-          <option value="">All competitions</option>
-          <?php foreach ($competitions as $c): ?>
-            <option value="<?= e($c) ?>" <?= $c === $competition ? 'selected' : '' ?>><?= e($c) ?></option>
-          <?php endforeach; ?>
-        </select>
-      </label>
-      <?php endif; ?>
-      <noscript><button type="submit">Go</button></noscript>
-    </form>
+    <?php if ($nextFx !== null):
+      $nTeams = pub_fixture_teams($nextFx);
+      $nOpp = pub_opponent_crest($nextFx['opponent_logo'] ?? '', (string) ($nextFx['opponent_name'] ?? $nextFx['opponent'] ?? ''));
+      $nHomeCrest = $nextFx['is_home'] ? club_crest_reverse() : $nOpp;
+      $nAwayCrest = $nextFx['is_home'] ? $nOpp : club_crest_reverse();
+      $nTime = !empty($nextFx['kickoff_time']) ? date('g:i A', strtotime((string) $nextFx['kickoff_time'])) : 'TBC';
+    ?>
+      <a class="mfx-next" href="<?= e(url('match/' . (int) $nextFx['id'])) ?>">
+        <span class="mfx-next__label">Next fixture</span>
+        <span class="mfx-next__date"><?= e(format_date($nextFx['match_date'], 'l j F Y')) ?></span>
+        <span class="mfx-next__teams">
+          <span class="mfx-next__name mfx-next__name--home"><?= e($nTeams['home']) ?></span>
+          <?php if ($nHomeCrest !== ''): ?><img src="<?= e($nHomeCrest) ?>" alt=""><?php endif; ?>
+          <span class="mfx-next__time"><?= e($nTime) ?></span>
+          <?php if ($nAwayCrest !== ''): ?><img src="<?= e($nAwayCrest) ?>" alt=""><?php endif; ?>
+          <span class="mfx-next__name mfx-next__name--away"><?= e($nTeams['away']) ?></span>
+        </span>
+        <span class="mfx-next__meta"><b><?= e(pub_competition_short((string) $nextFx['competition'])) ?></b><?php if (trim((string) ($nextFx['venue'] ?? '')) !== ''): ?><i></i><span><?= e((string) $nextFx['venue']) ?></span><?php endif; ?></span>
+      </a>
+    <?php endif; ?>
 
-    <?php if ($rows === []): ?>
+    <?php if ($rows === [] && $nextFx === null): ?>
       <div class="emptystate"><p>No <?= $mode === 'results' ? 'results' : 'fixtures' ?> to show for this selection.</p></div>
     <?php else: ?>
       <?php foreach ($byMonth as $month => $monthRows): ?>
-        <h2 class="fxmonth"><?= e($month) ?></h2>
-        <div class="fxlist">
+        <h3 class="mfx-month"><?= e($month) ?></h3>
+        <ul class="mfx-list">
           <?php foreach ($monthRows as $fixture): ?>
-            <?php partial('fixture_row', ['fixture' => $fixture]); ?>
+            <?php partial('fixture_row_mfc', ['fixture' => $fixture]); ?>
           <?php endforeach; ?>
-        </div>
+        </ul>
       <?php endforeach; ?>
     <?php endif; ?>
-
-    <p class="fxnote"><a class="linkarrow" href="<?= e(url('table')) ?>">League table</a></p>
   </div>
 </div>

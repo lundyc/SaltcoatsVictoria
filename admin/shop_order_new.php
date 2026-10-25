@@ -61,7 +61,14 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
         $credit = shop_manual_credit($value('manual_credit', '0'), $value('credit_reason'), round($subtotal - $discount['amount'], 2));
         $delivery = $value('fulfilment_method') === 'delivery' && shop_delivery_enabled($pdo);
         if ($delivery && $value('delivery_address') === '') { throw new RuntimeException('Enter the delivery address.'); }
-        $fee = $delivery ? shop_delivery_fee($pdo) : 0;
+        $fee = 0;
+        if ($delivery) {
+            $shipItems = array_map(static fn(array $l): array => ['product_id' => (int) $l['product_id'], 'quantity' => (int) $l['quantity']], $lines);
+            $chosenMethod = shop_shipping_method($pdo, (int) $value('shipping_method_id', '0'));
+            $fee = $chosenMethod && (int) $chosenMethod['is_active'] === 1
+                ? shop_shipping_method_cost($pdo, $chosenMethod, $shipItems, round(max(0.0, $subtotal - $discount['amount']), 2)) : null;
+            if ($fee === null) { throw new RuntimeException('Choose a delivery method that applies to this basket.'); }
+        }
         $preview = ['lines' => $lines, 'subtotal' => $subtotal, 'discount' => $discount['amount'], 'credit' => $credit, 'fee' => $fee, 'total' => round($subtotal - $discount['amount'] - $credit + $fee, 2)];
         if ($value('action') === 'create') {
             $payment = $value('payment_method', 'bank_transfer');
@@ -70,7 +77,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
                 'note' => 'Manual order. Payment method: ' . str_replace('_', ' ', $payment) . ".\n" . $value('note'), 'marketing_opt_in' => false], $lines,
                 ['discount_code' => $value('discount_code'), 'manual_credit' => $value('manual_credit', '0'), 'credit_reason' => $value('credit_reason'),
                  'fulfilment_method' => $delivery ? 'delivery' : 'collection', 'delivery_address' => $value('delivery_address'),
-                 'requested_date' => $value('requested_date')]);
+                 'delivery_country' => $value('delivery_country', 'GB'), 'delivery_postcode' => $value('delivery_postcode'),
+                 'shipping_method_id' => (int) $value('shipping_method_id', '0'), 'admin_any_method' => true]);
             $_SESSION['shop_manual_saved'][$nonce] = (int) $order['id'];
             $_SESSION['shop_manual_saved'] = array_slice($_SESSION['shop_manual_saved'], -20, null, true);
             $_SESSION['shop_manual_nonce'] = bin2hex(random_bytes(24));
@@ -100,11 +108,15 @@ require __DIR__ . '/header.php';
 <label class="col-md-4">Discount code (optional)<input class="form-control" name="discount_code" maxlength="40" value="<?= h($value('discount_code')) ?>"><a href="/admin/shop_discount_codes.php" target="_blank" rel="noopener">Manage discount codes</a></label>
 <label class="col-md-4">Credit / adjustment (£)<input class="form-control" type="number" min="0" step="0.01" name="manual_credit" value="<?= h($value('manual_credit', '0')) ?>" required></label>
 <label class="col-12">Credit reason<input class="form-control" name="credit_reason" value="<?= h($value('credit_reason')) ?>" placeholder="e.g. £10 owed from a previous sale"><span class="form-text">Deducted after any discount code. This records the credit on this order; it does not change the previous sale.</span></label>
-<label class="col-md-4">Fulfilment<select class="form-select" name="fulfilment_method"><option value="collection">Collection</option><?php if (shop_delivery_enabled($pdo)): ?><option value="delivery" <?= $value('fulfilment_method') === 'delivery' ? 'selected' : '' ?>>Delivery (<?= gbp(shop_delivery_fee($pdo)) ?>)</option><?php endif; ?></select></label>
-<label class="col-md-8">Delivery address (if delivering)<textarea class="form-control" name="delivery_address"><?= h($value('delivery_address')) ?></textarea></label>
-<?php if (shop_scheduling_enabled($pdo)): ?>
-<label class="col-md-4">Requested date <span class="text-muted small">(optional)</span><input class="form-control" type="date" name="requested_date" value="<?= h($value('requested_date')) ?>"><span class="form-text">Not restricted to the storefront's available dates — set whatever was agreed with the customer.</span></label>
-<?php endif; ?>
+<label class="col-md-4">Fulfilment<select class="form-select" name="fulfilment_method"><option value="collection">Collection</option><?php if (shop_delivery_enabled($pdo)): ?><option value="delivery" <?= $value('fulfilment_method') === 'delivery' ? 'selected' : '' ?>>Delivery</option><?php endif; ?></select></label>
+<label class="col-md-8">Delivery method (if delivering)<select class="form-select" name="shipping_method_id">
+<?php foreach (shop_shipping_zones($pdo, true) as $zn): foreach ($zn['methods'] as $mt): ?>
+<option value="<?= (int) $mt['id'] ?>" <?= (int) $value('shipping_method_id', '0') === (int) $mt['id'] ? 'selected' : '' ?>><?= h($zn['name'] . ' — ' . $mt['name']) ?></option>
+<?php endforeach; endforeach; ?></select><span class="form-text">Priced from the zone's rules for this basket.</span></label>
+<label class="col-md-4">Delivery country<select class="form-select" name="delivery_country">
+<?php foreach (shop_countries() as $cc => $cn): ?><option value="<?= h($cc) ?>" <?= $value('delivery_country', 'GB') === $cc ? 'selected' : '' ?>><?= h($cn) ?></option><?php endforeach; ?></select></label>
+<label class="col-md-4">Postcode<input class="form-control" name="delivery_postcode" maxlength="20" value="<?= h($value('delivery_postcode')) ?>"></label>
+<label class="col-md-4">Delivery address (if delivering)<textarea class="form-control" name="delivery_address" rows="2"><?= h($value('delivery_address')) ?></textarea></label>
 <label class="col-12">Order note<textarea class="form-control" name="note"><?= h($value('note')) ?></textarea></label>
 </div>
 <p class="text-muted mt-3">Orders are saved as pending payment, with stock reserved immediately. Open the order and mark it paid once the bank transfer or cash is received.</p>

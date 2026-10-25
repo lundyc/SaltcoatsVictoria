@@ -20,6 +20,46 @@ function render_normalize_lines(array $lines): array
     return $normalized;
 }
 
+/** Node runtime for the headless-Chrome scripts, kept separate from the system node (see render_capture_image()). */
+function render_node_binary(): string
+{
+    return '/opt/myclubhub-node24/bin/node';
+}
+
+/**
+ * Print a page to A4 landscape PDF with the shared headless Chrome (render_pdf.js).
+ *
+ * @return array{ok: bool, error: string, output: array<int, string>}
+ */
+function render_capture_pdf(string $url, string $outputPath, string $footerText, string $waitSelector = 'body'): array
+{
+    $command = 'timeout 150 ' . escapeshellarg(render_node_binary()) . ' '
+        . escapeshellarg(__DIR__ . '/render_pdf.js')
+        . ' ' . escapeshellarg($url)
+        . ' ' . escapeshellarg($outputPath)
+        . ' ' . escapeshellarg($waitSelector)
+        . ' ' . escapeshellarg($footerText);
+
+    $outputLines = [];
+    $status = 0;
+    exec($command . ' 2>&1', $outputLines, $status);
+    $details = render_normalize_lines($outputLines);
+
+    if ($status !== 0 || !is_file($outputPath)) {
+        return [
+            'ok' => false,
+            'error' => 'PDF generation failed.',
+            'output' => $details,
+        ];
+    }
+
+    return [
+        'ok' => true,
+        'error' => '',
+        'output' => $details,
+    ];
+}
+
 /**
  * Run the shared Puppeteer renderer and move the generated PNG into place.
  *
@@ -72,12 +112,12 @@ function render_capture_image(
     // those other things.
     // Deliberately not existence-checked with is_file()/is_executable(): this
     // path sits outside the FPM pool's open_basedir
-    // (/var/www/vhosts/myclubhub.co.uk/:/tmp/), so those checks always
+    // (/var/www/vhosts/saltcoatsvictoria.co.uk/:/tmp/), so those checks always
     // report false under real web requests regardless of whether the binary
     // is actually there — open_basedir restricts PHP's own filesystem calls,
     // not the process exec() below launches. If this hardcoded path is ever
     // wrong, exec()'s own non-zero exit status (handled below) catches it.
-    $nodeBinary = '/opt/myclubhub-node24/bin/node';
+    $nodeBinary = render_node_binary();
     $command = escapeshellarg($nodeBinary) . ' '
         . escapeshellarg($renderScript)
         . ' ' . escapeshellarg($url)

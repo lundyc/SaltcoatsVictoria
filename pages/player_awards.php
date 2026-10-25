@@ -76,6 +76,7 @@ set_meta([
     'description' => 'End-of-season player award winners for ' . club('club_name') . '.',
 ]);
 ?>
+<?php seo_breadcrumbs([['Club', url('club/history')], ['Player awards', url('club/player-awards')]]); ?>
 <?php partial('page_hero', [
     'eyebrow' => 'The club',
     'title'   => 'Player awards',

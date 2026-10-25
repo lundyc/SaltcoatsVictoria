@@ -16,7 +16,7 @@ function hub_mail_config_value(string $key, string $default = ''): string
 
 function hub_mail_from_address(): string
 {
-    return hub_mail_config_value('HUB_SMTP_FROM_EMAIL', 'orders@saltcoatsvictoria.co.uk');
+    return hub_mail_config_value('HUB_SMTP_FROM_EMAIL', 'noreply@saltcoatsvictoria.co.uk');
 }
 
 function hub_mail_from_name(): string
@@ -33,7 +33,7 @@ function hub_mail_smtp_config(): array
         'host' => hub_mail_config_value('HUB_SMTP_HOST', 'saltcoatsvictoria.co.uk'),
         'port' => (int) hub_mail_config_value('HUB_SMTP_PORT', '465'),
         'encryption' => strtolower(hub_mail_config_value('HUB_SMTP_ENCRYPTION', 'ssl')),
-        'username' => hub_mail_config_value('HUB_SMTP_USERNAME', 'orders@saltcoatsvictoria.co.uk'),
+        'username' => hub_mail_config_value('HUB_SMTP_USERNAME', 'noreply@saltcoatsvictoria.co.uk'),
         'password' => hub_mail_config_value('HUB_SMTP_PASSWORD', ''),
         'from_email' => hub_mail_from_address(),
         'from_name' => hub_mail_from_name(),
@@ -98,9 +98,10 @@ function hub_mail_smtp_escape_body(string $body): string
     return implode("\r\n", $lines);
 }
 
-function hub_mail_smtp_send(string $toEmail, string $subject, string $body, string $contentType, ?string $replyTo = null): bool
+/** @param array<string,string> $override optional username/password/from_email/from_name to send as a different mailbox */
+function hub_mail_smtp_send(string $toEmail, string $subject, string $body, string $contentType, ?string $replyTo = null, array $override = []): bool
 {
-    $config = hub_mail_smtp_config();
+    $config = array_merge(hub_mail_smtp_config(), $override);
     if ($config['host'] === '' || $config['username'] === '' || $config['password'] === '') {
         return false;
     }
@@ -167,14 +168,67 @@ function hub_mail_smtp_send(string $toEmail, string $subject, string $body, stri
     }
 }
 
-function hub_send_mail(string $toEmail, string $subject, string $body, bool $isHtml = false, ?string $replyTo = null): bool
+/** The address people are told to contact: the club's contact email in Settings, so it can change without code. */
+function hub_mail_help_address(): string
+{
+    static $addr = null;
+    if ($addr === null) {
+        $addr = '';
+        $pdo = $GLOBALS['pdo'] ?? null;
+        if ($pdo instanceof PDO) {
+            try {
+                $q = $pdo->prepare("SELECT setting_value FROM site_settings WHERE setting_key = 'contact_email' LIMIT 1");
+                $q->execute();
+                $v = trim((string) $q->fetchColumn());
+                $addr = filter_var($v, FILTER_VALIDATE_EMAIL) ? $v : '';
+            } catch (Throwable $e) {
+                $addr = '';
+            }
+        }
+    }
+    return $addr;
+}
+
+/** Footer for automatic (no-reply) emails: tells people where to go if they need a person. */
+function hub_mail_system_footer(bool $html): string
+{
+    $help = hub_mail_help_address();
+    $text = 'This is an automatic message from Saltcoats Victoria FC, so please do not reply to this address. '
+        . 'If you have a question or a problem, contact us ' . ($help !== '' ? 'at ' . $help . ' or ' : '') . 'through https://saltcoatsvictoria.co.uk/contact';
+    if ($html) {
+        return '<p style="margin-top:24px;padding-top:12px;border-top:1px solid #dddddd;color:#666666;font-size:12px;line-height:1.5">'
+            . 'This is an automatic message from Saltcoats Victoria FC, so please do not reply to this address. '
+            . 'If you have a question or a problem, contact us '
+            . ($help !== '' ? 'at <a href="mailto:' . htmlspecialchars($help, ENT_QUOTES) . '">' . htmlspecialchars($help, ENT_QUOTES) . '</a> or ' : '')
+            . 'through <a href="https://saltcoatsvictoria.co.uk/contact">our contact page</a>.</p>';
+    }
+    return "\n\n--\n" . $text . "\n";
+}
+
+function hub_mail_add_footer(string $body, bool $html): string
+{
+    if ($html) {
+        return stripos($body, '</body>') !== false
+            ? preg_replace('~</body>~i', hub_mail_system_footer(true) . '</body>', $body, 1)
+            : $body . hub_mail_system_footer(true);
+    }
+    return rtrim($body) . hub_mail_system_footer(false);
+}
+
+function hub_send_mail(string $toEmail, string $subject, string $body, bool $isHtml = false, ?string $replyTo = null, array $override = []): bool
 {
     $toEmail = trim($toEmail);
     if (!filter_var($toEmail, FILTER_VALIDATE_EMAIL)) {
         return false;
     }
 
-    return hub_mail_smtp_send($toEmail, $subject, $body, $isHtml ? 'text/html' : 'text/plain', $replyTo);
+    if ($override === [] && $replyTo === null) {
+        // Automatic Hub email (orders, tickets, accounts...): add the "contact us" footer, and send any stray reply to the club contact address.
+        $body = hub_mail_add_footer($body, $isHtml);
+        $replyTo = hub_mail_help_address() ?: null;
+    }
+
+    return hub_mail_smtp_send($toEmail, $subject, $body, $isHtml ? 'text/html' : 'text/plain', $replyTo, $override);
 }
 
 /**
@@ -198,6 +252,8 @@ function hub_send_mail_with_attachment(string $toEmail, string $subject, string 
         return false;
     }
 
+    $htmlBody = hub_mail_add_footer($htmlBody, true);
+    $replyTo = $replyTo ?? (hub_mail_help_address() ?: null);
     $boundary = 'hubmail-' . bin2hex(random_bytes(12));
     $mime = $attachment['mime'] ?? 'application/pdf';
     $filename = $attachment['filename'];

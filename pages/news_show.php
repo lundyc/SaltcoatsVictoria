@@ -47,7 +47,9 @@ pub_jsonld([
     'headline' => $article['title'],
     'datePublished' => $article['published_at'] ? date('c', strtotime((string) $article['published_at'])) : null,
     'dateModified' => !empty($article['updated_at']) ? date('c', strtotime((string) $article['updated_at'])) : null,
-    'author' => ['@type' => 'Organization', 'name' => trim((string) $article['author_name']) ?: club('club_name')],
+    'author' => trim((string) $article['author_name']) !== ''
+        ? ['@type' => 'Person', 'name' => trim((string) $article['author_name'])]
+        : ['@type' => 'Organization', 'name' => club('club_name')],
     'publisher' => ['@type' => 'Organization', 'name' => club('club_name'), 'logo' => ['@type' => 'ImageObject', 'url' => seo_absolute(club_crest())]],
     'image' => [seo_image()],
     'mainEntityOfPage' => ['@type' => 'WebPage', '@id' => seo_canonical()],
@@ -76,7 +78,7 @@ pub_jsonld([
           <p class="article__herocaption"><?= e($article['hero_caption']) ?></p>
         <?php endif; ?>
 
-        <?= $bodyHtml /* sanitised by news_purify() */ ?>
+        <?= seo_normalize_headings($bodyHtml) /* sanitised by news_purify() */ ?>
 
         <?php if ($gallery): ?>
           <div class="article__gallery" data-lightbox>
@@ -84,7 +86,7 @@ pub_jsonld([
               <?php $gu = news_image_url((string) $img['file_path']); $gc = trim((string) $img['caption']); $ga = $gc !== '' ? $gc : (string) $article['title'] . ' – photo ' . ($gi + 1) . ' of ' . count($gallery); ?>
               <figure>
                 <a class="article__gallery__item" href="<?= e($gu) ?>" data-full="<?= e($gu) ?>" data-caption="<?= e($gc) ?>">
-                  <img src="<?= e($gu) ?>" alt="<?= e($ga) ?>" loading="lazy">
+                  <img src="<?= e($gu) ?>" alt="<?= e($ga) ?>" loading="lazy" data-sz="120">
                 </a>
                 <?php if ($gc !== ''): ?><figcaption><?= e($gc) ?></figcaption><?php endif; ?>
               </figure>

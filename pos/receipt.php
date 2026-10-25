@@ -66,7 +66,7 @@ $paymentLabel = match ((string) $sale['payment_method']) {
 <div class="wrap">
     <div class="actions"><button type="button" onclick="window.print()">Print</button><a href="/pos/sale.php?id=<?= (int) $saleId ?>">Back</a></div>
     <section class="receipt">
-        <h1>MyClubHub POS</h1>
+        <h1>Saltcoats Victoria POS</h1>
         <h2><?= h((string) $sale['location_name']) ?> · <?= h($receiptNumber) ?></h2>
         <div class="meta"><span>Date</span><strong><?= h(date('d/m/Y H:i', strtotime((string) ($sale['completed_at'] ?: $sale['created_at'])))) ?></strong></div>
         <div class="meta"><span>Operator</span><strong><?= h((string) ($sale['operator_name'] ?: $sale['hub_user_name'] ?: 'Hub user')) ?></strong></div>

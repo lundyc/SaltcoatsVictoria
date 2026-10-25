@@ -6,6 +6,7 @@ declare(strict_types=1);
 // shell, so it boots only the pieces header.php would have pulled in and
 // echoes just the order-detail fragment.
 $stoPartial = (($_GET['partial'] ?? '') === 'order');
+$requestedOrderId = max(0, (int) ($_GET['id'] ?? ($_POST['order_id'] ?? 0)));
 
 if ($stoPartial) {
     require_once __DIR__ . '/auth.php';
@@ -23,12 +24,17 @@ if ($stoPartial) {
         'title' => 'Season Tickets',
         'subtitle' => 'Season-ticket packages attached to people, with shared order, payment, ticket and credential records.',
         'actions' => [],
+        'breadcrumbs' => $requestedOrderId > 0 ? [
+            ['label' => 'Season tickets', 'href' => '/admin/season_ticket_orders.php'],
+            ['label' => 'Order #' . $requestedOrderId],
+        ] : [],
     ];
     require_once __DIR__ . '/header.php';
 }
 
 require_once __DIR__ . '/lib/season_tickets.php';
 require_once __DIR__ . '/lib/season_passes.php';
+require_once __DIR__ . '/lib/season_ticket_stripe.php';
 require_once __DIR__ . '/lib/audit.php';
 require_once __DIR__ . '/lib/invoices.php';
 hub_auth_require_capability('tickets_ops');
@@ -47,7 +53,7 @@ $ticketStatus = trim((string) ($_GET['ticket_status'] ?? ''));
 $credentialActive = trim((string) ($_GET['credential_active'] ?? ''));
 $dateFrom = trim((string) ($_GET['from'] ?? ''));
 $dateTo = trim((string) ($_GET['to'] ?? ''));
-$orderId = max(0, (int) ($_GET['id'] ?? ($_POST['order_id'] ?? 0)));
+$orderId = $requestedOrderId;
 $paymentOptions = seasonTicketPaymentMethodOptions();
 $ticketTypes = getSeasonTicketTypes($pdo, null, false);
 $errors = [];
@@ -69,6 +75,33 @@ function season_ticket_order_date(?string $value, string $format = 'd/m/Y'): str
 {
     $timestamp = strtotime((string) $value);
     return $timestamp ? date($format, $timestamp) : 'Not set';
+}
+
+/** Resolve a controlled reason choice, with an explicit free-text fallback. */
+function season_ticket_order_action_reason(string $action, string $selected, string $custom): string
+{
+    $catalog = $action === 'refund' ? [
+        'customer_request' => 'Requested by customer',
+        'duplicate_order' => 'Duplicate order or payment',
+        'ticket_change' => 'Ticket changed or replaced',
+        'club_cancellation' => 'Cancelled by the club',
+    ] : [
+        'customer_request' => 'Requested by customer',
+        'duplicate_order' => 'Duplicate order',
+        'details_incorrect' => 'Incorrect customer or ticket details',
+        'no_longer_required' => 'Ticket no longer required',
+    ];
+    if ($selected === 'other') {
+        $custom = trim($custom);
+        if ($custom === '') {
+            throw new RuntimeException('Enter the reason in the box provided.');
+        }
+        return mb_substr($custom, 0, 500);
+    }
+    if (!isset($catalog[$selected])) {
+        throw new RuntimeException('Choose a reason for this action.');
+    }
+    return $catalog[$selected];
 }
 
 /**
@@ -144,30 +177,108 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     } else {
         try {
             $action = (string) ($_POST['action'] ?? '');
-            if ($action === 'cancel_order') {
-                cancelSeasonPassOrder($pdo, $orderId, (string) ($_POST['reason'] ?? ''), isset($currentUser['account_id']) ? (int) $currentUser['account_id'] : null);
-                $cancelledOrder = getSeasonPassOrderBundle($pdo, $orderId);
-                auditLog($pdo, 'season_ticket_order_cancelled', "Cancelled season ticket order #{$orderId} for '" . (string) ($cancelledOrder['holder_name'] ?? '') . "'");
-                header('Location: /admin/season_ticket_orders.php?id=' . $orderId . '&cancelled=1');
-                exit;
-            }
-            if ($action === 'refund_order') {
+            if ($action === 'apply_order_action') {
+                $selectedAction = (string) ($_POST['order_action_type'] ?? '');
+                if (!in_array($selectedAction, ['cancel', 'refund'], true)) {
+                    throw new RuntimeException('Choose what you want to do with this order.');
+                }
+                $orderBeforeAction = getSeasonPassOrderBundle($pdo, $orderId);
+                if (!$orderBeforeAction) {
+                    throw new RuntimeException('Order not found.');
+                }
+                if (in_array((string) $orderBeforeAction['status'], ['cancelled', 'refunded'], true)) {
+                    throw new RuntimeException('This order has already been ' . (string) $orderBeforeAction['status'] . '.');
+                }
+                $reason = season_ticket_order_action_reason(
+                    $selectedAction,
+                    (string) ($_POST['action_reason'] ?? ''),
+                    (string) ($_POST['custom_reason'] ?? '')
+                );
+                $accountId = isset($currentUser['account_id']) ? (int) $currentUser['account_id'] : null;
+
+                if ($selectedAction === 'cancel') {
+                    cancelSeasonPassOrder($pdo, $orderId, $reason, $accountId);
+                    $emailSent = sendSeasonPassOrderActionEmail($pdo, $orderId, 'cancel', $reason);
+                    auditLog($pdo, 'season_ticket_order_cancelled', "Cancelled season ticket order #{$orderId} for '" . (string) ($orderBeforeAction['holder_name'] ?? '') . "' — {$reason}");
+                    header('Location: /admin/season_ticket_orders.php?id=' . $orderId . '&cancelled=1&email=' . ($emailSent ? 'sent' : 'failed'));
+                    exit;
+                }
+
                 if (!hub_auth_has_any_capability(['tickets_refund_comp', 'finance_manage'])) {
                     throw new RuntimeException('You do not have permission to refund ticket orders.');
                 }
-                refundSeasonPassOrder($pdo, $orderId, (float) ($_POST['amount'] ?? 0), (string) ($_POST['reason'] ?? ''), isset($currentUser['account_id']) ? (int) $currentUser['account_id'] : null);
-                $refundedOrder = getSeasonPassOrderBundle($pdo, $orderId);
-                auditLog($pdo, 'season_ticket_order_refunded', "Refunded season ticket order #{$orderId} for '" . (string) ($refundedOrder['holder_name'] ?? '') . "'");
-                header('Location: /admin/season_ticket_orders.php?id=' . $orderId . '&refunded=1');
+                $remaining = seasonPassOrderRefundableAmount($pdo, $orderBeforeAction);
+                $refundMode = (string) ($_POST['refund_mode'] ?? '');
+                $percentageMap = ['100' => 1.0, '75' => 0.75, '50' => 0.5, '25' => 0.25];
+                if (isset($percentageMap[$refundMode])) {
+                    $refundAmount = round($remaining * $percentageMap[$refundMode], 2);
+                } elseif ($refundMode === 'custom') {
+                    $refundAmount = round((float) ($_POST['refund_amount'] ?? 0), 2);
+                } else {
+                    throw new RuntimeException('Choose a refund percentage or custom amount.');
+                }
+                if ($refundAmount <= 0 || $refundAmount > $remaining + 0.0001) {
+                    throw new RuntimeException('Refund amount must be between £0.01 and ' . gbp($remaining) . '.');
+                }
+                $stripeRefund = season_ticket_stripe_refund_order(
+                    $pdo,
+                    $orderBeforeAction,
+                    $refundAmount,
+                    (string) ($_POST['refund_request_key'] ?? '')
+                );
+                $providerRefundId = trim((string) ($stripeRefund['id'] ?? ''));
+                if ($providerRefundId === '') {
+                    throw new RuntimeException('Stripe did not confirm the refund. Nothing was recorded locally.');
+                }
+                refundSeasonPassOrder($pdo, $orderId, $refundAmount, $reason, $accountId, $providerRefundId);
+                $emailSent = sendSeasonPassOrderActionEmail($pdo, $orderId, 'refund', $reason, $refundAmount);
+                auditLog($pdo, 'season_ticket_order_refunded', 'Refunded ' . gbp($refundAmount) . " via Stripe for season ticket order #{$orderId} ('" . (string) ($orderBeforeAction['holder_name'] ?? '') . "') — {$reason}");
+                header('Location: /admin/season_ticket_orders.php?id=' . $orderId . '&refunded=1&email=' . ($emailSent ? 'sent' : 'failed'));
                 exit;
             }
             if ($action === 'generate_invoice') {
+                $existingInvoice = invoices_latest_active_for_source($pdo, 'season_pass_order', $orderId);
+                if ($existingInvoice) {
+                    header('Location: /admin/season_ticket_orders.php?id=' . $orderId . '&invoice_exists=1');
+                    exit;
+                }
                 $result = invoices_generate_for_season_pass_order($pdo, $orderId, (string) ($currentUser['display_name'] ?? $currentUser['username'] ?? $currentUser['email'] ?? ''));
                 if ($result['errors']) {
                     throw new RuntimeException(implode(' ', $result['errors']));
                 }
-                auditLog($pdo, 'invoice_generated', "Generated invoice for season ticket order #{$orderId}");
-                header('Location: /admin/season_ticket_orders.php?id=' . $orderId . '&invoice_generated=1');
+                $invoice = invoices_get($pdo, (int) $result['id']);
+                $emailSent = false;
+                if ($invoice) {
+                    try {
+                        $emailSent = invoices_email_pdf($pdo, $invoice, (string) ($invoice['bill_to_email'] ?? ''));
+                    } catch (Throwable $emailError) {
+                        $emailSent = false;
+                    }
+                }
+                auditLog($pdo, 'invoice_generated', "Generated invoice for season ticket order #{$orderId}" . ($emailSent ? ' and emailed it to the customer' : ''));
+                header('Location: /admin/season_ticket_orders.php?id=' . $orderId . '&invoice_generated=1&invoice_email=' . ($emailSent ? 'sent' : 'failed'));
+                exit;
+            }
+            if (in_array($action, ['email_invoice', 'mark_invoice_paid'], true)) {
+                $invoiceId = (int) ($_POST['invoice_id'] ?? 0);
+                $invoice = $invoiceId > 0 ? invoices_get($pdo, $invoiceId) : null;
+                if (!$invoice || (string) $invoice['source_type'] !== 'season_pass_order' || (int) $invoice['source_id'] !== $orderId) {
+                    throw new RuntimeException('Invoice not found for this order.');
+                }
+                if ($action === 'mark_invoice_paid') {
+                    if ((string) $invoice['status'] === 'void') {
+                        throw new RuntimeException('A void invoice cannot be marked as paid.');
+                    }
+                    invoices_mark_paid($pdo, $invoiceId);
+                    auditLog($pdo, 'invoice_marked_paid', 'Invoice ' . (string) $invoice['invoice_number'] . ' marked paid');
+                    header('Location: /admin/season_ticket_orders.php?id=' . $orderId . '&invoice_paid=1');
+                    exit;
+                }
+                if (!invoices_email_pdf($pdo, $invoice, (string) ($invoice['bill_to_email'] ?? ''))) {
+                    throw new RuntimeException('The invoice email could not be sent. Check the customer email and mail settings.');
+                }
+                auditLog($pdo, 'invoice_emailed', 'Invoice ' . (string) $invoice['invoice_number'] . ' emailed to ' . (string) $invoice['bill_to_email']);
+                header('Location: /admin/season_ticket_orders.php?id=' . $orderId . '&invoice_emailed=1');
                 exit;
             }
         } catch (Throwable $exception) {
@@ -189,20 +300,26 @@ if ($orderId > 0) {
         exit;
     }
     $holderUrl = '/club_person.php?id=' . (int) $order['owner_person_id'];
-    $verifyUrl = !empty($order['token']) ? '/verify_ticket.php?token=' . rawurlencode((string) $order['token']) : '';
+    $refundableAmount = seasonPassOrderRefundableAmount($pdo, $order);
+    $stripeRefundAvailable = (string) ($order['provider'] ?? '') === 'stripe'
+        && trim((string) ($order['provider_payment_id'] ?? '')) !== ''
+        && $refundableAmount > 0.0
+        && hub_auth_has_any_capability(['tickets_refund_comp', 'finance_manage']);
+    $refundRequestKey = isset($_POST['refund_request_key']) && is_string($_POST['refund_request_key'])
+        ? $_POST['refund_request_key']
+        : bin2hex(random_bytes(16));
+    $activeInvoice = invoices_latest_active_for_source($pdo, 'season_pass_order', (int) $order['id']);
     ?>
 
     <?php if (!$stoPartial): ?>
-    <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
-        <a class="btn btn-outline-secondary" href="/admin/season_ticket_orders.php?season_id=<?= (int) $seasonId ?>"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i> Orders</a>
-        <div class="d-flex flex-wrap gap-2">
-            <a class="btn btn-outline-secondary" href="<?= h($holderUrl) ?>"><i class="fa-solid fa-user" aria-hidden="true"></i> Person</a>
-            <a class="btn btn-brand" href="/admin/season_ticket_order.php?action=new"><i class="fa-solid fa-plus" aria-hidden="true"></i> Add ticket</a>
-        </div>
-    </div>
-
-    <?php if (isset($_GET['cancelled'])): ?><div class="alert alert-success">Season ticket cancelled and credential revoked.</div><?php endif; ?>
-    <?php if (isset($_GET['refunded'])): ?><div class="alert alert-success">Refund recorded. Full refunds revoke the ticket credential.</div><?php endif; ?>
+    <?php if (isset($_GET['cancelled'])): ?><div class="alert alert-success">Season ticket cancelled and credential revoked.<?= ($_GET['email'] ?? '') === 'sent' ? ' The customer was emailed.' : '' ?></div><?php endif; ?>
+    <?php if (isset($_GET['refunded'])): ?><div class="alert alert-success">Stripe refund completed. Full refunds revoke the ticket credential.<?= ($_GET['email'] ?? '') === 'sent' ? ' The customer was emailed.' : '' ?></div><?php endif; ?>
+    <?php if (isset($_GET['invoice_generated'])): ?><div class="alert alert-success">Invoice generated successfully.<?= ($_GET['invoice_email'] ?? '') === 'sent' ? ' A PDF copy was emailed to the customer.' : '' ?></div><?php endif; ?>
+    <?php if (($_GET['invoice_email'] ?? '') === 'failed'): ?><div class="alert alert-warning">The invoice was created, but its email could not be sent. You can try again using the invoice controls below.</div><?php endif; ?>
+    <?php if (isset($_GET['invoice_exists'])): ?><div class="alert alert-info">This order already has an invoice, so another was not created.</div><?php endif; ?>
+    <?php if (isset($_GET['invoice_emailed'])): ?><div class="alert alert-success">The invoice PDF was emailed to the customer.</div><?php endif; ?>
+    <?php if (isset($_GET['invoice_paid'])): ?><div class="alert alert-success">Invoice marked as paid.</div><?php endif; ?>
+    <?php if (($_GET['email'] ?? '') === 'failed'): ?><div class="alert alert-warning">The order action completed, but the customer email could not be sent. Please contact them manually.</div><?php endif; ?>
     <?php if ($errors): ?><div class="alert alert-danger"><?= h(implode(' ', $errors)) ?></div><?php endif; ?>
     <?php endif; ?>
 
@@ -213,8 +330,8 @@ if ($orderId > 0) {
     <?php if ($errors): ?><div class="alert alert-danger"><?= h(implode(' ', $errors)) ?></div><?php endif; ?>
     <?php endif; ?>
 
-    <div class="row g-3">
-        <div class="col-lg-8">
+    <div class="season-order-layout">
+        <div class="season-order-main">
             <section class="card shadow-sm border-0 mb-3">
                 <div class="card-body">
                     <div class="d-flex flex-wrap gap-2 justify-content-between align-items-start">
@@ -230,13 +347,19 @@ if ($orderId > 0) {
                         <div class="col-md-6"><div class="text-muted small">Person / ticket holder</div><div class="fw-semibold"><?= h((string) $order['holder_name']) ?></div><div><?= h((string) ($order['holder_email'] ?? '')) ?></div></div>
                         <div class="col-md-6"><div class="text-muted small">Payment</div><div class="fw-semibold"><?= gbp((float) $order['total_amount']) ?></div><div><?= h((string) $order['payment_status']) ?><?= !empty($order['paid_at']) ? ' - ' . h(season_ticket_order_date((string) $order['paid_at'])) : '' ?></div><div class="small text-muted"><?= h((string) ($paymentOptions[$order['payment_method']] ?? $order['payment_method'] ?? 'No method')) ?></div></div>
                         <div class="col-md-6"><div class="text-muted small">Ticket</div><div class="fw-semibold"><?= h((string) $order['pass_status']) ?></div><div class="small text-muted">Entitlement #<?= (int) $order['entitlement_id'] ?> · Ticket #<?= (int) $order['season_pass_id'] ?></div></div>
-                        <div class="col-md-6"><div class="text-muted small">Credential</div><div class="fw-semibold font-monospace"><?= h((string) $order['manual_code']) ?></div><div class="small text-muted"><?= (int) $order['credential_is_active'] === 1 ? 'Active' : 'Inactive' ?></div><?php if ($verifyUrl !== ''): ?><a class="small" href="<?= h($verifyUrl) ?>" target="_blank" rel="noopener">Open verification</a><?php endif; ?></div>
+                        <div class="col-md-6"><div class="text-muted small">Credential</div><div class="fw-semibold font-monospace"><?= h((string) $order['manual_code']) ?></div><div class="small text-muted"><?= (int) $order['credential_is_active'] === 1 ? 'Active' : 'Inactive' ?></div></div>
                     </div>
                 </div>
+                <?php if (!$stoPartial): ?>
+                <div class="card-footer bg-white border-top d-flex flex-wrap justify-content-end gap-2 py-3">
+                        <a class="btn btn-outline-secondary" href="<?= h($holderUrl) ?>#tab-ticketing"><i class="fa-solid fa-user" aria-hidden="true"></i> View person</a>
+                        <a class="btn btn-brand" href="/admin/season_ticket_order.php?action=new&amp;person_id=<?= (int) $order['owner_person_id'] ?>"><i class="fa-solid fa-plus" aria-hidden="true"></i> Add another ticket</a>
+                </div>
+                <?php endif; ?>
             </section>
         </div>
 
-        <div class="col-lg-4">
+        <div class="season-order-sidebar">
             <section class="card shadow-sm border-0 mb-3">
                 <div class="card-body">
                     <h3 class="h5 mb-3">Order Summary</h3>
@@ -250,42 +373,160 @@ if ($orderId > 0) {
             </section>
 
             <section class="card shadow-sm border-0 mb-3">
-                <div class="card-body">
-                    <?= invoices_render_admin_section(invoices_list_for_source($pdo, 'season_pass_order', (int) $order['id']), '<form method="post" action="/admin/season_ticket_orders.php">' . csrf_field() . '<input type="hidden" name="order_id" value="' . (int) $order['id'] . '"><input type="hidden" name="action" value="generate_invoice"><button type="submit" class="btn btn-outline-primary btn-sm">Generate invoice</button></form>') ?>
+                <div class="card-header bg-white border-0 px-3 pt-3 pb-2">
+                    <div class="d-flex align-items-center gap-2"><i class="fa-solid fa-file-invoice text-primary" aria-hidden="true"></i><h3 class="h5 mb-0">Invoice</h3></div>
                 </div>
-            </section>
-
-            <section class="card shadow-sm border-0">
-                <div class="card-body">
-                    <h3 class="h5 mb-3">Actions</h3>
-                    <?php if (!in_array((string) $order['status'], ['cancelled', 'refunded'], true)): ?>
-                        <form method="post" class="mb-3" action="/admin/season_ticket_orders.php">
-                            <?= csrf_field() ?>
-                            <input type="hidden" name="order_id" value="<?= (int) $order['id'] ?>">
-                            <input type="hidden" name="action" value="cancel_order">
-                            <label class="form-label fw-semibold" for="cancel_reason">Cancel reason</label>
-                            <textarea class="form-control mb-2" id="cancel_reason" name="reason" rows="2" required></textarea>
-                            <button class="btn btn-outline-danger w-100" type="submit">Cancel Ticket</button>
-                        </form>
-                        <?php if ((string) $order['payment_status'] === 'paid'): ?>
+                <div class="card-body px-3 pt-2">
+                    <?php if ($activeInvoice): ?>
+                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2"><strong><?= h((string) $activeInvoice['invoice_number']) ?></strong><span class="badge <?= (string) $activeInvoice['status'] === 'paid' ? 'text-bg-success' : 'text-bg-secondary' ?>"><?= h(ucfirst((string) $activeInvoice['status'])) ?></span></div>
+                        <div class="small text-muted mb-3"><?= !empty($activeInvoice['sent_at']) ? 'Emailed ' . h(date('d/m/Y H:i', strtotime((string) $activeInvoice['sent_at']))) : 'Not emailed yet' ?></div>
+                        <div class="d-grid gap-2">
+                            <div class="d-flex gap-2">
+                                <a class="btn btn-outline-primary flex-fill" href="/admin/invoice_pdf.php?id=<?= (int) $activeInvoice['id'] ?>" target="_blank" rel="noopener"><i class="fa-solid fa-eye" aria-hidden="true"></i> View PDF</a>
+                                <a class="btn btn-outline-secondary" href="/admin/invoice_pdf.php?id=<?= (int) $activeInvoice['id'] ?>&amp;download=1" aria-label="Download invoice PDF" title="Download PDF"><i class="fa-solid fa-download" aria-hidden="true"></i></a>
+                            </div>
                             <form method="post" action="/admin/season_ticket_orders.php">
-                                <?= csrf_field() ?>
-                                <input type="hidden" name="order_id" value="<?= (int) $order['id'] ?>">
-                                <input type="hidden" name="action" value="refund_order">
-                                <label class="form-label fw-semibold" for="refund_amount">Refund amount</label>
-                                <input class="form-control mb-2" id="refund_amount" name="amount" type="number" min="0" step="0.01" value="<?= h((string) $order['total_amount']) ?>" required>
-                                <label class="form-label fw-semibold" for="refund_reason">Refund reason</label>
-                                <textarea class="form-control mb-2" id="refund_reason" name="reason" rows="2"></textarea>
-                                <button class="btn btn-outline-warning w-100" type="submit">Record Refund</button>
+                                <?= csrf_field() ?><input type="hidden" name="order_id" value="<?= (int) $order['id'] ?>"><input type="hidden" name="invoice_id" value="<?= (int) $activeInvoice['id'] ?>"><input type="hidden" name="action" value="email_invoice">
+                                <button type="submit" class="btn btn-outline-secondary w-100"><i class="fa-solid fa-envelope" aria-hidden="true"></i> Email PDF</button>
                             </form>
-                        <?php endif; ?>
+                            <?php if ((string) $activeInvoice['status'] === 'issued'): ?>
+                                <form method="post" action="/admin/season_ticket_orders.php" onsubmit="return window.confirm('Mark this invoice as paid?');">
+                                    <?= csrf_field() ?><input type="hidden" name="order_id" value="<?= (int) $order['id'] ?>"><input type="hidden" name="invoice_id" value="<?= (int) $activeInvoice['id'] ?>"><input type="hidden" name="action" value="mark_invoice_paid">
+                                    <button type="submit" class="btn btn-outline-success w-100"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> Mark as paid</button>
+                                </form>
+                            <?php endif; ?>
+                        </div>
                     <?php else: ?>
-                        <div class="alert alert-secondary mb-0">This ticket is not active.</div>
+                        <p class="small text-muted">No invoice has been generated for this order.</p>
+                        <form method="post" action="/admin/season_ticket_orders.php">
+                            <?= csrf_field() ?><input type="hidden" name="order_id" value="<?= (int) $order['id'] ?>"><input type="hidden" name="action" value="generate_invoice">
+                            <button type="submit" class="btn btn-outline-primary w-100"><i class="fa-solid fa-file-invoice" aria-hidden="true"></i> Generate &amp; email invoice</button>
+                        </form>
                     <?php endif; ?>
                 </div>
             </section>
+
         </div>
+
+    <section class="card shadow-sm border-0 mb-3 season-order-actions">
+        <div class="card-header bg-white border-0 px-4 pt-4 pb-2">
+            <h2 class="h5 mb-1">Order actions</h2>
+            <p class="text-muted small mb-0">Use these controls only when the ticket or payment needs to be changed.</p>
+        </div>
+        <div class="card-body px-4 pt-2 pb-4">
+            <?php if (!in_array((string) $order['status'], ['cancelled', 'refunded'], true)): ?>
+                <form method="post" action="/admin/season_ticket_orders.php" id="seasonOrderActionForm" data-refund-remaining="<?= h(number_format($refundableAmount, 2, '.', '')) ?>">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="order_id" value="<?= (int) $order['id'] ?>">
+                    <input type="hidden" name="action" value="apply_order_action">
+                    <input type="hidden" name="refund_request_key" value="<?= h($refundRequestKey) ?>">
+                    <div class="row g-3 align-items-start">
+                        <div class="col-lg-4">
+                            <label class="form-label fw-semibold" for="orderActionType">What do you want to do?</label>
+                            <select class="form-select" id="orderActionType" name="order_action_type" required>
+                                <option value="">Choose an action</option>
+                                <option value="cancel">Cancel the ticket</option>
+                                <option value="refund" <?= $stripeRefundAvailable ? '' : 'disabled' ?>>Refund through Stripe</option>
+                            </select>
+                            <?php if (!$stripeRefundAvailable): ?><div class="form-text">A Stripe refund is unavailable because there is no refundable Stripe balance or you do not have refund permission.</div><?php endif; ?>
+                        </div>
+                        <div class="col-lg-4" data-order-action-reason hidden>
+                            <label class="form-label fw-semibold" for="actionReason">Reason</label>
+                            <select class="form-select" id="actionReason" name="action_reason"></select>
+                        </div>
+                        <div class="col-lg-4" data-custom-reason hidden>
+                            <label class="form-label fw-semibold" for="customReason">Your reason</label>
+                            <input class="form-control" id="customReason" name="custom_reason" maxlength="500" type="text">
+                        </div>
+                    </div>
+
+                    <div class="rounded-3 border bg-light p-3 mt-3" data-refund-options hidden>
+                        <div class="d-flex flex-wrap justify-content-between gap-2 mb-3"><div><strong>Refund amount</strong><div class="text-muted small">Refundable Stripe balance: <?= gbp($refundableAmount) ?></div></div><span class="badge text-bg-light border text-dark align-self-start">Original payment method</span></div>
+                        <div class="row g-3">
+                            <div class="col-md-6"><label class="form-label" for="refundMode">Amount to refund</label><select class="form-select" id="refundMode" name="refund_mode"><option value="100">100% — full remaining balance</option><option value="75">75% of remaining balance</option><option value="50">50% of remaining balance</option><option value="25">25% of remaining balance</option><option value="custom">Custom amount</option></select></div>
+                            <div class="col-md-6" data-custom-refund hidden><label class="form-label" for="refundAmount">Custom amount</label><div class="input-group"><span class="input-group-text">£</span><input class="form-control" id="refundAmount" name="refund_amount" type="number" min="0.01" max="<?= h(number_format($refundableAmount, 2, '.', '')) ?>" step="0.01" value="<?= h(number_format($refundableAmount, 2, '.', '')) ?>"></div></div>
+                        </div>
+                        <div class="mt-3 fw-semibold">Stripe refund to process: <span data-refund-preview><?= gbp($refundableAmount) ?></span></div>
+                    </div>
+
+                    <div class="rounded-3 border bg-light p-3 mt-3" data-cancel-summary hidden><div class="d-flex gap-3"><i class="fa-solid fa-ban text-danger mt-1" aria-hidden="true"></i><div><strong>This immediately disables the ticket.</strong><div class="text-muted small">It does not automatically refund a payment. Choose the Stripe refund action when money must also be returned.</div></div></div></div>
+
+                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mt-4" data-order-action-submit hidden>
+                        <div class="text-muted small"><i class="fa-solid fa-envelope me-1" aria-hidden="true"></i>The customer will be emailed after the action completes.</div>
+                        <button class="btn btn-danger" type="submit" data-action-submit-button>Continue</button>
+                    </div>
+                </form>
+            <?php else: ?>
+                <div class="d-flex align-items-center gap-3 rounded-3 bg-light p-3"><i class="fa-solid fa-circle-check text-secondary fs-4" aria-hidden="true"></i><div><strong>No further actions available</strong><div class="text-muted small">This ticket has already been <?= h((string) $order['status']) ?>.</div></div></div>
+            <?php endif; ?>
+        </div>
+    </section>
     </div>
+
+    <script>
+    (() => {
+        const form = document.getElementById('seasonOrderActionForm');
+        if (!form) return;
+        const action = form.querySelector('#orderActionType');
+        const reasonWrap = form.querySelector('[data-order-action-reason]');
+        const reason = form.querySelector('#actionReason');
+        const customReasonWrap = form.querySelector('[data-custom-reason]');
+        const customReason = form.querySelector('#customReason');
+        const refundOptions = form.querySelector('[data-refund-options]');
+        const refundMode = form.querySelector('#refundMode');
+        const customRefund = form.querySelector('[data-custom-refund]');
+        const refundAmount = form.querySelector('#refundAmount');
+        const refundPreview = form.querySelector('[data-refund-preview]');
+        const cancelSummary = form.querySelector('[data-cancel-summary]');
+        const submitWrap = form.querySelector('[data-order-action-submit]');
+        const submitButton = form.querySelector('[data-action-submit-button]');
+        const remaining = Number(form.dataset.refundRemaining || 0);
+        const reasons = {
+            cancel: [['', 'Choose a cancellation reason'], ['customer_request', 'Requested by customer'], ['duplicate_order', 'Duplicate order'], ['details_incorrect', 'Incorrect customer or ticket details'], ['no_longer_required', 'Ticket no longer required'], ['other', 'Other — type my own']],
+            refund: [['', 'Choose a refund reason'], ['customer_request', 'Requested by customer'], ['duplicate_order', 'Duplicate order or payment'], ['ticket_change', 'Ticket changed or replaced'], ['club_cancellation', 'Cancelled by the club'], ['other', 'Other — type my own']]
+        };
+        const pounds = (value) => new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(value);
+        const updateRefund = () => {
+            const mode = refundMode?.value || '100';
+            customRefund.hidden = mode !== 'custom';
+            refundAmount.required = mode === 'custom';
+            const amount = mode === 'custom' ? Number(refundAmount.value || 0) : remaining * (Number(mode) / 100);
+            refundPreview.textContent = pounds(Math.round(amount * 100) / 100);
+        };
+        const updateReason = () => {
+            const isOther = reason.value === 'other';
+            customReasonWrap.hidden = !isOther;
+            customReason.required = isOther;
+        };
+        const updateAction = () => {
+            const selected = action.value;
+            reasonWrap.hidden = selected === '';
+            refundOptions.hidden = selected !== 'refund';
+            cancelSummary.hidden = selected !== 'cancel';
+            submitWrap.hidden = selected === '';
+            reason.innerHTML = '';
+            (reasons[selected] || []).forEach(([value, label]) => reason.add(new Option(label, value)));
+            reason.required = selected !== '';
+            customReasonWrap.hidden = true;
+            customReason.required = false;
+            submitButton.textContent = selected === 'refund' ? 'Refund through Stripe' : 'Cancel ticket';
+            submitButton.className = selected === 'refund' ? 'btn btn-warning' : 'btn btn-danger';
+            updateRefund();
+        };
+        action.addEventListener('change', updateAction);
+        reason.addEventListener('change', updateReason);
+        refundMode?.addEventListener('change', updateRefund);
+        refundAmount?.addEventListener('input', updateRefund);
+        form.addEventListener('submit', (event) => {
+            const selected = action.value;
+            const message = selected === 'refund'
+                ? `Refund ${refundPreview.textContent} through Stripe to the original payment method?`
+                : 'Cancel this ticket and disable it immediately?';
+            if (!window.confirm(message)) event.preventDefault();
+        });
+        updateAction();
+    })();
+    </script>
     <?php
     if ($stoPartial) {
         exit;
@@ -369,7 +610,7 @@ $stoPageUrl = static function (int $target) use ($stoQueryBase): string {
 <div class="hub-section-commandbar">
   <div><h2>Season Ticket Orders</h2><p><?= count($orders) ?> ticket order<?= count($orders) === 1 ? '' : 's' ?> · <?= gbp($totalPaid) ?> paid · <?= gbp($totalOutstanding) ?> outstanding</p></div>
   <div class="hub-local-actions">
-    <a class="btn btn-outline-secondary btn-sm" href="club_people.php">People &amp; Users</a>
+    <a class="btn btn-outline-secondary btn-sm" href="club_people.php">Users</a>
     <a class="btn btn-outline-secondary btn-sm" href="season_ticket_free_codes.php">Free links</a>
     <a class="btn btn-brand btn-sm" href="season_ticket_order.php?action=new"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Add ticket</a>
   </div>

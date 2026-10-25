@@ -7,6 +7,22 @@ function hub_player_stats_normalize_name(string $name): string
     return mb_strtolower($name, 'UTF-8');
 }
 
+/** Normalised names of players whose record says they have left: status Left, or inactive (as on the Players page). */
+function hub_player_stats_left_names(PDO $pdo): array
+{
+    $left = [];
+    $current = [];
+    foreach ($pdo->query('SELECT name, status, active FROM players') as $row) {
+        if ((string)$row['status'] === 'left' || (int)$row['active'] === 0) {
+            $left[hub_player_stats_normalize_name((string)$row['name'])] = true;
+        } else {
+            $current[hub_player_stats_normalize_name((string)$row['name'])] = true;
+        }
+    }
+    // A name only counts as left when no current record shares it.
+    return array_diff_key($left, $current);
+}
+
 /** Own-goal events identify the benefiting team, not the scorer's team. */
 function hub_player_stats_is_club_player_event(array $event): bool
 {
@@ -74,13 +90,14 @@ function hub_player_match_stats(
     }
 
     if ($fixtures === null) {
+        require_once __DIR__ . '/stats.php';
         $stmt = $pdo->prepare("
             SELECT id, is_home, status,
                    starting11_starters_json, starting11_substitutes_json,
                    full_time_home_score, full_time_away_score
             FROM match_fixtures
             WHERE season_id = :season_id
-              AND status = 'played'
+              AND status = 'played'" . hub_stats_not_friendly_sql($pdo) . "
             ORDER BY match_date ASC, kickoff_time ASC, id ASC
         ");
         $stmt->execute([':season_id' => $seasonId]);

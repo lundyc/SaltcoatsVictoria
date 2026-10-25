@@ -29,7 +29,7 @@ if ($path === null) {
     exit;
 }
 
-$data = json_decode((string)file_get_contents($path), true);
+$data = hub_opposition_report_load($path);
 if (!is_array($data) || !isset($data['matches']) || !is_array($data['matches'])) {
     echo json_encode(['ok' => false, 'message' => 'That file is not a readable opponent report.']);
     exit;

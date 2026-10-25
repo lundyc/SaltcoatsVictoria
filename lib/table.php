@@ -233,3 +233,23 @@ function pub_is_league_fixture(string $competition): bool
         || str_contains($c, 'league')
         || ($title !== '' && str_contains($c, $title));
 }
+
+/**
+ * True only when every club in the table has a badge image on disk, so the
+ * table never shows a partial (or broken) set of badges.
+ *
+ * @param list<array<string, mixed>> $rows
+ */
+function pub_league_table_all_badges_exist(array $rows): bool
+{
+    if ($rows === []) {
+        return false;
+    }
+    foreach ($rows as $row) {
+        $logo = trim((string) ($row['logo'] ?? ''));
+        if ($logo === '' || !is_file(dirname(__DIR__) . '/' . ltrim($logo, '/'))) {
+            return false;
+        }
+    }
+    return true;
+}

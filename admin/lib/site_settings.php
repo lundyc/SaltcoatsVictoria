@@ -38,6 +38,13 @@ function site_settings_ensure_schema(PDO $pdo): void
 function site_settings_defaults(): array
 {
     return [
+        // Events: booking fee (rate % plus fixed pence, charged once per paid order) and the reply-to for ticket emails.
+        'events_fee_rate_pct'    => '1.5',
+        'events_fee_fixed_pence' => '20',
+        'events_reply_to'        => '',
+        'wallet_issuer_id'       => '',
+        'wallet_service_email'   => '',
+        'wallet_key_path'        => '',
         // Identity
         'club_name'       => 'Saltcoats Victoria FC',
         'club_short_name' => 'Saltcoats Vics',
@@ -60,6 +67,11 @@ function site_settings_defaults(): array
         // Contact
         'contact_email'   => '',
         'contact_phone'   => '',
+        'enquiry_email_commercial' => '',
+        'enquiry_email_hire'       => '',
+        'enquiry_email_media'      => '',
+        'enquiry_email_supporters' => '',
+        'enquiry_email_volunteers' => '',
         'contact_address' => '',
 
         // Invoicing — shown on the letterhead of every generated invoice
@@ -82,6 +94,11 @@ function site_settings_defaults(): array
         'social_twitter'   => '',
         'social_instagram' => '',
         'social_youtube'   => '',
+
+        // Player profiles — which statistics the public player page shows ('1' = show, '0' = hide)
+        'player_show_goals'    => '0',
+        'player_show_cards'    => '0',
+        'player_show_shootout' => '0',
 
         // Advanced
         'league_table_url'  => '',   // overrides the competition's WOSFL URL

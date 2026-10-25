@@ -60,9 +60,15 @@ function match_google_calendar_event_duration_minutes(): int
 
 function match_google_calendar_bearer_token(): string
 {
+          static $cached = null;
+          if ($cached !== null && $cached !== '') {
+                    return $cached;
+          }
+
           $env = match_google_calendar_env();
+          // A stored access token only lasts an hour, so prefer the refresh token when there is one.
           $accessToken = trim((string) ($env['GOOGLE_CALENDAR_ACCESS_TOKEN'] ?? ''));
-          if ($accessToken !== '') {
+          if ($accessToken !== '' && trim((string) ($env['GOOGLE_CALENDAR_REFRESH_TOKEN'] ?? '')) === '') {
                     return $accessToken;
           }
 
@@ -107,7 +113,7 @@ function match_google_calendar_bearer_token(): string
                     return '';
           }
 
-          return trim((string) ($decoded['access_token'] ?? ''));
+          return $cached = trim((string) ($decoded['access_token'] ?? ''));
 }
 
 function match_google_calendar_request(string $method, string $path, ?array $payload = null, array $query = [], ?string $bearerToken = null): array
@@ -213,49 +219,115 @@ function match_google_calendar_fixture_label(array $fixture): string
           $opponent = trim((string) ($fixture['opponent'] ?? ''));
           $isHome = (int) ($fixture['is_home'] ?? 1) === 1;
 
-          return 'Saltcoats Victoria ' . ($isHome ? 'vs ' : 'at ') . ($opponent !== '' ? $opponent : 'TBC');
+          return ($isHome ? 'vs ' : 'at ') . ($opponent !== '' ? $opponent : 'TBC');
 }
 
-function match_google_calendar_fixture_description(array $fixture): string
+/**
+ * Full ground address for Google Maps, e.g. "Campbell Park, Blakely Road, Saltcoats, KA21 5JQ".
+ * Falls back to the plain venue name when the ground is not in match_venues.
+ */
+function match_google_calendar_fixture_location(?PDO $pdo, array $fixture): string
 {
-          $parts = [
-                    'Fixture synced from the Hub.',
-          ];
-
-          $competition = trim((string) ($fixture['competition'] ?? ''));
-          if ($competition !== '') {
-                    $parts[] = 'Competition: ' . $competition;
-          }
-
           $venue = trim((string) ($fixture['venue'] ?? ''));
-          if ($venue !== '') {
-                    $parts[] = 'Venue: ' . $venue;
+          if ($venue === '' || $pdo === null) {
+                    return $venue;
           }
 
-          $matchDate = trim((string) ($fixture['match_date'] ?? ''));
-          if ($matchDate !== '') {
-                    $parts[] = 'Match date: ' . $matchDate;
+          try {
+                    $stmt = $pdo->prepare("SELECT name, club_name, address_line1, town, postcode FROM match_venues WHERE name = :n OR name LIKE :p OR address_line1 LIKE :p OR name LIKE :w ORDER BY (name = :n) DESC, (postcode IS NOT NULL AND postcode <> '') DESC");
+                    $stmt->execute([':n' => $venue, ':p' => $venue . '%', ':w' => (preg_split('/\s+/', $venue)[0] ?: $venue) . ' %']);
+                    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+          } catch (Throwable) {
+                    return $venue;
           }
+
+          $rows = array_values(array_filter($rows, fn($r) => trim((string) ($r['postcode'] ?? '')) !== ''));
+          if ($rows === []) {
+                    return $venue;
+          }
+
+          $row = $rows[0];
+          if (count($rows) > 1) {
+                    // Same ground name at several clubs (e.g. Victoria Park): match on who is playing.
+                    $who = strtolower(((int) ($fixture['is_home'] ?? 1) === 1 ? 'saltcoats victoria' : (string) ($fixture['opponent'] ?? '')));
+                    foreach ($rows as $r) {
+                              $club = strtolower(trim((string) ($r['club_name'] ?? '')));
+                              $club = trim(preg_replace('/\s+(fc|afc|f\.c\.)$/', '', $club));
+                              if ($club !== '' && $who !== '' && (str_contains($who, $club) || str_contains($club, $who))) {
+                                        $row = $r;
+                                        break;
+                              }
+                    }
+          }
+
+          $parts = [];
+          foreach (['name', 'address_line1', 'town', 'postcode'] as $k) {
+                    $v = trim((string) ($row[$k] ?? ''));
+                    if ($v !== '' && !in_array(strtolower($v), array_map('strtolower', $parts), true)) {
+                              $parts[] = $v;
+                    }
+          }
+
+          return implode(', ', $parts);
+}
+
+function match_google_calendar_fixture_description(array $fixture, string $location = ''): string
+{
+          $opponent = trim((string) ($fixture['opponent'] ?? '')) ?: 'TBC';
+          $isHome = (int) ($fixture['is_home'] ?? 1) === 1;
+          $competition = trim((string) ($fixture['competition'] ?? ''));
+          $where = $location !== '' ? $location : trim((string) ($fixture['venue'] ?? ''));
+
+          $when = '';
+          $matchDate = trim((string) ($fixture['match_date'] ?? ''));
+          $kickoff = trim((string) ($fixture['kickoff_time'] ?? ''));
+          if ($matchDate !== '') {
+                    try {
+                              $d = new DateTimeImmutable($matchDate . ' ' . ($kickoff !== '' ? substr($kickoff, 0, 5) : '00:00'));
+                              $when = $d->format('l j F Y');
+                              if ($kickoff !== '') {
+                                        $when .= ' at ' . strtolower($d->format('g:ia'));
+                              }
+                    } catch (Throwable) {
+                    }
+          }
+
+          $lines = [];
+          $lines[] = $isHome
+                    ? "Home game: Saltcoats Victoria host {$opponent}" . ($where !== '' ? " at {$where}." : '.')
+                    : "Away day: Saltcoats Victoria travel to face {$opponent}" . ($where !== '' ? " at {$where}." : '.');
+          if ($when !== '') {
+                    $lines[] = ($kickoff !== '' ? 'Kick-off is ' : 'The match is on ') . $when . '.';
+          }
+          if ($competition !== '') {
+                    $lines[] = "This one counts towards the {$competition}.";
+          }
+          $lines[] = $isHome ? 'Come along to Campbell Park and get behind the Vics!' : 'Plenty of support travelling would be great. Come on the Vics!';
 
           $fixtureId = trim((string) ($fixture['id'] ?? ''));
-          if ($fixtureId !== '') {
-                    $parts[] = 'Fixture id: ' . $fixtureId;
-          }
+          $lines[] = 'Added automatically by the Saltcoats Victoria Hub' . ($fixtureId !== '' ? " (fixture {$fixtureId})" : '') . '. Changes made in the Hub update this event.';
 
-          return implode("\n", $parts);
+          return implode("\n\n", $lines);
 }
 
-function match_google_calendar_fixture_payload(array $fixture): array
+function match_google_calendar_fixture_payload(array $fixture, ?PDO $pdo = null): array
 {
           $timezone = match_google_calendar_timezone();
           $kickoffTime = trim((string) ($fixture['kickoff_time'] ?? ''));
           $matchDate = trim((string) ($fixture['match_date'] ?? ''));
           $durationMinutes = match_google_calendar_event_duration_minutes();
+          $location = match_google_calendar_fixture_location($pdo, $fixture);
 
           $payload = [
                     'summary' => match_google_calendar_fixture_label($fixture),
-                    'description' => match_google_calendar_fixture_description($fixture),
-                    'location' => trim((string) ($fixture['venue'] ?? '')),
+                    'description' => match_google_calendar_fixture_description($fixture, $location),
+                    'location' => $location,
+                    // Home = Tomato (red), away = Blueberry (blue).
+                    'colorId' => (int) ($fixture['is_home'] ?? 1) === 1 ? '11' : '9',
+                    'reminders' => [
+                              'useDefault' => false,
+                              'overrides' => [['method' => 'popup', 'minutes' => 1440]],
+                    ],
                     'extendedProperties' => [
                               'private' => [
                                         'hubFixtureId' => trim((string) ($fixture['id'] ?? '')),
@@ -334,6 +406,16 @@ function match_google_calendar_find_event_id(PDO $pdo, int $fixtureId): string
 /**
  * @return array{ok: bool, message: string, event_id?: string, skipped?: bool}
  */
+function match_google_calendar_is_current_season(PDO $pdo, int $seasonId): bool
+{
+          if ($seasonId <= 0) {
+                    return false;
+          }
+          $stmt = $pdo->prepare('SELECT is_current FROM seasons WHERE id = ? LIMIT 1');
+          $stmt->execute([$seasonId]);
+          return (int) $stmt->fetchColumn() === 1;
+}
+
 function match_google_calendar_sync_fixture(PDO $pdo, array $fixture, string $operation = 'upsert'): array
 {
           if (!match_google_calendar_is_enabled()) {
@@ -359,6 +441,15 @@ function match_google_calendar_sync_fixture(PDO $pdo, array $fixture, string $op
                     return [
                               'ok' => false,
                               'message' => 'Fixture id is required for Google Calendar sync.',
+                    ];
+          }
+
+          // Only the current season goes on the club calendar; older seasons are left alone.
+          if ($operation !== 'delete' && !match_google_calendar_is_current_season($pdo, (int) ($fixture['season_id'] ?? 0))) {
+                    return [
+                              'ok' => true,
+                              'message' => 'Not in the current season, so not added to Google Calendar.',
+                              'skipped' => true,
                     ];
           }
 
@@ -388,7 +479,7 @@ function match_google_calendar_sync_fixture(PDO $pdo, array $fixture, string $op
                     ];
           }
 
-          $payload = match_google_calendar_fixture_payload($fixture);
+          $payload = match_google_calendar_fixture_payload($fixture, $pdo);
           if ($existingEventId !== '') {
                     $result = match_google_calendar_request('PATCH', 'events/' . rawurlencode($existingEventId), $payload, [], $bearerToken);
                     if (!$result['ok']) {

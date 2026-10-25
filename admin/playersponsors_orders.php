@@ -61,7 +61,7 @@ if (!in_array($statusFilter, ['all', 'pending_payment', 'paid', 'partially_confl
   $statusFilter = 'all';
 }
 
-$where = $statusFilter !== 'all' ? 'WHERE o.status = :status' : '';
+$where = $statusFilter !== 'all' ? 'WHERE o.status = :status' : "WHERE o.status NOT IN ('enquiry','declined')";
 $sql = "SELECT o.* FROM player_sponsorship_orders o $where ORDER BY o.created_at DESC, o.id DESC";
 $stmt = $pdo->prepare($sql);
 if ($statusFilter !== 'all') {

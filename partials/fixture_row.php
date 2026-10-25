@@ -10,7 +10,7 @@ $oppCrest = pub_opponent_crest($fixture['opponent_logo'] ?? '', (string) ($fixtu
 $homeCrest = $fixture['is_home'] ? club_crest() : $oppCrest; // light rows
 $awayCrest = $fixture['is_home'] ? $oppCrest : club_crest();
 $ko = format_time($fixture['kickoff_time'] ?? '');
-$href = url('match/' . (int) $fixture['id']);
+$href = isset($rowHref) && $rowHref !== '' ? (string) $rowHref : url('match/' . (int) $fixture['id']);
 $showTickets = !$played && $fixture['is_home'] && pub_fixture_has_tickets((int) $fixture['id']);
 ?>
 <div class="fxrow<?= $played && $outcome['outcome'] ? ' fxrow--' . strtolower($outcome['outcome']) : '' ?>">

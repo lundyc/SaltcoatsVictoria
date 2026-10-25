@@ -1,7 +1,7 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "MyClubHub Mobile API",
+    "title": "Saltcoats Victoria Mobile API",
     "version": "1.0.0",
     "description": "Supporter/member API for the existing club installation. HTTPS only. Bearer tokens are independent of browser cookies. JSON objects only; 16 KiB request limit. All responses use Cache-Control: no-store. Native apps require no CORS configuration; browser origins must be allowlisted. General limit: 300 requests/IP/minute. Login: 30/IP and 10/email per 15 minutes. Refresh: 60/IP per 15 minutes. Errors never expose database details. Serialize token refresh requests: a consumed refresh token revokes the device session if replayed. Access lasts 15 minutes; refresh has a 30-day sliding expiry and a 90-day absolute session limit. Profile writes do not allow email, passwords, roles, or identity changes. Amounts are decimal strings in the specified currency. Fixture date/time values use the returned IANA timezone; timestamps with Z are UTC. Guest orders must be explicitly linked to a person; email matching is not authorization. Purchases, registration/password reset APIs, dependent management, staff actions, and push delivery are outside this release."
   },

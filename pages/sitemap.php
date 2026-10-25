@@ -36,7 +36,7 @@ $add('news', $newsMod ?: null);
 $add('fixtures', $fixturesMod);
 $add('results', $fixturesMod);
 $add('table', $fixturesMod);
-foreach (['team', 'staff', 'gallery', 'partners', 'contact', 'privacy', 'tickets'] as $p) {
+foreach (['team', 'staff', 'gallery', 'commercial', 'partners', 'contact', 'privacy', 'tickets', 'season-tickets', 'playersponsors', 'pitchside-boards', 'matchday-sponsorship', 'hospitality', 'lottery'] as $p) {
     $add($p);
 }
 
@@ -67,6 +67,17 @@ foreach (club_pages_menu(db()) as $cp) {
     if (!in_array($cp['slug'], $staticClubSlugs, true) && $cp['slug'] !== 'privacy') {
         $add('club/' . $cp['slug'], (string) ($cp['updated_at'] ?? ''));
     }
+}
+// Events: public, not-yet-finished events (hidden and draft events never appear).
+try {
+    require_once HUB_ROOT . '/lib/events.php';
+    ensureEventsSchema(db());
+    $add('events');
+    foreach (db()->query("SELECT slug, updated_at, created_at FROM events WHERE visibility = 'public' AND status IN ('on_sale', 'sold_out', 'postponed') AND starts_at >= NOW()")->fetchAll(PDO::FETCH_ASSOC) as $evRow) {
+        $add('events/' . $evRow['slug'], (string) (($evRow['updated_at'] ?? '') ?: ($evRow['created_at'] ?? '')));
+    }
+} catch (Throwable) {
+    // Events are optional: a problem here must never break the sitemap.
 }
 foreach (squad_public_players(db()) as $pl) {
     $add('team/' . $pl['slug']);

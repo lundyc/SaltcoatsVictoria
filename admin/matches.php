@@ -18,11 +18,27 @@ $seasonsDesc = array_reverse($seasons);
 $isOpenSeason = !$allSeasons && $season !== null && (int) ($season['is_locked'] ?? 0) !== 1;
 $showSponsor  = $isOpenSeason;                        // sponsorship only tracked for the working season
 
+$nextMatchFixtureId = 0;
+if (!$allSeasons) {
+    try {
+        $nextStmt = $pdo->prepare("SELECT id FROM match_fixtures WHERE season_id = :s AND match_date >= CURDATE() AND status IN ('scheduled', 'postponed') ORDER BY match_date, kickoff_time LIMIT 1");
+        $nextStmt->execute([':s' => (int) $seasonId]);
+        $nextMatchFixtureId = (int) $nextStmt->fetchColumn();
+    } catch (Throwable $e) {
+        $nextMatchFixtureId = 0;
+    }
+}
+
+$heroActions = [];
+if (!$allSeasons) {
+    $heroActions[] = ['label' => 'Add match', 'href' => 'match.php?action=new&season_id=' . (int) $seasonId, 'class' => 'btn btn-light btn-sm'];
+}
+
 $pageHero = [
     'eyebrow'  => 'Fixture management',
     'title'    => 'Matches',
     'subtitle' => $allSeasons ? 'All seasons' : ('Season: ' . ($season['name'] ?? 'Unknown')),
-    'actions'  => [],
+    'actions'  => $heroActions,
 ];
 
 require_once __DIR__ . '/header.php';
@@ -192,10 +208,33 @@ if ($showSponsor) {
 } else {
     $metrics[] = ['label' => 'Goals', 'value' => $played ? ($gf . '–' . $ga) : '—', 'meta' => $played ? 'For – against' : '', 'icon' => 'fa-futbol', 'tone' => 'neutral'];
 }
-hub_render_metric_grid($metrics, 'Match summary');
+?>
+<section class="matches-summary" aria-label="Match summary">
+    <?php foreach ($metrics as $m): ?>
+        <?php $alert = ($m['label'] === 'Outstanding' && $outstanding > 0.004); ?>
+        <article class="matches-summary__item<?= $alert ? ' is-alert' : '' ?>">
+            <span class="matches-summary__label"><?= h((string) $m['label']) ?></span>
+            <strong class="matches-summary__value"><?= h((string) $m['value']) ?></strong>
+            <?php if (trim((string) ($m['meta'] ?? '')) !== ''): ?><span class="matches-summary__meta"><?= h((string) $m['meta']) ?></span><?php endif; ?>
+        </article>
+    <?php endforeach; ?>
+</section>
+<?php
 
 $colspan = 5 + ($allSeasons ? 1 : 0) + ($showSponsor ? 3 : 0);
 ?>
+
+<?php if (isset($_GET['gcal_synced'])): ?>
+    <div class="alert alert-<?= (int) ($_GET['gcal_failed_count'] ?? 0) > 0 ? 'warning' : 'success' ?>">
+        Google Calendar: <?= (int) $_GET['gcal_synced'] ?> fixture(s) synced for this season.
+        <?php if ((int) ($_GET['gcal_failed_count'] ?? 0) > 0): ?>
+            <?= (int) $_GET['gcal_failed_count'] ?> could not be synced. Check Settings &rarr; Calendar.
+        <?php endif; ?>
+    </div>
+<?php endif; ?>
+<?php if (isset($_GET['gcal_failed'])): ?>
+    <div class="alert alert-warning">The change was saved, but Google Calendar could not be updated. Check Settings &rarr; Calendar.</div>
+<?php endif; ?>
 
 <?php if (isset($_GET['imported'])): ?>
     <div class="alert alert-success">
@@ -206,92 +245,76 @@ $colspan = 5 + ($allSeasons ? 1 : 0) + ($showSponsor ? 3 : 0);
     </div>
 <?php endif; ?>
 
-<div class="hub-toolbar matches-toolbar" aria-label="Filter matches">
-    <div class="matches-toolbar__heading">
-        <span class="matches-toolbar__eyebrow">Match list</span>
-        <strong>Upcoming first</strong>
-        <span class="matches-toolbar__hint">Finished matches follow, newest first</span>
+<section class="matches-filters" aria-label="Filter matches">
+    <div class="matches-search">
+        <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+        <label class="visually-hidden" for="matchSearch">Search matches</label>
+        <input type="search" id="matchSearch" class="form-control" placeholder="Search matches…" autocomplete="off">
     </div>
-    <form class="matches-toolbar__season" method="get" action="matches.php">
-        <label for="matchSeason">Season scope</label>
-        <select id="matchSeason" name="season_id" class="form-select form-select-sm" onchange="this.form.submit()">
-            <option value="all" <?= $allSeasons ? 'selected' : '' ?>>All seasons</option>
-            <?php foreach ($seasonsDesc as $s): ?>
-                <option value="<?= (int) $s['id'] ?>" <?= (!$allSeasons && (int) $s['id'] === (int) $seasonId) ? 'selected' : '' ?>>
-                    <?= h((string) $s['name']) ?><?= !empty($s['is_current']) ? ' · Current' : '' ?><?= !empty($s['is_locked']) ? ' · Locked' : '' ?>
-                </option>
-            <?php endforeach; ?>
-        </select>
-        <noscript><button type="submit" class="btn btn-sm btn-outline-secondary">Go</button></noscript>
-    </form>
-
-    <div class="matches-toolbar__filters">
-        <div class="matches-toolbar__field">
-            <label for="matchStatusFilter">View</label>
-            <select id="matchStatusFilter" class="form-select form-select-sm" aria-label="Match status">
-                <option value="all">All matches</option>
-                <option value="upcoming">Upcoming</option>
-                <option value="played">Finished</option>
-            </select>
+    <button type="button" class="btn btn-outline-secondary matches-filters__toggle" id="matchFilterToggle" aria-expanded="false" aria-controls="matchFilterPanel">
+        <i class="fa-solid fa-sliders" aria-hidden="true"></i> Filters <span class="badge text-bg-dark" id="matchFilterBadge" hidden>0</span>
+    </button>
+    <div class="matches-filters__panel" id="matchFilterPanel">
+        <div class="matches-field">
+            <span class="matches-field__label" id="lblView">View</span>
+            <div class="matches-seg" role="group" aria-labelledby="lblView" data-target="matchStatusFilter">
+                <button type="button" data-value="all" aria-pressed="true">All</button>
+                <button type="button" data-value="upcoming" aria-pressed="false">Upcoming</button>
+                <button type="button" data-value="played" aria-pressed="false">Finished</button>
+            </div>
+            <input type="hidden" id="matchStatusFilter" value="all">
         </div>
-        <div class="matches-toolbar__field">
-            <label for="matchVenueFilter">Venue</label>
-            <select id="matchVenueFilter" class="form-select form-select-sm" aria-label="Home or away">
-                <option value="all">Home &amp; away</option>
-                <option value="home">Home</option>
-                <option value="away">Away</option>
-            </select>
+        <div class="matches-field">
+            <span class="matches-field__label" id="lblVenue">Venue</span>
+            <div class="matches-seg" role="group" aria-labelledby="lblVenue" data-target="matchVenueFilter">
+                <button type="button" data-value="all" aria-pressed="true">All</button>
+                <button type="button" data-value="home" aria-pressed="false">Home</button>
+                <button type="button" data-value="away" aria-pressed="false">Away</button>
+            </div>
+            <input type="hidden" id="matchVenueFilter" value="all">
         </div>
-        <div class="matches-toolbar__field">
-            <label for="matchOutcomeFilter">Outcome</label>
-            <select id="matchOutcomeFilter" class="form-select form-select-sm" aria-label="Match outcome">
+        <div class="matches-field">
+            <label class="matches-field__label" for="matchOutcomeFilter">Outcome</label>
+            <select id="matchOutcomeFilter" class="form-select" aria-label="Match outcome">
                 <option value="all">Any outcome</option>
                 <option value="W">Wins</option>
                 <option value="D">Draws</option>
                 <option value="L">Losses</option>
             </select>
         </div>
-        <div class="matches-toolbar__field matches-toolbar__field--competition">
-            <label for="matchCompetitionFilter">Competition</label>
-            <select id="matchCompetitionFilter" class="form-select form-select-sm" aria-label="Competition">
+        <div class="matches-field matches-field--wide">
+            <label class="matches-field__label" for="matchCompetitionFilter">Competition</label>
+            <select id="matchCompetitionFilter" class="form-select" aria-label="Competition">
                 <option value="all">All competitions</option>
                 <?php foreach ($competitionOptions as $competition): ?>
                     <option value="<?= h($competition) ?>"><?= h($competition) ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
-        <div class="matches-search">
-            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
-            <label class="visually-hidden" for="matchSearch">Search matches</label>
-            <input type="search" id="matchSearch" class="form-control form-control-sm" placeholder="Search opponent, date…" autocomplete="off">
-        </div>
-        <button type="button" class="btn btn-outline-secondary btn-sm" id="matchFilterReset" hidden>
+        <form class="matches-field" method="get" action="matches.php">
+            <label class="matches-field__label" for="matchSeason">Season</label>
+            <select id="matchSeason" name="season_id" class="form-select" onchange="this.form.submit()">
+                <option value="all" <?= $allSeasons ? 'selected' : '' ?>>All seasons</option>
+                <?php
+                $optLine = static function (array $opt) use ($allSeasons, $seasonId): string {
+                    return '<option value="' . (int) $opt['id'] . '"' . ((!$allSeasons && (int) $opt['id'] === (int) $seasonId) ? ' selected' : '') . '>'
+                        . h((string) $opt['name']) . (!empty($opt['is_current']) ? ' · Current' : '') . (!empty($opt['is_locked']) && empty($opt['is_archived']) ? ' · Locked' : '') . '</option>';
+                };
+                foreach ($seasonsDesc as $opt) { if (empty($opt['is_archived'])) { echo $optLine($opt); } }
+                $archivedOpts = array_filter($seasonsDesc, static fn (array $o): bool => !empty($o['is_archived']));
+                if ($archivedOpts): ?>
+                    <optgroup label="Archived (history)">
+                        <?php foreach ($archivedOpts as $opt) { echo $optLine($opt); } ?>
+                    </optgroup>
+                <?php endif; ?>
+            </select>
+            <noscript><button type="submit" class="btn btn-sm btn-outline-secondary mt-1">Go</button></noscript>
+        </form>
+        <button type="button" class="btn btn-link matches-filters__reset" id="matchFilterReset" hidden>
             <i class="fa-solid fa-rotate-left" aria-hidden="true"></i> Reset
         </button>
     </div>
-
-    <div class="hub-toolbar__count" aria-live="polite">
-        <strong id="matchVisibleCount"><?= $fixtureCount ?></strong>
-        <span id="matchCountLabel"><?= $fixtureCount === 1 ? 'match' : 'matches' ?></span>
-    </div>
-
-    <div class="hub-local-actions">
-        <?php if (!$allSeasons): ?>
-            <a href="match.php?action=new&amp;season_id=<?= (int) $seasonId ?>" class="btn btn-brand btn-sm"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Add match</a>
-        <?php endif; ?>
-        <div class="dropdown">
-            <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">More</button>
-            <div class="dropdown-menu dropdown-menu-end">
-                <?php if (!$allSeasons): ?>
-                    <button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#importFixturesModal"><i class="fa-solid fa-upload" aria-hidden="true"></i>Import fixtures</button>
-                    <a class="dropdown-item" href="monthly_fixtures.php?season_id=<?= (int) $seasonId ?>"><i class="fa-solid fa-calendar-days" aria-hidden="true"></i>Monthly fixtures</a>
-                    <a class="dropdown-item" href="match_fixtures_poster.php?season_id=<?= (int) $seasonId ?>"><i class="fa-solid fa-image" aria-hidden="true"></i>Fixture poster</a>
-                <?php endif; ?>
-                <a class="dropdown-item" href="seasons.php"><i class="fa-solid fa-calendar-days" aria-hidden="true"></i>Seasons</a>
-            </div>
-        </div>
-    </div>
-</div>
+</section>
 
 <?php if (!$allSeasons): ?>
 <div class="modal fade" id="importFixturesModal" tabindex="-1" aria-labelledby="importFixturesModalLabel" aria-hidden="true">
@@ -341,97 +364,140 @@ $colspan = 5 + ($allSeasons ? 1 : 0) + ($showSponsor ? 3 : 0);
 </div>
 <?php endif; ?>
 
-<div class="card shadow-sm hub-section hub-table-card">
+<div class="card shadow-sm hub-section hub-table-card matches-list">
+    <div class="matches-list__head">
+        <div>
+            <h2 class="matches-list__title"><span id="matchVisibleCount" aria-live="polite"><?= $fixtureCount ?></span> <span id="matchCountLabel"><?= $fixtureCount === 1 ? 'match' : 'matches' ?></span></h2>
+            <span class="matches-list__hint">Next 5 upcoming, then results</span>
+        </div>
+        <div class="matches-list__tools">
+            <?php if ($showSponsor && $rowsVm): ?>
+                <details class="matches-key">
+                    <summary><i class="fa-solid fa-circle-info" aria-hidden="true"></i> Key</summary>
+                    <div class="matches-key__panel" aria-label="Sponsorship payment key">
+                        <span><span class="fixtures-sponsorship-status is-available is-compact"><i class="fa-solid fa-minus" aria-hidden="true"></i></span>Available</span>
+                        <span><span class="fixtures-sponsorship-status is-unpaid is-compact"><i class="fa-solid fa-sterling-sign" aria-hidden="true"></i></span>Unpaid</span>
+                        <span><span class="fixtures-sponsorship-status is-partial is-compact"><i class="fa-solid fa-circle-half-stroke" aria-hidden="true"></i></span>Part paid</span>
+                        <span><span class="fixtures-sponsorship-status is-paid is-compact"><i class="fa-solid fa-check" aria-hidden="true"></i></span>Paid</span>
+                        <span><span class="fixtures-sponsorship-status is-complimentary is-compact"><i class="fa-solid fa-gift" aria-hidden="true"></i></span>Complimentary</span>
+                    </div>
+                </details>
+            <?php endif; ?>
+            <div class="dropdown">
+                <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">More</button>
+                <div class="dropdown-menu dropdown-menu-end">
+                    <?php if (!$allSeasons && $nextMatchFixtureId > 0): ?>
+                        <a class="dropdown-item" href="match_next_match.php?fixture_id=<?= $nextMatchFixtureId ?>&amp;season_id=<?= (int) $seasonId ?>"><i class="fa-solid fa-image" aria-hidden="true"></i>Next match graphic</a>
+                    <?php endif; ?>
+                    <?php if (!$allSeasons): ?>
+                        <button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#importFixturesModal"><i class="fa-solid fa-upload" aria-hidden="true"></i>Import fixtures</button>
+                        <a class="dropdown-item" href="monthly_fixtures.php?season_id=<?= (int) $seasonId ?>"><i class="fa-solid fa-calendar-days" aria-hidden="true"></i>Monthly fixtures</a>
+                        <a class="dropdown-item" href="match_fixtures_poster.php?season_id=<?= (int) $seasonId ?>"><i class="fa-solid fa-image" aria-hidden="true"></i>Fixture poster</a>
+                    <?php endif; ?>
+                    <?php if (!$allSeasons && $season !== null && (int) ($season['is_current'] ?? 0) === 1): ?>
+                        <form method="post" action="matches_calendar_sync.php" onsubmit="return confirm('Add or update every fixture in this season on the club Google Calendar?');">
+                            <?= csrf_field() ?>
+                            <button class="dropdown-item" type="submit"><i class="fa-brands fa-google" aria-hidden="true"></i>Sync season to Google Calendar</button>
+                        </form>
+                    <?php endif; ?>
+                    <a class="dropdown-item" href="seasons.php"><i class="fa-solid fa-calendar-days" aria-hidden="true"></i>Seasons</a>
+                </div>
+            </div>
+        </div>
+    </div>
     <div class="card-body">
         <?php if (!$rowsVm): ?>
             <div class="alert alert-info mb-0 hub-empty-state">No matches recorded for this selection.</div>
         <?php else: ?>
-            <?php if ($showSponsor): ?>
-                <div class="matches-legend" aria-label="Sponsorship payment key">
-                    <span><span class="fixtures-sponsorship-status is-available is-compact"><i class="fa-solid fa-minus" aria-hidden="true"></i></span>Available</span>
-                    <span><span class="fixtures-sponsorship-status is-unpaid is-compact"><i class="fa-solid fa-sterling-sign" aria-hidden="true"></i></span>Unpaid</span>
-                    <span><span class="fixtures-sponsorship-status is-partial is-compact"><i class="fa-solid fa-circle-half-stroke" aria-hidden="true"></i></span>Part paid</span>
-                    <span><span class="fixtures-sponsorship-status is-paid is-compact"><i class="fa-solid fa-check" aria-hidden="true"></i></span>Paid</span>
-                    <span><span class="fixtures-sponsorship-status is-complimentary is-compact"><i class="fa-solid fa-gift" aria-hidden="true"></i></span>Complimentary</span>
-                </div>
-            <?php endif; ?>
-
             <?php
+            $compCounts = [];
+            foreach ($rowsVm as $cv) { $cn = trim((string) ($cv['f']['competition'] ?? '')); if ($cn !== '') { $compCounts[$cn] = ($compCounts[$cn] ?? 0) + 1; } }
+            arsort($compCounts);
+            $mainComp = (string) (array_key_first($compCounts) ?? '');
             /** One row/card, shared desktop + mobile. */
             $renderMatch = function (array $vm, string $mode) use (
                 $seasonId, $allSeasons, $showSponsor, $fixtureStatusClass, $outcomeChipClass,
-                $matchSponsorshipStateClass, $matchSponsorshipStateIcon, $matchSponsorshipStateLabel
+                $matchSponsorshipStateClass, $matchSponsorshipStateIcon, $matchSponsorshipStateLabel, $mainComp
             ): void {
                 $f = $vm['f'];
                 $o = $vm['o'];
                 $id = (int) $f['id'];
                 $isHome = !empty($f['is_home']);
                 $deleted = isDeletedOpponentLabel((string) ($f['opponent'] ?? ''));
-                $dateStr = date('d/m/Y', strtotime((string) $f['match_date']));
+                $ts = strtotime((string) $f['match_date']);
+                $dateStr = date('d/m/Y', $ts);
                 $ko = !empty($f['kickoff_time']) ? substr((string) $f['kickoff_time'], 0, 5) : '';
                 $comp = trim((string) ($f['competition'] ?? ''));
                 $stage = trim((string) ($f['competition_stage'] ?? ''));
+                $compLine = $comp . ($comp !== '' && $stage !== '' ? ' · ' : '') . $stage;
                 $seasonName = (string) ($f['season_name'] ?? '');
                 $statusRaw = (string) ($f['status'] ?? '');
+                $statusKey = strtolower(trim($statusRaw));
+                $isPlainScheduled = in_array($statusKey, ['', 'scheduled', 'upcoming'], true);
+                // Anything other than scheduled or finished (postponed, cancelled, ...) needs action, so it gets flagged.
+                $flagClass = ($isPlainScheduled || in_array($statusKey, ['played', 'finished', 'complete', 'completed'], true)) ? '' : ' is-flagged';
                 $search = strtolower(implode(' ', array_filter([
                     (string) ($f['opponent'] ?? ''), $comp, $stage, $seasonName, $statusRaw,
                     (string) $f['match_date'], $dateStr, $isHome ? 'home' : 'away',
                 ])));
                 $href = 'match.php?id=' . $id . '&season_id=' . ($allSeasons ? (int) $f['season_id'] : (int) $seasonId);
+                $opp = $deleted ? '<em class="text-muted">Team deleted</em>' : h((string) $f['opponent']);
 
                 $scoreCell = $o['played'] && $o['us'] !== null
                     ? '<span class="match-score">' . ($isHome ? (int) $o['us'] : (int) $o['them']) . '&ndash;' . ($isHome ? (int) $o['them'] : (int) $o['us']) . '</span>'
                       . ' <span class="' . $outcomeChipClass($o['outcome']) . '">' . $o['outcome'] . '</span>'
-                    : '<span class="badge ' . h($fixtureStatusClass($statusRaw)) . '">' . h(ucfirst($statusRaw ?: 'scheduled')) . '</span>';
+                    : ($isPlainScheduled
+                        ? ''
+                        : '<span class="badge ' . h($fixtureStatusClass($statusRaw)) . '">' . h(ucfirst($statusRaw)) . '</span>');
+
+                $data = 'data-match-id="' . $id . '" data-status="' . ($o['played'] ? 'played' : 'upcoming') . '"'
+                    . ' data-venue="' . ($isHome ? 'home' : 'away') . '" data-outcome="' . h($o['outcome']) . '"'
+                    . ' data-competition="' . h($comp) . '" data-search="' . h($search) . '"';
 
                 if ($mode === 'mobile'):
+                    $needsAttention = false;
+                    if ($showSponsor && !$o['played']) {
+                        foreach ([$vm['dayRow'], $vm['ballRow'], $vm['motmRow']] as $sr) {
+                            if ($sr !== null && (int) ($sr['is_complimentary'] ?? 0) !== 1
+                                && (float) ($sr['paid_total'] ?? 0) + 0.0001 < (float) ($sr['amount'] ?? 0)) { $needsAttention = true; }
+                        }
+                    }
+                    $showComp = $compLine !== '' && ($allSeasons || $comp !== $mainComp);
                     ?>
-                    <a class="matches-card js-match-item" href="<?= h($href) ?>"
-                       data-match-id="<?= $id ?>" data-status="<?= $o['played'] ? 'played' : 'upcoming' ?>"
-                       data-venue="<?= $isHome ? 'home' : 'away' ?>" data-outcome="<?= h($o['outcome']) ?>"
-                       data-competition="<?= h($comp) ?>" data-search="<?= h($search) ?>">
-                        <div class="matches-card__top">
-                            <span class="matches-venue-icon <?= $isHome ? 'is-home' : 'is-away' ?>"><i class="fa-solid <?= $isHome ? 'fa-house' : 'fa-bus' ?>" aria-hidden="true"></i></span>
-                            <span class="matches-card__opp"><?= $deleted ? '<em class="text-muted">Team deleted</em>' : h((string) $f['opponent']) ?></span>
-                            <span class="matches-card__score"><?= $scoreCell ?></span>
-                        </div>
-                        <div class="matches-card__meta">
-                            <span><?= h($dateStr) ?><?= $ko ? ' · ' . h($ko) : '' ?></span>
-                            <?php if ($comp !== ''): ?><span><?= h($comp) ?><?= $stage ? ' · ' . h($stage) : '' ?></span><?php endif; ?>
-                            <?php if ($allSeasons && $seasonName !== ''): ?><span class="badge bg-light text-dark"><?= h($seasonName) ?></span><?php endif; ?>
-                        </div>
-                        <?php if ($showSponsor): ?>
-                            <div class="matches-card__sponsors">
-                                <?php foreach ([['Day', $vm['dayRow']], ['Ball', $vm['ballRow']], ['MOTM', $vm['motmRow']]] as [$lbl, $r]): ?>
-                                    <span><?= h($lbl) ?>
-                                        <span class="fixtures-sponsorship-status is-compact <?= h($matchSponsorshipStateClass($r)) ?>" title="<?= h($matchSponsorshipStateLabel($r)) ?>"><?= $matchSponsorshipStateIcon($r) ?></span>
-                                    </span>
-                                <?php endforeach; ?>
-                            </div>
-                        <?php endif; ?>
+                    <a class="matches-card js-match-item<?= $flagClass ?>" href="<?= h($href) ?>" <?= $data ?>>
+                        <span class="matches-card__date" aria-label="<?= h(date('l j F Y', $ts)) ?>">
+                            <strong><?= h(date('j', $ts)) ?></strong>
+                            <span><?= h(date('M', $ts)) ?></span>
+                        </span>
+                        <span class="matches-card__main">
+                            <span class="matches-card__row">
+                                <span class="matches-card__opp"><?= $opp ?></span>
+                                <?php if ($scoreCell !== ''): ?><span class="matches-card__score"><?= $scoreCell ?></span><?php endif; ?>
+                            </span>
+                            <span class="matches-card__meta">
+                                <?= $isHome ? 'Home' : 'Away' ?><?= $ko ? ' · ' . h(date('D', $ts)) . ' ' . h($ko) : '' ?><?= ($allSeasons && $seasonName !== '') ? ' · ' . h($seasonName) : '' ?>
+                            </span>
+                            <?php if ($showComp): ?><span class="matches-card__comp"><?= h($compLine) ?></span><?php endif; ?>
+                            <?php if ($needsAttention): ?><span class="matches-card__flag"><i class="fa-solid fa-sterling-sign" aria-hidden="true"></i> Sponsor payment due</span><?php endif; ?>
+                        </span>
                     </a>
                     <?php
                 else:
                     ?>
-                    <tr class="match-row js-match-item" role="link" tabindex="0"
-                        data-href="<?= h($href) ?>" data-match-id="<?= $id ?>"
-                        data-status="<?= $o['played'] ? 'played' : 'upcoming' ?>"
-                        data-venue="<?= $isHome ? 'home' : 'away' ?>" data-outcome="<?= h($o['outcome']) ?>"
-                        data-competition="<?= h($comp) ?>" data-search="<?= h($search) ?>">
+                    <tr class="match-row js-match-item<?= $flagClass ?>" role="link" tabindex="0" data-href="<?= h($href) ?>" <?= $data ?>>
                         <td class="text-center">
-                            <span class="matches-venue-icon <?= $isHome ? 'is-home' : 'is-away' ?>" title="<?= $isHome ? 'Home' : 'Away' ?>"><i class="fa-solid <?= $isHome ? 'fa-house' : 'fa-bus' ?>" aria-hidden="true"></i></span>
+                            <span class="matches-venue-icon <?= $isHome ? 'is-home' : 'is-away' ?>" title="<?= $isHome ? 'Home' : 'Away' ?>"><i class="fa-solid <?= $isHome ? 'fa-house' : 'fa-bus' ?>" aria-hidden="true"></i><span class="visually-hidden"><?= $isHome ? 'Home' : 'Away' ?></span></span>
                         </td>
-                        <td class="nowrap"><?= h($dateStr) ?><?php if ($ko): ?><div class="small text-muted"><?= h($ko) ?></div><?php endif; ?></td>
-                        <td>
-                            <?php if ($deleted): ?><em class="text-muted">Team deleted</em>
-                            <?php else: ?><span class="fw-semibold"><?= h((string) $f['opponent']) ?></span><?php endif; ?>
+                        <td class="nowrap">
+                            <span class="match-date"><?= h(date('j M Y', $ts)) ?></span>
+                            <div class="small text-muted"><?= h(date('D', $ts)) ?><?= $ko ? ' · ' . h($ko) : '' ?></div>
                         </td>
-                        <td class="match-comp">
-                            <?= $comp !== '' ? h($comp) : '<span class="text-muted">—</span>' ?>
-                            <?php if ($stage !== ''): ?><div class="small text-muted"><?= h($stage) ?></div><?php endif; ?>
+                        <td class="match-opp-cell">
+                            <span class="fw-semibold"><?= $opp ?></span>
+                            <?php if ($compLine !== ''): ?><div class="small text-muted match-comp-line" title="<?= h($compLine) ?>"><?= h($compLine) ?></div><?php endif; ?>
                         </td>
                         <?php if ($allSeasons): ?><td class="nowrap small text-muted"><?= h($seasonName) ?></td><?php endif; ?>
-                        <td class="nowrap"><?= $scoreCell ?></td>
+                        <td class="nowrap"><?= $scoreCell !== '' ? $scoreCell : '<span class="text-muted">—</span>' ?></td>
                         <?php if ($showSponsor): ?>
                             <?php foreach ([$vm['dayRow'], $vm['ballRow'], $vm['motmRow']] as $r): ?>
                                 <td class="text-center">
@@ -443,106 +509,168 @@ $colspan = 5 + ($allSeasons ? 1 : 0) + ($showSponsor ? 3 : 0);
                     <?php
                 endif;
             };
+            $groupLabels = ['upcoming' => 'Upcoming', 'played' => 'Results'];
+                        ?>
+
+            <?php
+            $blocks = ['upcoming' => [], 'played' => []];
+            foreach ($rowsVm as $vm) { $blocks[$vm['o']['played'] ? 'played' : 'upcoming'][] = $vm; }
+            $blockSize = ['upcoming' => 5, 'played' => 10];
+            foreach ($blocks as $grp => $groupRows):
+                if (!$groupRows) { continue; }
             ?>
+            <section class="matches-block" data-group="<?= $grp ?>" data-size="<?= $blockSize[$grp] ?>" aria-labelledby="matchesHead-<?= $grp ?>">
+                <h3 class="matches-group" id="matchesHead-<?= $grp ?>"><?= h($groupLabels[$grp]) ?> <span class="matches-block__count"><?= count($groupRows) ?></span></h3>
 
-            <div class="d-lg-none d-flex flex-column gap-2" id="matchesMobileList">
-                <?php foreach ($rowsVm as $vm) { $renderMatch($vm, 'mobile'); } ?>
-            </div>
+                <div class="d-lg-none matches-mobile-list">
+                    <?php foreach ($groupRows as $vm) { $renderMatch($vm, 'mobile'); } ?>
+                </div>
 
-            <div class="d-none d-lg-block table-responsive">
-                <table class="table hub-data-table align-middle matches-table">
-                    <thead>
-                        <tr>
-                            <th class="text-center"><span class="visually-hidden">Venue</span></th>
-                            <th>Date</th>
-                            <th>Opponent</th>
-                            <th>Competition</th>
-                            <?php if ($allSeasons): ?><th>Season</th><?php endif; ?>
-                            <th>Result</th>
-                            <?php if ($showSponsor): ?>
-                                <th class="text-center">Match Day</th>
-                                <th class="text-center">Match Ball</th>
-                                <th class="text-center">MOTM</th>
-                            <?php endif; ?>
-                        </tr>
-                    </thead>
-                    <tbody id="matchesTableBody">
-                        <?php foreach ($rowsVm as $vm) { $renderMatch($vm, 'desktop'); } ?>
-                    </tbody>
-                </table>
-            </div>
+                <div class="d-none d-lg-block table-responsive">
+                    <table class="table hub-data-table align-middle matches-table">
+                        <thead>
+                            <tr>
+                                <th class="text-center c-venue"><span class="visually-hidden">Venue</span></th>
+                                <th class="c-date">Date</th>
+                                <th>Opponent</th>
+                                <?php if ($allSeasons): ?><th class="c-season">Season</th><?php endif; ?>
+                                <th class="c-result">Result</th>
+                                <?php if ($showSponsor): ?>
+                                    <th class="text-center c-spons">Match Day</th>
+                                    <th class="text-center c-spons">Match Ball</th>
+                                    <th class="text-center c-spons">MOTM</th>
+                                <?php endif; ?>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($groupRows as $vm) { $renderMatch($vm, 'desktop'); } ?>
+                        </tbody>
+                    </table>
+                </div>
+
+                <nav class="matches-pagination" aria-label="<?= h($groupLabels[$grp]) ?> pages" hidden>
+                    <ul class="pagination pagination-sm justify-content-center mb-0"></ul>
+                </nav>
+            </section>
+            <?php endforeach; ?>
 
             <div class="hub-empty-state matches-filter-empty" id="matchesFilterEmpty" hidden>
                 <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
                 <strong>No matches for these filters</strong>
                 <span>Try a different search or filter.</span>
             </div>
-
-            <nav class="matches-pagination mt-3" id="matchesPagination" aria-label="Match pages" hidden>
-                <ul class="pagination pagination-sm justify-content-center mb-0"></ul>
-            </nav>
         <?php endif; ?>
     </div>
 </div>
 
 <style>
-.matches-toolbar { display:flex; flex-wrap:wrap; align-items:flex-end; gap:.75rem 1rem; }
-.matches-toolbar__heading { display:flex; flex-direction:column; gap:.08rem; margin-right:auto; min-width:13rem; }
-.matches-toolbar__eyebrow, .matches-toolbar__field label { font-size:.68rem; font-weight:800; letter-spacing:.07em; text-transform:uppercase; color:var(--bs-secondary-color,#6c757d); }
-.matches-toolbar__heading strong { font-size:.96rem; color:#1f1a1d; }
-.matches-toolbar__hint { font-size:.75rem; color:var(--bs-secondary-color,#6c757d); }
-.matches-toolbar__season { display:flex; flex-direction:column; gap:.2rem; }
-.matches-toolbar__season label { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--bs-secondary-color,#6c757d); }
-.matches-toolbar__season select { min-width:14rem; }
-.matches-toolbar__filters { display:flex; flex-wrap:wrap; align-items:center; gap:.5rem; }
-.matches-toolbar__field { display:flex; flex-direction:column; gap:.2rem; }
-.matches-toolbar__field select { min-width:8.5rem; }
-.matches-toolbar__field--competition select { min-width:12rem; max-width:15rem; }
-.matches-search { position:relative; }
-.matches-search i { position:absolute; left:.6rem; top:50%; transform:translateY(-50%); color:var(--bs-secondary-color,#6c757d); font-size:.8rem; }
-.matches-search input { padding-left:1.9rem; min-width:15rem; }
-.matches-legend { display:flex; flex-wrap:wrap; gap:1rem; font-size:.8rem; color:var(--bs-secondary-color,#6c757d); margin-bottom:.9rem; }
-.matches-legend > span { display:inline-flex; align-items:center; gap:.35rem; }
+/* Summary strip */
+.matches-summary { display:grid; grid-auto-flow:column; grid-auto-columns:minmax(0,1fr); gap:.6rem; margin:0 0 1rem; }
+.matches-summary__item { display:flex; flex-direction:column; gap:.05rem; min-width:0; padding:.6rem .85rem; background:var(--hub-surface,#fffdf9); border:1px solid var(--hub-line,rgba(75,8,24,.12)); border-radius:var(--hub-radius-sm,.7rem); }
+.matches-summary__label { font-size:.66rem; font-weight:800; letter-spacing:.07em; text-transform:uppercase; color:var(--hub-muted,#70676b); }
+.matches-summary__value { font-size:1.35rem; line-height:1.15; font-weight:800; color:var(--hub-ink,#1f1a1d); font-variant-numeric:tabular-nums; }
+.matches-summary__meta { font-size:.72rem; color:var(--hub-muted,#70676b); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.matches-summary__item.is-alert .matches-summary__value { color:#a32a3a; }
+
+/* Filters */
+.matches-filters { display:flex; flex-wrap:wrap; align-items:flex-end; gap:.7rem 1rem; padding:.85rem 1rem; margin-bottom:1rem; background:var(--hub-surface,#fffdf9); border:1px solid var(--hub-line,rgba(75,8,24,.12)); border-radius:var(--hub-radius,1rem); box-shadow:var(--hub-shadow-sm,none); }
+.matches-search { position:relative; flex:1 1 16rem; min-width:12rem; }
+.matches-search i { position:absolute; left:.8rem; top:50%; transform:translateY(-50%); color:var(--hub-muted,#70676b); font-size:.85rem; pointer-events:none; }
+.matches-search input { padding-left:2.3rem; }
+.matches-filters .matches-filters__toggle { display:none; }
+.matches-filters__panel { display:flex; flex-wrap:wrap; align-items:flex-end; gap:.7rem 1rem; }
+.matches-field { display:flex; flex-direction:column; gap:.25rem; margin:0; }
+.matches-field__label { font-size:.66rem; font-weight:800; letter-spacing:.07em; text-transform:uppercase; color:var(--hub-muted,#70676b); }
+.matches-field select { min-width:8.5rem; }
+.matches-field--wide select { min-width:12rem; max-width:17rem; }
+.matches-seg { display:inline-flex; padding:.15rem; gap:.1rem; background:rgba(75,8,24,.06); border-radius:.65rem; }
+.matches-seg button { border:0; background:transparent; padding:.38rem .8rem; border-radius:.5rem; font-size:.85rem; font-weight:600; color:var(--hub-ink,#1f1a1d); line-height:1.2; white-space:nowrap; }
+.matches-seg button[aria-pressed="true"] { background:#fff; color:#6a2036; box-shadow:0 1px 3px rgba(31,26,29,.18); }
+.matches-seg button:focus-visible { outline:2px solid #6a2036; outline-offset:1px; }
+.matches-filters__reset { align-self:flex-end; padding:.4rem .2rem; color:#6a2036; text-decoration:none; font-weight:600; font-size:.85rem; }
+
+/* List card */
+.matches-list__head { display:flex; align-items:center; justify-content:space-between; gap:.75rem; padding:.9rem 1.1rem .2rem; }
+.matches-list__title { font-size:1.05rem; font-weight:800; margin:0; color:var(--hub-ink,#1f1a1d); }
+.matches-list__hint { font-size:.78rem; color:var(--hub-muted,#70676b); }
+.matches-list__tools { display:flex; align-items:center; gap:.5rem; }
+.matches-key { position:relative; }
+.matches-key summary { white-space:nowrap; display:inline-flex; align-items:center; gap:.35rem; list-style:none; cursor:pointer; padding:.28rem .65rem; border:1px solid var(--hub-line-strong,rgba(75,8,24,.2)); border-radius:.5rem; font-size:.8rem; font-weight:600; color:var(--hub-muted,#70676b); background:#fff; }
+.matches-key summary::-webkit-details-marker { display:none; }
+.matches-key__panel { position:absolute; right:0; top:calc(100% + .4rem); z-index:20; display:flex; flex-direction:column; gap:.45rem; min-width:12rem; padding:.8rem .9rem; background:#fff; border:1px solid var(--hub-line-strong,rgba(75,8,24,.2)); border-radius:.7rem; box-shadow:0 .6rem 1.4rem rgba(31,26,29,.14); font-size:.82rem; }
+.matches-key__panel > span { display:flex; align-items:center; gap:.5rem; }
+
+/* Rows */
 .matches-venue-icon { display:inline-grid; place-items:center; width:1.9rem; height:1.9rem; border-radius:50%; font-size:.78rem; }
 .matches-venue-icon.is-home { background:rgba(106,32,54,.10); color:#6a2036; }
 .matches-venue-icon.is-away { background:rgba(0,0,0,.06); color:#555; }
+.matches-table { table-layout:fixed; }
+.matches-table .c-venue { width:4rem; }
+.matches-table .c-date { width:9.5rem; }
+.matches-table .c-season { width:8rem; }
+.matches-table .c-result { width:8rem; }
+.matches-table .c-spons { width:7.5rem; }
 .matches-table td { vertical-align:middle; }
+.matches-table thead th { font-size:.7rem; letter-spacing:.06em; text-transform:uppercase; color:var(--hub-muted,#70676b); }
 .match-row { cursor:pointer; }
 .match-row:hover td { background:rgba(106,32,54,.045); }
 .match-row:focus-visible { outline:2px solid #6a2036; outline-offset:-2px; }
-.match-comp { max-width:22rem; }
+.match-date { font-weight:600; font-variant-numeric:tabular-nums; }
+.match-opp-cell { max-width:34rem; }
+.match-comp-line { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:32rem; }
 .match-score { font-weight:700; font-variant-numeric:tabular-nums; }
 .match-outcome { display:inline-grid; place-items:center; min-width:1.4rem; height:1.4rem; padding:0 .3rem; border-radius:.35rem; font-size:.72rem; font-weight:800; color:#fff; }
 .match-outcome--w { background:#2f7d55; }
 .match-outcome--d { background:#8a8a8a; }
 .match-outcome--l { background:#b23b3b; }
-.matches-card { display:block; padding:.8rem .9rem; border:1px solid var(--bs-border-color,#dee2e6); border-radius:.7rem; text-decoration:none; color:inherit; background:#fff; }
-.matches-card:hover { border-color:#6a2036; }
-.matches-card__top { display:flex; align-items:center; gap:.6rem; }
-.matches-card__opp { font-weight:600; flex:1; min-width:0; }
-.matches-card__score { white-space:nowrap; }
-.matches-card__meta { display:flex; flex-wrap:wrap; gap:.4rem .8rem; margin-top:.4rem; font-size:.82rem; color:var(--bs-secondary-color,#6c757d); }
-.matches-card__sponsors { display:flex; gap:1rem; margin-top:.5rem; font-size:.78rem; color:var(--bs-secondary-color,#6c757d); }
-.matches-card__sponsors span { display:inline-flex; align-items:center; gap:.3rem; }
+.matches-table tr.matches-group th, .matches-group { font-size:.7rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:#6a2036; background:rgba(106,32,54,.06); padding:.45rem .75rem; }
+.matches-block + .matches-block { margin-top:1.4rem; padding-top:1rem; border-top:1px solid var(--hub-line,#eadfdf); }
+.matches-block[hidden] { display:none; }
+h3.matches-group { display:flex; align-items:center; gap:.5rem; margin:0 0 .5rem; border-radius:.5rem; font-size:.78rem; }
+.matches-block__count { display:inline-grid; place-items:center; min-width:1.5rem; padding:0 .4rem; height:1.25rem; border-radius:999px; background:#6a2036; color:#fff; font-size:.7rem; letter-spacing:0; }
+.matches-pagination { margin-top:.8rem; }
+
+/* Mobile cards */
+.matches-mobile-list { display:flex; flex-direction:column; gap:.55rem; }
+.matches-card { display:flex; align-items:center; gap:.8rem; padding:.65rem .8rem; border:1px solid var(--hub-line,#e6dede); border-radius:.8rem; text-decoration:none; color:inherit; background:#fff; }
+.matches-card:hover, .matches-card:focus-visible { border-color:#6a2036; }
+.matches-card[hidden] { display:none; }
+.matches-card.is-flagged { background:#fff3cd; border-color:#e0b64a; }
+.match-row.is-flagged > td { background-color:#fff3cd; }
+.matches-card__date { flex:0 0 2.9rem; display:flex; flex-direction:column; align-items:center; line-height:1.05; padding:.4rem 0; border-radius:.6rem; background:rgba(106,32,54,.07); color:#6a2036; }
+.matches-card__date strong { font-size:1.25rem; font-weight:800; }
+.matches-card__date span { font-size:.68rem; font-weight:800; text-transform:uppercase; letter-spacing:.06em; }
+.matches-card__main { flex:1; min-width:0; display:flex; flex-direction:column; gap:.15rem; }
+.matches-card__row { display:flex; align-items:center; justify-content:space-between; gap:.5rem; }
+.matches-card__opp { font-weight:700; min-width:0; overflow-wrap:anywhere; }
+.matches-card__score { white-space:nowrap; flex:none; }
+.matches-card__meta { font-size:.8rem; color:var(--hub-muted,#70676b); }
+.matches-card__comp { font-size:.76rem; color:var(--hub-muted,#70676b); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.matches-card__flag { align-self:flex-start; margin-top:.2rem; padding:.1rem .5rem; border-radius:999px; background:rgba(178,59,59,.1); color:#a32a3a; font-size:.72rem; font-weight:700; }
 .matches-filter-empty { text-align:center; padding:2rem 1rem; }
-@media (max-width: 900px) {
-    .matches-toolbar__heading { flex-basis:100%; }
-    .matches-toolbar__field--competition { flex:1 1 12rem; }
-}
-@media (max-width: 560px) {
-    .matches-toolbar__season, .matches-toolbar__filters, .matches-toolbar__field,
-    .matches-toolbar__field select, .matches-search, .matches-search input { width:100%; max-width:none; }
+
+@media (max-width: 991.98px) {
+    .matches-summary { display:flex; overflow-x:auto; scroll-snap-type:x proximity; padding-bottom:.35rem; margin-inline:-.1rem; scrollbar-width:none; }
+    .matches-summary::-webkit-scrollbar { display:none; }
+    .matches-summary__item { flex:0 0 8.4rem; scroll-snap-align:start; }
+    .matches-filters { padding:.7rem; }
+    .matches-search { flex:1 1 0; min-width:0; }
+    .matches-filters .matches-filters__toggle { display:inline-flex; align-items:center; gap:.4rem; flex:none; }
+    .matches-filters__panel { display:none; flex:1 0 100%; flex-direction:column; align-items:stretch; padding-top:.7rem; border-top:1px solid var(--hub-line,#eadfdf); }
+    .matches-filters__panel.is-open { display:flex; }
+    .matches-field select, .matches-field--wide select { width:100%; max-width:none; }
+    .matches-seg { display:flex; }
+    .matches-seg button { flex:1; padding:.5rem .4rem; }
+    .matches-filters__reset { align-self:flex-start; }
+    .matches-list__head { padding:.8rem .85rem .1rem; }
+    .hub-table-card.matches-list > .card-body { padding:.7rem; }
 }
 </style>
 
 <script>
 (function () {
-    var PAGE_SIZE = 25;
-    var page = 1;
-
-    var body = document.getElementById('matchesTableBody');
-    var mobile = document.getElementById('matchesMobileList');
-    if (!body && !mobile) { return; }
+    var blocks = Array.prototype.slice.call(document.querySelectorAll('.matches-block'));
+    if (!blocks.length) { return; }
 
     var search = document.getElementById('matchSearch');
     var venueSel = document.getElementById('matchVenueFilter');
@@ -553,21 +681,19 @@ $colspan = 5 + ($allSeasons ? 1 : 0) + ($showSponsor ? 3 : 0);
     var countEl = document.getElementById('matchVisibleCount');
     var countLabel = document.getElementById('matchCountLabel');
     var emptyEl = document.getElementById('matchesFilterEmpty');
-    var pager = document.getElementById('matchesPagination');
+    var toggleBtn = document.getElementById('matchFilterToggle');
+    var panel = document.getElementById('matchFilterPanel');
+    var badge = document.getElementById('matchFilterBadge');
 
-    var status = 'all';
-    var items = Array.prototype.slice.call(document.querySelectorAll('.js-match-item'));
-    // De-dupe by id so desktop + mobile copies count once for totals.
-    var ids = [];
-    items.forEach(function (el) { if (ids.indexOf(el.dataset.matchId) === -1) { ids.push(el.dataset.matchId); } });
+    var pages = {};
+    blocks.forEach(function (b) { pages[b.dataset.group] = 1; });
 
     function norm(v) { return String(v || '').toLowerCase().trim(); }
+    function val(el) { return el ? el.value : 'all'; }
 
     function matches(el) {
         var q = norm(search && search.value);
-        var venue = venueSel ? venueSel.value : 'all';
-        var outcome = outcomeSel ? outcomeSel.value : 'all';
-        var competition = competitionSel ? competitionSel.value : 'all';
+        var status = val(statusSel), venue = val(venueSel), outcome = val(outcomeSel), competition = val(competitionSel);
         if (status !== 'all' && el.dataset.status !== status) { return false; }
         if (venue !== 'all' && el.dataset.venue !== venue) { return false; }
         if (outcome !== 'all' && el.dataset.outcome !== outcome) { return false; }
@@ -576,71 +702,103 @@ $colspan = 5 + ($allSeasons ? 1 : 0) + ($showSponsor ? 3 : 0);
         return true;
     }
 
-    function render() {
-        // Desktop pagination works on rows; mobile just shows everything that matches.
-        var visibleIds = [];
-        (body ? Array.prototype.slice.call(body.querySelectorAll('.js-match-item')) : []).forEach(function (el) {
-            if (visibleIds.indexOf(el.dataset.matchId) === -1 && matches(el)) { visibleIds.push(el.dataset.matchId); }
-        });
-        var total = visibleIds.length;
-        var pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-        if (page > pages) { page = pages; }
-        var start = (page - 1) * PAGE_SIZE;
-        var onPage = {};
-        visibleIds.slice(start, start + PAGE_SIZE).forEach(function (id) { onPage[id] = true; });
-
-        if (body) {
-            body.querySelectorAll('.js-match-item').forEach(function (el) {
-                el.hidden = !(matches(el) && onPage[el.dataset.matchId]);
+    function syncSegments() {
+        document.querySelectorAll('.matches-seg').forEach(function (seg) {
+            var input = document.getElementById(seg.dataset.target);
+            seg.querySelectorAll('button').forEach(function (b) {
+                b.setAttribute('aria-pressed', input && b.dataset.value === input.value ? 'true' : 'false');
             });
-        }
-        if (mobile) {
-            mobile.querySelectorAll('.js-match-item').forEach(function (el) { el.hidden = !matches(el); });
-        }
-
-        if (countEl) { countEl.textContent = String(total); }
-        if (countLabel) { countLabel.textContent = total === 1 ? 'match' : 'matches'; }
-        if (emptyEl) { emptyEl.hidden = total !== 0; }
-
-        var active = (search && search.value) || (venueSel && venueSel.value !== 'all')
-            || (outcomeSel && outcomeSel.value !== 'all') || (competitionSel && competitionSel.value !== 'all') || status !== 'all';
-        if (resetBtn) { resetBtn.hidden = !active; }
-
-        renderPager(pages);
+        });
     }
 
-    function renderPager(pages) {
-        if (!pager) { return; }
+    function renderPager(block, totalPages) {
+        var pager = block.querySelector('.matches-pagination');
         var ul = pager.querySelector('ul');
+        var g = block.dataset.group;
         ul.innerHTML = '';
-        if (pages <= 1) { pager.hidden = true; return; }
+        if (totalPages <= 1) { pager.hidden = true; return; }
         pager.hidden = false;
         function add(label, target, disabled, current) {
             var li = document.createElement('li');
             li.className = 'page-item' + (disabled ? ' disabled' : '') + (current ? ' active' : '');
             var b = document.createElement('button');
             b.type = 'button'; b.className = 'page-link'; b.textContent = label;
-            if (!disabled && !current) { b.addEventListener('click', function () { page = target; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); }); }
+            if (!disabled && !current) {
+                b.addEventListener('click', function () {
+                    pages[g] = target; render();
+                    block.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                });
+            }
             li.appendChild(b); ul.appendChild(li);
         }
-        add('Prev', page - 1, page === 1, false);
-        for (var i = 1; i <= pages; i++) {
-            if (pages > 9 && Math.abs(i - page) > 2 && i !== 1 && i !== pages) {
-                if (i === 2 || i === pages - 1) { add('…', page, true, false); }
+        var cur = pages[g];
+        add('Prev', cur - 1, cur === 1, false);
+        for (var i = 1; i <= totalPages; i++) {
+            if (totalPages > 9 && Math.abs(i - cur) > 2 && i !== 1 && i !== totalPages) {
+                if (i === 2 || i === totalPages - 1) { add('…', cur, true, false); }
                 continue;
             }
-            add(String(i), i, false, i === page);
+            add(String(i), i, false, i === cur);
         }
-        add('Next', page + 1, page === pages, false);
+        add('Next', cur + 1, cur === totalPages, false);
     }
 
-    function onChange() { page = 1; render(); }
+    function render() {
+        var grandTotal = 0;
+        blocks.forEach(function (block) {
+            var g = block.dataset.group;
+            var size = parseInt(block.dataset.size, 10) || 10;
+            var rows = Array.prototype.slice.call(block.querySelectorAll('tbody .js-match-item'));
+            var visibleIds = rows.filter(matches).map(function (el) { return el.dataset.matchId; });
+            var total = visibleIds.length;
+            grandTotal += total;
+            var totalPages = Math.max(1, Math.ceil(total / size));
+            if (pages[g] > totalPages) { pages[g] = totalPages; }
+            var start = (pages[g] - 1) * size;
+            var onPage = {};
+            visibleIds.slice(start, start + size).forEach(function (id) { onPage[id] = true; });
+
+            block.querySelectorAll('.js-match-item').forEach(function (el) {
+                el.hidden = !(matches(el) && onPage[el.dataset.matchId]);
+            });
+            var c = block.querySelector('.matches-block__count');
+            if (c) { c.textContent = String(total); }
+            block.hidden = total === 0;
+            renderPager(block, totalPages);
+        });
+
+        if (countEl) { countEl.textContent = String(grandTotal); }
+        if (countLabel) { countLabel.textContent = grandTotal === 1 ? 'match' : 'matches'; }
+        if (emptyEl) { emptyEl.hidden = grandTotal !== 0; }
+
+        var n = 0;
+        if (val(statusSel) !== 'all') { n++; }
+        if (val(venueSel) !== 'all') { n++; }
+        if (val(outcomeSel) !== 'all') { n++; }
+        if (val(competitionSel) !== 'all') { n++; }
+        var active = n > 0 || !!(search && search.value);
+        if (resetBtn) { resetBtn.hidden = !active; }
+        if (badge) { badge.textContent = String(n); badge.hidden = n === 0; }
+    }
+
+    function onChange() { Object.keys(pages).forEach(function (k) { pages[k] = 1; }); syncSegments(); render(); }
 
     if (search) { search.addEventListener('input', onChange); }
-    if (venueSel) { venueSel.addEventListener('change', onChange); }
-    if (statusSel) { statusSel.addEventListener('change', function () { status = statusSel.value; onChange(); }); }
     if (outcomeSel) { outcomeSel.addEventListener('change', onChange); }
     if (competitionSel) { competitionSel.addEventListener('change', onChange); }
+    document.querySelectorAll('.matches-seg button').forEach(function (b) {
+        b.addEventListener('click', function () {
+            var input = document.getElementById(b.closest('.matches-seg').dataset.target);
+            if (input) { input.value = b.dataset.value; }
+            onChange();
+        });
+    });
+    if (toggleBtn && panel) {
+        toggleBtn.addEventListener('click', function () {
+            var open = panel.classList.toggle('is-open');
+            toggleBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        });
+    }
     if (resetBtn) {
         resetBtn.addEventListener('click', function () {
             if (search) { search.value = ''; }
@@ -648,7 +806,6 @@ $colspan = 5 + ($allSeasons ? 1 : 0) + ($showSponsor ? 3 : 0);
             if (statusSel) { statusSel.value = 'all'; }
             if (outcomeSel) { outcomeSel.value = 'all'; }
             if (competitionSel) { competitionSel.value = 'all'; }
-            status = 'all';
             onChange();
         });
     }

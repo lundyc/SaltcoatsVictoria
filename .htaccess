@@ -20,10 +20,6 @@ RewriteRule (^|/)(composer\.json|package(-lock)?\.json|league-config\.json|htacc
 RewriteRule ^admin/(backup|docs)(/|$) - [F,L]
 
 # standalone customer flows still served by the Hub (now under admin/)
-RewriteRule ^season-tickets/?$ admin/season_tickets_signup.php [L,QSA]
-RewriteRule ^season-tickets/checkout/?$ admin/season_tickets_checkout.php [L,QSA]
-RewriteRule ^playersponsors/?$ admin/playersponsors.php [L,QSA]
-RewriteRule ^playersponsors/checkout/?$ admin/playersponsors_checkout.php [L,QSA]
 RewriteRule ^p/([A-Za-z0-9]{6,24})/?$ admin/pay.php?c=$1 [L,QSA]
 
 # back-compat: old flat Hub URLs -> /admin/ (only when nothing matches at root)
@@ -53,3 +49,14 @@ RewriteRule . index.php [L]
         Header set Cache-Control "public, max-age=2592000"
     </FilesMatch>
 </IfModule>
+
+# Branded error pages (static, so they work even if PHP/DB is down)
+ErrorDocument 400 /errors/400.html
+ErrorDocument 401 /errors/401.html
+ErrorDocument 403 /errors/403.html
+ErrorDocument 404 /errors/404.html
+ErrorDocument 405 /errors/405.html
+ErrorDocument 500 /errors/500.html
+ErrorDocument 502 /errors/502.html
+ErrorDocument 503 /errors/503.html
+ErrorDocument 504 /errors/504.html

@@ -34,7 +34,8 @@ if ($id > 0 && !$article) {
 
 /** Fixtures for the "link to match" selector (most recent first). */
 $fixtures = $pdo->query(
-    "SELECT f.id, f.match_date, f.opponent, f.is_home, f.competition
+    "SELECT f.id, f.match_date, f.kickoff_time, f.opponent, f.is_home, f.competition, f.status,
+            f.full_time_home_score AS hs, f.full_time_away_score AS aws
      FROM match_fixtures f
      ORDER BY f.match_date DESC LIMIT 1000"
 )->fetchAll(PDO::FETCH_ASSOC);
@@ -262,6 +263,8 @@ $styleV = (int) (@filemtime(__DIR__ . '/assets/css/style.css') ?: time());
         </div>
         <div class="mb-2">
           <label class="form-label" for="body">Article</label>
+          <?php $edClassic = (($_GET['editor'] ?? '') === 'classic'); $edQs = $id > 0 ? 'id=' . $id . '&' : ''; ?>
+          <a class="small ms-2" href="?<?= $edQs ?>editor=<?= $edClassic ? 'blocks' : 'classic' ?>" data-no-dirty><?= $edClassic ? 'Switch to the block editor' : 'Use the classic editor' ?></a>
           <textarea id="body" name="body"><?= h($bodyForEditor) ?></textarea>
           <input type="hidden" name="body_format" value="html">
         </div>
@@ -337,60 +340,164 @@ $styleV = (int) (@filemtime(__DIR__ . '/assets/css/style.css') ?: time());
           <input class="form-control" id="author_name" name="author_name" value="<?= h((string) $data['author_name']) ?>">
         </div>
         <div class="mb-0">
-          <label class="form-label" for="fixture_id">Link to match (optional)</label>
+          <label class="form-label" for="fixture_pick_btn">Link to match (optional)</label>
           <?php
             $fxLabel = static fn(array $f): string => date('d/m/y', strtotime((string) $f['match_date'])) . ' · ' . ($f['is_home'] ? 'H' : 'A') . ' v ' . (string) $f['opponent']
                 . (($f['competition'] ?? '') !== '' ? ' · ' . $f['competition'] : '');
-            $fxList = array_map(static fn(array $f): array => ['id' => (int) $f['id'], 'label' => $fxLabel($f)], $fixtures);
+            $fxList = array_map(static function (array $f) use ($fxLabel): array {
+                $score = ($f['status'] === 'played' && $f['hs'] !== null && $f['aws'] !== null) ? ($f['hs'] . '–' . $f['aws']) : '';
+                return ['id' => (int) $f['id'], 'label' => $fxLabel($f), 'date' => (string) $f['match_date'], 'ko' => substr((string) ($f['kickoff_time'] ?? ''), 0, 5), 'opp' => (string) $f['opponent'],
+                    'home' => (int) $f['is_home'], 'comp' => (string) ($f['competition'] ?? ''), 'status' => (string) $f['status'], 'score' => $score];
+            }, $fixtures);
             $fxCurrent = '';
             foreach ($fxList as $x) { if ($x['id'] === (int) $data['fixture_id']) { $fxCurrent = $x['label']; } }
           ?>
-          <div class="position-relative" id="fixture_combo">
-            <input type="hidden" name="fixture_id" id="fixture_id" value="<?= (int) $data['fixture_id'] ?: '' ?>">
-            <input type="text" class="form-control" id="fixture_search" autocomplete="off"
-                   placeholder="Type an opponent, date or competition…" value="<?= h($fxCurrent) ?>">
-            <div class="list-group position-absolute w-100 shadow d-none" id="fixture_results"
-                 style="z-index:1050;max-height:260px;overflow-y:auto"></div>
+          <input type="hidden" name="fixture_id" id="fixture_id" value="<?= (int) $data['fixture_id'] ?: '' ?>">
+          <div class="fx-card">
+            <div id="fixture_current" class="fx-current"><?php
+              $fxCur = null;
+              foreach ($fxList as $x) { if ($x['id'] === (int) $data['fixture_id']) { $fxCur = $x; } }
+              if ($fxCur): ?>
+              <div class="fx-current__title"><span><?= h($fxCur['opp']) ?></span><span class="fx-current__venue">(<?= $fxCur['home'] ? 'Home' : 'Away' ?>)</span></div>
+              <div class="fx-current__meta"><?= h(date('D j M Y', strtotime($fxCur['date']))) ?><?= $fxCur['ko'] !== '' ? ' @ ' . h($fxCur['ko']) : '' ?><?= $fxCur['comp'] !== '' ? ' - ' . h(preg_replace('/^West of Scotland Football League\s*/i', 'WOSFL - ', $fxCur['comp'])) : '' ?></div>
+              <?php else: ?><span class="small text-muted">No match linked</span><?php endif; ?></div>
+            <div class="d-flex justify-content-between align-items-center mt-2">
+              <button type="button" class="btn btn-sm btn-link text-danger p-0 <?= $fxCur ? '' : 'invisible' ?>" id="fixture_clear">Remove</button>
+              <button type="button" class="btn btn-outline-primary btn-sm" id="fixture_pick_btn" data-bs-toggle="modal" data-bs-target="#fixtureModal">Select Match</button>
+            </div>
           </div>
-          <div class="form-text">Start typing to search; clear the box to remove the link.</div>
-          <script>
-          (function () {
-            var fixtures = <?= json_encode($fxList, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?>;
-            var input = document.getElementById('fixture_search');
-            var hidden = document.getElementById('fixture_id');
-            var box = document.getElementById('fixture_results');
-            function render() {
-              var q = input.value.trim().toLowerCase();
-              var hits = fixtures.filter(function (f) { return !q || f.label.toLowerCase().indexOf(q) !== -1; }).slice(0, 30);
-              box.innerHTML = '';
-              if (!hits.length) {
-                var n = document.createElement('div');
-                n.className = 'list-group-item text-muted small';
-                n.textContent = 'No matches found';
-                box.appendChild(n);
-              }
-              hits.forEach(function (f) {
-                var b = document.createElement('button');
-                b.type = 'button';
-                b.className = 'list-group-item list-group-item-action small';
-                b.textContent = f.label;
-                b.addEventListener('mousedown', function (e) {
-                  e.preventDefault();
-                  hidden.value = f.id; input.value = f.label; box.classList.add('d-none');
-                });
-                box.appendChild(b);
-              });
-              box.classList.remove('d-none');
-            }
-            input.addEventListener('input', function () { hidden.value = ''; render(); });
-            input.addEventListener('focus', render);
-            input.addEventListener('blur', function () {
-              box.classList.add('d-none');
-              if (hidden.value === '' && input.value.trim() !== '') { input.value = ''; }
-            });
-          })();
-          </script>
         </div>
+
+        <style>
+.fx-card{border:1px solid #dee2e6;border-radius:.5rem;padding:.75rem 1rem;background:#fff}
+.fx-current{line-height:1.35}
+.fx-current__title{display:flex;justify-content:space-between;gap:.75rem;font-weight:700;color:#4b0818}
+.fx-current__venue{font-weight:600;white-space:nowrap}
+.fx-current__meta{font-style:italic;font-size:.88rem;color:#6c665c}
+</style>
+        <div class="modal fade" id="fixtureModal" tabindex="-1" aria-labelledby="fixtureModalLabel" aria-hidden="true">
+          <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h2 class="modal-title h5" id="fixtureModalLabel">Link to a match</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body">
+                <button type="button" class="btn btn-sm btn-outline-secondary mb-2" id="fx_filter_toggle" aria-expanded="false" aria-controls="fx_filters">
+                  <i class="fa-solid fa-sliders me-1" aria-hidden="true"></i>Filter &amp; search
+                </button>
+                <div id="fx_filters" class="row g-2 mb-3" hidden>
+                  <div class="col-md-6"><label class="form-label small mb-1" for="fx_q">Search</label><input type="search" class="form-control form-control-sm" id="fx_q" placeholder="Opponent, competition or date…" autocomplete="off"></div>
+                  <div class="col-md-6"><label class="form-label small mb-1" for="fx_comp">Competition</label><select class="form-select form-select-sm" id="fx_comp"><option value="">All competitions</option></select></div>
+                  <div class="col-md-4"><label class="form-label small mb-1" for="fx_venue">Venue</label><select class="form-select form-select-sm" id="fx_venue"><option value="">Home &amp; away</option><option value="1">Home</option><option value="0">Away</option></select></div>
+                  <div class="col-md-4"><label class="form-label small mb-1" for="fx_status">Show</label><select class="form-select form-select-sm" id="fx_status"><option value="past">Played / past</option><option value="upcoming">Upcoming</option><option value="all">All</option></select></div>
+                  <div class="col-md-4 d-flex align-items-end"><button type="button" class="btn btn-sm btn-link p-0" id="fx_reset">Reset filters</button></div>
+                </div>
+                <div class="table-responsive">
+                  <table class="table table-sm table-hover align-middle mb-2">
+                    <thead><tr><th scope="col">Date</th><th scope="col">Match</th><th scope="col">Competition</th><th scope="col">Score</th><th scope="col"><span class="visually-hidden">Select</span></th></tr></thead>
+                    <tbody id="fx_rows"></tbody>
+                  </table>
+                </div>
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                  <span class="small text-muted" id="fx_count"></span>
+                  <div class="btn-group btn-group-sm" role="group" aria-label="Pagination">
+                    <button type="button" class="btn btn-outline-secondary" id="fx_prev"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i> Newer</button>
+                    <button type="button" class="btn btn-outline-secondary" id="fx_next">Older <i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <script>
+        (function () {
+          var fixtures = <?= json_encode($fxList, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?>;
+          var PER = 5, page = 0;
+          var today = new Date().toISOString().slice(0, 10);
+          var hidden = document.getElementById('fixture_id');
+          var modalEl = document.getElementById('fixtureModal');
+          var rowsEl = document.getElementById('fx_rows');
+          var q = document.getElementById('fx_q'), comp = document.getElementById('fx_comp'), venue = document.getElementById('fx_venue'), status = document.getElementById('fx_status');
+          var toggle = document.getElementById('fx_filter_toggle'), panel = document.getElementById('fx_filters');
+          var cur = document.getElementById('fixture_current'), clearBtn = document.getElementById('fixture_clear');
+          document.body.appendChild(modalEl);
+
+          var comps = [];
+          fixtures.forEach(function (f) { if (f.comp && comps.indexOf(f.comp) === -1) comps.push(f.comp); });
+          comps.sort().forEach(function (c) { var o = document.createElement('option'); o.value = c; o.textContent = c; comp.appendChild(o); });
+
+          function fmt(d) { var p = d.split('-'); return p[2] + '/' + p[1] + '/' + p[0].slice(2); }
+          function filtered() {
+            var term = q.value.trim().toLowerCase();
+            var list = fixtures.filter(function (f) {
+              var past = f.date <= today;
+              if (status.value === 'past' && !past) return false;
+              if (status.value === 'upcoming' && past) return false;
+              if (comp.value && f.comp !== comp.value) return false;
+              if (venue.value !== '' && String(f.home) !== venue.value) return false;
+              if (term && (f.label + ' ' + f.date).toLowerCase().indexOf(term) === -1) return false;
+              return true;
+            });
+            list.sort(function (a, b) { return status.value === 'upcoming' ? (a.date < b.date ? -1 : 1) : (a.date < b.date ? 1 : -1); });
+            return list;
+          }
+          function render() {
+            var list = filtered(), pages = Math.max(1, Math.ceil(list.length / PER));
+            if (page >= pages) page = pages - 1;
+            var slice = list.slice(page * PER, page * PER + PER);
+            rowsEl.innerHTML = '';
+            if (!slice.length) {
+              var tr = document.createElement('tr'), td = document.createElement('td');
+              td.colSpan = 5; td.className = 'text-muted small'; td.textContent = 'No matches found.';
+              tr.appendChild(td); rowsEl.appendChild(tr);
+            }
+            slice.forEach(function (f) {
+              var tr = document.createElement('tr');
+              if (String(f.id) === hidden.value) tr.className = 'table-active';
+              function cell(t, cls) { var c = document.createElement('td'); c.textContent = t; if (cls) c.className = cls; tr.appendChild(c); return c; }
+              cell(fmt(f.date), 'text-nowrap');
+              cell((f.home ? 'H' : 'A') + ' v ' + f.opp);
+              cell(f.comp || '—', 'small');
+              cell(f.score || '—', 'text-nowrap');
+              var act = document.createElement('td'); act.className = 'text-end';
+              var b = document.createElement('button'); b.type = 'button'; b.className = 'btn btn-sm btn-primary'; b.textContent = 'Select';
+              b.addEventListener('click', function () { choose(f); });
+              act.appendChild(b); tr.appendChild(act); rowsEl.appendChild(tr);
+            });
+            document.getElementById('fx_count').textContent = list.length
+              ? 'Showing ' + (page * PER + 1) + '–' + (page * PER + slice.length) + ' of ' + list.length + ' matches' : '';
+            document.getElementById('fx_prev').disabled = page === 0;
+            document.getElementById('fx_next').disabled = page >= pages - 1;
+          }
+          function esc(t) { return String(t).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+          function showCurrent(f) {
+            if (!f) { cur.innerHTML = '<span class="small text-muted">No match linked</span>'; return; }
+            var d = new Date(f.date + 'T12:00:00');
+            var ds = d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }).replace(',', '');
+            cur.innerHTML = '<div class="fx-current__title"><span>' + esc(f.opp) + '</span><span class="fx-current__venue">(' + (f.home ? 'Home' : 'Away') + ')</span></div>'
+                + '<div class="fx-current__meta">' + esc(ds) + (f.ko ? ' @ ' + esc(f.ko) : '') + (f.comp ? ' - ' + esc(f.comp.replace(/^West of Scotland Football League\s*/i, 'WOSFL - ')) : '') + '</div>';
+          }
+          function choose(f) {
+            hidden.value = f.id; showCurrent(f);
+            clearBtn.classList.remove('invisible');
+            bootstrap.Modal.getInstance(modalEl).hide();
+          }
+          clearBtn.addEventListener('click', function () {
+            hidden.value = ''; showCurrent(null);
+            clearBtn.classList.add('invisible');
+          });
+          toggle.addEventListener('click', function () {
+            panel.hidden = !panel.hidden; toggle.setAttribute('aria-expanded', String(!panel.hidden));
+            if (!panel.hidden) q.focus();
+          });
+          [q, comp, venue, status].forEach(function (el) { el.addEventListener('input', function () { page = 0; render(); }); });
+          document.getElementById('fx_reset').addEventListener('click', function () { q.value = ''; comp.value = ''; venue.value = ''; status.value = 'past'; page = 0; render(); });
+          document.getElementById('fx_prev').addEventListener('click', function () { page--; render(); });
+          document.getElementById('fx_next').addEventListener('click', function () { page++; render(); });
+          modalEl.addEventListener('show.bs.modal', function () { page = 0; render(); });
+        })();
+        </script>
       </div>
     </div>
 
@@ -400,20 +507,22 @@ $styleV = (int) (@filemtime(__DIR__ . '/assets/css/style.css') ?: time());
         <p class="text-muted small">The big image at the top of the article and on cards. Pick from the Media Library or drop a new photo in.</p>
 
         <div id="hero-preview" class="mb-2 <?= $data['hero_image_path'] === '' ? 'd-none' : '' ?>">
-          <div class="hf-pick" id="hf-pick" title="Click or drag to choose the focal point">
-            <img src="<?= h(news_image_url((string) $data['hero_image_path'])) ?>" alt="" draggable="false">
-            <span class="hf-dot" id="hf-dot"></span>
-          </div>
-          <div class="form-text mb-2">Pick a preview below, then click or drag on the photo to choose what stays in view for that one.</div>
-          <label class="form-label small mb-0 mt-2" for="hf-zoom">Zoom for <b id="hf-which"></b> <span id="hf-zoom-val" class="text-muted"></span></label>
-          <input type="range" class="form-range" id="hf-zoom" min="1" max="3" step="0.05">
-          <div class="small fw-semibold mt-2">Preview — how it will look</div>
+          <div class="hf-pick d-none" id="hf-pick"><img src="<?= h(news_image_url((string) $data['hero_image_path'])) ?>" alt="" draggable="false"></div>
+          <div class="small fw-semibold mt-2">Preview &mdash; how it will look</div>
+          <div class="form-text mb-2">Drag inside any preview to move the photo for that one, and use its slider or the mouse wheel to zoom. Each preview is set separately.</div>
           <div class="hf-frames">
-            <div><div class="hf-cap">Home page (main)</div><div class="hf-frame" data-k="home" style="aspect-ratio:2.4/1"><img class="hf-img" alt=""></div></div>
-            <div><div class="hf-cap">News card</div><div class="hf-frame" data-k="card" style="aspect-ratio:16/9"><img class="hf-img" alt=""></div></div>
-            <div><div class="hf-cap">Article banner</div><div class="hf-frame" data-k="banner" style="aspect-ratio:5.6/1"><img class="hf-img" alt=""></div></div>
+            <?php foreach ([['home', 'Home page (main)', '2.4/1'], ['card', 'News card', '16/9'], ['banner', 'Article banner', '5.6/1']] as [$hfK, $hfLabel, $hfRatio]): ?>
+            <div>
+              <div class="hf-cap d-flex align-items-center gap-2">
+                <span class="me-auto"><?= h($hfLabel) ?></span>
+                <input type="range" class="form-range hf-zoom" data-k="<?= $hfK ?>" min="1" max="3" step="0.05" style="width:7rem" aria-label="Zoom for <?= h($hfLabel) ?>">
+                <span class="text-muted hf-zoom-val" data-k="<?= $hfK ?>" style="min-width:2.4rem;text-align:right"></span>
+                <button type="button" class="btn btn-sm btn-link p-0 hf-reset" data-k="<?= $hfK ?>">Reset</button>
+              </div>
+              <div class="hf-frame" data-k="<?= $hfK ?>" style="aspect-ratio:<?= $hfRatio ?>" title="Drag to reposition"><img class="hf-img" alt="" draggable="false"></div>
+            </div>
+            <?php endforeach; ?>
           </div>
-          <button type="button" class="btn btn-sm btn-link p-0 mt-1" id="hf-reset">Reset this one</button>
           <input type="hidden" name="hero_framing" id="hero_framing" value="<?= h((string) ($data['hero_framing'] ?? '')) ?>">
           <input type="hidden" id="hf-legacy" value="<?= h((float) $data['hero_focus_x'] . ',' . (float) $data['hero_focus_y'] . ',' . (float) $data['hero_zoom']) ?>">
         </div>
@@ -422,9 +531,9 @@ $styleV = (int) (@filemtime(__DIR__ . '/assets/css/style.css') ?: time());
           .hf-pick img{width:100%;display:block}
           .hf-dot{position:absolute;width:26px;height:26px;margin:-13px 0 0 -13px;border:3px solid #fff;border-radius:50%;box-shadow:0 0 0 2px #7a1f3d,0 0 8px rgba(0,0,0,.5);pointer-events:none}
           .hf-frames{display:grid;gap:.6rem;margin-top:.35rem}
-          .hf-frame.is-active{outline:3px solid #7a1f3d;outline-offset:1px}
+          .hf-frame.is-drag{outline:3px solid #7a1f3d;outline-offset:1px}
           .hf-cap{font-size:.72rem;color:#6b6f76;margin-bottom:2px}
-          .hf-frame{cursor:pointer;position:relative;overflow:hidden;border-radius:6px;border:1px solid #d7d2c8;background:#222}
+          .hf-frame{cursor:grab;touch-action:none;user-select:none;position:relative;overflow:hidden;border-radius:6px;border:1px solid #d7d2c8;background:#222}
           .hf-frame img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
         </style>
         <input type="hidden" id="hero_image_path" name="hero_image_path" value="<?= h((string) $data['hero_image_path']) ?>">
@@ -496,7 +605,22 @@ $styleV = (int) (@filemtime(__DIR__ . '/assets/css/style.css') ?: time());
   </div>
 </div>
 
+<?php if (($_GET['editor'] ?? '') === 'classic'): ?>
 <script src="https://cdn.jsdelivr.net/npm/tinymce@7.6.1/tinymce.min.js" referrerpolicy="origin"></script>
+<script src="/admin/assets/js/news_blocks.js?v=<?= (int)(@filemtime(__DIR__ . '/assets/js/news_blocks.js') ?: time()) ?>"></script>
+<?php else:
+  $gbDir = '/admin/assets/vendor/isolated-block-editor/';
+  $gbFs = __DIR__ . '/assets/vendor/isolated-block-editor/';
+  $gbV = (int) (@filemtime($gbFs . 'isolated-block-editor.js') ?: time()); ?>
+<link rel="stylesheet" href="<?= $gbDir ?>base-layout.css?v=<?= $gbV ?>">
+<link rel="stylesheet" href="<?= $gbDir ?>core.css?v=<?= $gbV ?>">
+<link rel="stylesheet" href="<?= $gbDir ?>isolated-block-editor.css?v=<?= $gbV ?>">
+<script crossorigin src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"></script>
+<script crossorigin src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="<?= $gbDir ?>isolated-block-editor.js?v=<?= $gbV ?>"></script>
+<script src="/admin/assets/js/media_picker.js?v=<?= (int)(@filemtime(__DIR__ . '/assets/js/media_picker.js') ?: time()) ?>"></script>
+<script src="/admin/assets/js/news_gutenberg.js?v=<?= (int)(@filemtime(__DIR__ . '/assets/js/news_gutenberg.js') ?: time()) ?>"></script>
+<?php endif; ?>
 <script>
 (function () {
   var csrf = document.querySelector('input[name="csrf_token"]').value;
@@ -581,17 +705,20 @@ $styleV = (int) (@filemtime(__DIR__ . '/assets/css/style.css') ?: time());
     if (t) t.textContent = text || '';
   }
 
-  tinymce.init({
+  if (window.tinymce) tinymce.init({
     selector: '#body',
     license_key: 'gpl',
-    menubar: 'edit format table',
+    menubar: 'edit insert format table',
+    menu: { insert: { title: 'Insert', items: 'addblock | image link table hr charmap nonbreaking' } },
     plugins: 'autolink autoresize lists advlist link image table code fullscreen wordcount visualblocks charmap searchreplace nonbreaking help',
     toolbar: [
-      'undo redo | blocks | bold italic underline strikethrough | forecolor backcolor | removeformat',
+      'addblock | undo redo | blocks | bold italic underline strikethrough | forecolor backcolor | removeformat',
       'alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | blockquote link image table hr | visualblocks code fullscreen'
     ],
     toolbar_mode: 'wrap',
-    block_formats: 'Paragraph=p; Heading 2=h2; Heading 3=h3; Heading 4=h4; Quote=blockquote',
+    block_formats: 'Paragraph=p; Heading 2=h2; Heading 3=h3; Heading 4=h4; Quote=blockquote; Preformatted=pre',
+    extended_valid_elements: 'details[open|class],summary,div[class|style],a[href|target|rel|class|title],hr[class],pre[class],blockquote[class|style],p[class|style]',
+    custom_elements: 'details,summary',
     color_map: [
       '6d2231', 'Club maroon', 'e0b42a', 'Club gold', '2e2c2d', 'Ink',
       '7c7178', 'Muted grey', 'ffffff', 'White',
@@ -614,7 +741,7 @@ $styleV = (int) (@filemtime(__DIR__ . '/assets/css/style.css') ?: time());
       "blockquote{border-left:3px solid #6d2231;margin:1.2rem 0;padding:.25rem 0 .25rem 1.1rem;color:#5c5560;font-style:italic}",
       "table{border-collapse:collapse;width:100%;margin:1rem 0} td,th{border:1px solid #cfc8bb;padding:.45rem .7rem} th{background:#f4efe6}",
       "hr{border:0;border-top:2px solid #e7dccb;margin:1.6rem 0}"
-    ].join(''),
+    ].join('') + (window.NB_CONTENT_CSS || ''),
     automatic_uploads: true,
     images_upload_credentials: true,
     file_picker_types: 'image',
@@ -624,58 +751,78 @@ $styleV = (int) (@filemtime(__DIR__ . '/assets/css/style.css') ?: time());
       });
     },
     setup: function (ed) {
+      if (window.nbSetup) window.nbSetup(ed);
       // keep the underlying <textarea> in sync for normal form submits
       ed.on('change input undo redo', function () { ed.save(); });
     }
   });
 
+  if (!window.tinymce && window.nbGutenberg) { window.nbGutenberg(document.getElementById('body'), uploadImage); }
 
-  // Hero framing editor (per-placement focal point + zoom, live previews)
-  var hfPick = document.getElementById('hf-pick'), hfDot = document.getElementById('hf-dot');
+
+  // Hero framing editor: every preview is its own editor (drag to reposition, slider/wheel to zoom)
+  var hfPick = document.getElementById('hf-pick');
   var hfField = document.getElementById('hero_framing');
-  var hfZoom = document.getElementById('hf-zoom'), hfZoomVal = document.getElementById('hf-zoom-val'), hfWhich = document.getElementById('hf-which');
-  var HF_NAMES = { home: 'Home page', card: 'News card', banner: 'Article banner' };
-  var hfState = {}, hfActive = 'banner';
+  var HF_KEYS = ['home', 'card', 'banner'];
+  var hfState = {};
   (function () {
     var leg = (document.getElementById('hf-legacy').value || '50,50,1').split(',').map(parseFloat);
     var saved = {};
     try { saved = JSON.parse(hfField.value || '{}') || {}; } catch (e) {}
-    ['home', 'card', 'banner'].forEach(function (k) {
+    HF_KEYS.forEach(function (k) {
       hfState[k] = saved[k] ? { x: +saved[k].x, y: +saved[k].y, z: +saved[k].z } : { x: leg[0] || 50, y: leg[1] || 50, z: leg[2] || 1 };
     });
   })();
   function hfSave() { hfField.value = JSON.stringify(hfState); }
   function hfRender() {
-    var st = hfState[hfActive];
-    hfDot.style.left = st.x + '%'; hfDot.style.top = st.y + '%';
-    hfZoom.value = st.z; hfZoomVal.textContent = st.z.toFixed(2).replace(/\.?0+$/, '') + '×';
-    hfWhich.textContent = HF_NAMES[hfActive];
     var src = hfPick.querySelector('img').src;
     document.querySelectorAll('.hf-frame').forEach(function (fr) {
       var k = fr.getAttribute('data-k'), s2 = hfState[k], im = fr.querySelector('.hf-img');
-      fr.classList.toggle('is-active', k === hfActive);
       if (im.src !== src) im.src = src;
       im.style.objectPosition = s2.x + '% ' + s2.y + '%';
       im.style.transformOrigin = s2.x + '% ' + s2.y + '%';
       im.style.transform = 'scale(' + s2.z + ')';
+      var sl = document.querySelector('.hf-zoom[data-k="' + k + '"]'), vl = document.querySelector('.hf-zoom-val[data-k="' + k + '"]');
+      if (sl) sl.value = s2.z;
+      if (vl) vl.textContent = s2.z.toFixed(2).replace(/\.?0+$/, '') + '×';
     });
   }
-  function hfSet(e) {
-    var r = hfPick.getBoundingClientRect(), st = hfState[hfActive];
-    st.x = Math.round(Math.max(0, Math.min(100, (e.clientX - r.left) / r.width * 100)) * 10) / 10;
-    st.y = Math.round(Math.max(0, Math.min(100, (e.clientY - r.top) / r.height * 100)) * 10) / 10;
-    hfSave(); hfRender();
-  }
-  var hfDrag = false;
-  hfPick.addEventListener('pointerdown', function (e) { hfDrag = true; hfPick.setPointerCapture(e.pointerId); hfSet(e); });
-  hfPick.addEventListener('pointermove', function (e) { if (hfDrag) hfSet(e); });
-  hfPick.addEventListener('pointerup', function () { hfDrag = false; });
-  hfZoom.addEventListener('input', function () { hfState[hfActive].z = parseFloat(hfZoom.value); hfSave(); hfRender(); });
+  function hfClamp(v) { return Math.round(Math.max(0, Math.min(100, v)) * 10) / 10; }
   document.querySelectorAll('.hf-frame').forEach(function (fr) {
-    fr.addEventListener('click', function () { hfActive = fr.getAttribute('data-k'); hfRender(); });
+    var k = fr.getAttribute('data-k'), im = fr.querySelector('.hf-img'), drag = null;
+    function range(axis) {
+      // How many pixels the photo can travel along this axis at the current zoom.
+      var fw = fr.clientWidth, fh = fr.clientHeight, iw = im.naturalWidth || 16, ih = im.naturalHeight || 9;
+      var sc = Math.max(fw / iw, fh / ih), z = hfState[k].z;
+      return axis === 'x' ? (iw * sc - fw) * z + fw * (z - 1) : (ih * sc - fh) * z + fh * (z - 1);
+    }
+    fr.addEventListener('pointerdown', function (e) {
+      drag = { px: e.clientX, py: e.clientY, x: hfState[k].x, y: hfState[k].y };
+      fr.setPointerCapture(e.pointerId); fr.classList.add('is-drag'); fr.style.cursor = 'grabbing';
+    });
+    fr.addEventListener('pointermove', function (e) {
+      if (!drag) return;
+      var rx = range('x'), ry = range('y');
+      if (rx > 1) hfState[k].x = hfClamp(drag.x - (e.clientX - drag.px) / rx * 100);
+      if (ry > 1) hfState[k].y = hfClamp(drag.y - (e.clientY - drag.py) / ry * 100);
+      hfSave(); hfRender();
+    });
+    function end() { drag = null; fr.classList.remove('is-drag'); fr.style.cursor = ''; }
+    fr.addEventListener('pointerup', end);
+    fr.addEventListener('pointercancel', end);
+    fr.addEventListener('wheel', function (e) {
+      e.preventDefault();
+      hfState[k].z = Math.max(1, Math.min(3, Math.round((hfState[k].z - e.deltaY * 0.002) * 100) / 100));
+      hfSave(); hfRender();
+    }, { passive: false });
   });
-  function hfResetAll() { ['home', 'card', 'banner'].forEach(function (k) { hfState[k] = { x: 50, y: 50, z: 1 }; }); hfSave(); hfRender(); }
-  document.getElementById('hf-reset').addEventListener('click', function () { hfState[hfActive] = { x: 50, y: 50, z: 1 }; hfSave(); hfRender(); });
+  document.querySelectorAll('.hf-zoom').forEach(function (sl) {
+    sl.addEventListener('input', function () { hfState[sl.getAttribute('data-k')].z = parseFloat(sl.value); hfSave(); hfRender(); });
+  });
+  document.querySelectorAll('.hf-reset').forEach(function (b) {
+    b.addEventListener('click', function () { hfState[b.getAttribute('data-k')] = { x: 50, y: 50, z: 1 }; hfSave(); hfRender(); });
+  });
+  function hfResetAll() { HF_KEYS.forEach(function (k) { hfState[k] = { x: 50, y: 50, z: 1 }; }); hfSave(); hfRender(); }
   hfPick.querySelector('img').addEventListener('load', hfRender);
   hfRender();
 

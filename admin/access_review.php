@@ -17,7 +17,7 @@ require_once __DIR__ . '/header.php';
 require_once __DIR__ . '/lib/access.php';
 
 /**
- * One row per person with an account, a template assignment or an override.
+ * One row per person with an account, a role assignment or an override.
  *
  * @return list<array<string,mixed>>
  */
@@ -27,8 +27,8 @@ function access_review_rows(PDO $pdo): array
     $people = $pdo->query(
         'SELECT p.id, p.display_name, p.is_active,
                 a.id AS account_id, a.is_active AS account_active, a.last_login_at,
-                (SELECT COUNT(*) FROM account_roles ar JOIN roles r ON r.id = ar.role_id
-                  WHERE ar.account_id = a.id AND r.code = \'admin\') AS is_admin_account
+                (SELECT COUNT(*) FROM person_access_templates pat JOIN access_templates t ON t.id = pat.template_id
+                  WHERE pat.person_id = p.id AND t.bypass_all = 1) AS is_admin_account
          FROM people p
          LEFT JOIN accounts a ON a.person_id = p.id
          WHERE a.id IS NOT NULL
@@ -119,7 +119,7 @@ function access_review_rows(PDO $pdo): array
         if ($isAdminTpl && $roles === []) {
             $stale = $lastLogin === null || strtotime($lastLogin) < strtotime('-180 days');
             if ($stale) {
-                $flags[] = ['review', 'Administrator: no club role, no login 180d+'];
+                $flags[] = ['review', 'Administrator: no club position, no login 180d+'];
             }
         }
 
@@ -176,7 +176,7 @@ $badgeClass = ['danger' => 'text-bg-danger', 'warn' => 'text-bg-warning', 'revie
         <div class="table-responsive">
             <table class="table table-striped hub-data-table align-middle mb-0">
                 <thead>
-                    <tr><th>Name</th><th>Club roles</th><th>Access templates</th><th>Extras / removals</th><th>Effective access</th><th>Login</th><th>Flags</th></tr>
+                    <tr><th>Name</th><th>Club positions</th><th>Roles</th><th>Extras / removals</th><th>Effective access</th><th>Login</th><th>Flags</th></tr>
                 </thead>
                 <tbody>
                 <?php foreach ($rows as $r): ?>

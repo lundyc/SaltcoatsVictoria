@@ -71,10 +71,23 @@ try {
         'secondary_player_name' => (string) ($_POST['secondary_player_name'] ?? ''),
         'own_goal' => !empty($_POST['own_goal']),
         'note' => (string) ($_POST['note'] ?? ''),
+        'outcome' => '',
     ];
     $eventId = (int) ($_POST['event_id'] ?? 0);
     if ($eventId > 0) {
         $data['id'] = $eventId;
+    }
+
+    if ($type === 'shootout_penalty') {
+        // A shootout kick: no minute, never a goal; the result is Scored or Missed.
+        $outcome = (string) ($_POST['outcome'] ?? '');
+        if (!in_array($outcome, ['scored', 'missed'], true)) {
+            mre_back($fixtureId, $seasonId, 'error', 'Choose whether the shootout penalty was scored or missed.');
+        }
+        $data['outcome'] = $outcome;
+        $data['minute'] = null;
+        $data['minute_extra'] = 0;
+        $data['own_goal'] = false;
     }
 
     if ($type === 'substitution') {

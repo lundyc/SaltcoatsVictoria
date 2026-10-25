@@ -4,6 +4,7 @@ require_once __DIR__ . '/lib/functions.php';
 require_once __DIR__ . '/lib/sponsorship_catalog.php';
 require_once __DIR__ . '/sync_social_directory.php';
 require_once __DIR__ . '/lib/audit.php';
+require_once __DIR__ . '/lib/birthday_calendar.php';
 
 // Explicit guard: the writes below run before header.php, and the only check
 // so far was sync_social_directory.php's unrelated content_social gate.
@@ -202,6 +203,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                               $pdo->commit();
                               $success = true;
+                              birthday_calendar_queue_sync($pdo);
                               player_sponsors_sync_social_directory();
 
                               auditLog($pdo, 'player_left', "Marked player '" . (string) $player['name'] . "' as left as of {$leftAt}" . ($lockedReplacement ? ", sponsorships transferred to '" . (string) $lockedReplacement['name'] . "'" : ''));

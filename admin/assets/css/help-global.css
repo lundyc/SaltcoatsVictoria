@@ -1,0 +1,46 @@
+/* Help button, slide-out and field hints — loaded on every signed-in admin page. */
+.hub-help-fab { position: fixed; right: 1rem; bottom: calc(5rem + env(safe-area-inset-bottom)); z-index: 1025; width: 3rem; height: 3rem; border-radius: 50%; border: 0; background: var(--brand-primary, #6a2036); color: #fff; box-shadow: 0 0.4rem 1rem rgba(31, 26, 29, 0.3); font-size: 1.2rem; display: inline-flex; align-items: center; justify-content: center; }
+.hub-help-fab:hover, .hub-help-fab:focus-visible { background: var(--brand-dark, #4b0818); color: #fff; }
+@media (min-width: 992px) { .hub-help-fab { bottom: 1.5rem; right: 1.5rem; } }
+@media print { .hub-help-fab { display: none; } }
+#hubHelpPanel .help-panel__article { margin-bottom: 1.5rem; }
+#hubHelpPanel .help-article-body h2 { font-size: 1.05rem; margin-top: 1.1rem; }
+.hub-help-hint { border: 0; background: none; padding: 0 0.15rem; color: var(--hub-muted, #70676b); line-height: 1; }
+.hub-help-hint:hover, .hub-help-hint:focus-visible { color: var(--brand-primary, #6a2036); }
+
+/* First-login tour prompt (Club overview only) */
+.hub-tour-prompt { position: fixed; left: 1rem; bottom: calc(5rem + env(safe-area-inset-bottom)); z-index: 1025; max-width: 22rem; padding: 1rem; background: var(--hub-surface, #fffdf9); border: 1px solid var(--hub-line-strong, rgba(75, 8, 24, 0.2)); border-radius: var(--hub-radius, 1rem); box-shadow: 0 0.7rem 1.7rem rgba(31, 26, 29, 0.2); }
+.hub-tour-prompt[hidden] { display: none; }
+.hub-tour-prompt__title { font-weight: 700; margin-bottom: 0.25rem; }
+.hub-tour-prompt__actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
+@media (min-width: 992px) { .hub-tour-prompt { bottom: 1.5rem; left: 1.5rem; } }
+@media (max-width: 575.98px) { .hub-tour-prompt { right: 1rem; max-width: none; } }
+@media print { .hub-tour-prompt { display: none; } }
+
+#hubHelpPanel .help-figure { display: block; margin: 0.75rem 0 1rem; }
+#hubHelpPanel .help-figure img { width: 100%; height: auto; border: 1px solid var(--hub-line-strong, rgba(75, 8, 24, .2)); border-radius: 0.5rem; }
+#hubHelpPanel .help-figure { position: relative; cursor: zoom-in; }
+
+/* Lightbox */
+.hub-lightbox { position: fixed; inset: 0; z-index: 2000; display: flex; align-items: center; justify-content: center; background: rgba(20, 14, 17, .88); padding: 2.5rem 4rem; }
+.hub-lightbox[hidden] { display: none; }
+.hub-lightbox__figure { margin: 0; max-width: 100%; max-height: 100%; display: flex; flex-direction: column; align-items: center; gap: .6rem; }
+.hub-lightbox__figure img { max-width: 100%; max-height: calc(100vh - 8rem); width: auto; height: auto; border-radius: .6rem; background: #fff; box-shadow: 0 1rem 3rem rgba(0, 0, 0, .5); }
+.hub-lightbox figcaption { color: #f6ecde; font-size: .9rem; text-align: center; display: flex; gap: .9rem; align-items: baseline; flex-wrap: wrap; justify-content: center; }
+.hub-lightbox__counter { color: rgba(246, 236, 222, .65); font-size: .8rem; }
+.hub-lightbox__btn { position: absolute; border: 0; background: rgba(255, 255, 255, .14); color: #fff; width: 2.8rem; height: 2.8rem; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 1.05rem; cursor: pointer; }
+.hub-lightbox__btn:hover, .hub-lightbox__btn:focus-visible { background: rgba(255, 255, 255, .28); outline: 2px solid #fff; outline-offset: 2px; }
+.hub-lightbox__btn[hidden] { display: none; }
+.hub-lightbox__close { top: 1rem; right: 1rem; }
+.hub-lightbox__prev { left: .8rem; top: 50%; transform: translateY(-50%); }
+.hub-lightbox__next { right: .8rem; top: 50%; transform: translateY(-50%); }
+html.hub-lightbox-open { overflow: hidden; }
+@media (max-width: 575.98px) { .hub-lightbox { padding: 3.5rem .5rem 1rem; } .hub-lightbox__nav { top: auto; bottom: .8rem; transform: none; } .hub-lightbox__prev { left: .8rem; } .hub-lightbox__next { right: .8rem; } }
+@media print { .hub-lightbox { display: none !important; } }
+
+/* Lightbox on phones: show the screenshot large enough to read and let people swipe around it. */
+@media (max-width: 767.98px) {
+  .hub-lightbox__figure { overflow: auto; max-height: calc(100vh - 7rem); -webkit-overflow-scrolling: touch; align-items: flex-start; }
+  .hub-lightbox__figure img { max-width: none; max-height: none; width: 900px; }
+  .hub-lightbox figcaption { position: sticky; left: 0; width: calc(100vw - 1rem); }
+}

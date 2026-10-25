@@ -74,7 +74,7 @@ try {
 
           $pdo->commit();
           auditLog($pdo, 'match_deleted', 'Deleted fixture vs ' . (string) ($fixture['opponent'] ?? '') . ' on ' . (string) ($fixture['match_date'] ?? ''));
-          match_google_calendar_sync_fixture($pdo, $fixtureForCalendar, 'delete');
+          $gcal = match_google_calendar_sync_fixture($pdo, $fixtureForCalendar, 'delete');
           if ($backgroundImage !== '' && str_starts_with($backgroundImage, 'uploads/matches/')) {
                     $absolutePath = __DIR__ . '/' . $backgroundImage;
                     if (is_file($absolutePath)) {
@@ -87,7 +87,7 @@ try {
                               @unlink($absolutePath);
                     }
           }
-          header('Location: matches.php?season_id=' . $seasonId . '&deleted=1');
+          header('Location: matches.php?season_id=' . $seasonId . '&deleted=1' . (($gcal['ok'] ?? true) ? '' : '&gcal_failed=1'));
           exit;
 } catch (Throwable $e) {
           if ($pdo->inTransaction()) {

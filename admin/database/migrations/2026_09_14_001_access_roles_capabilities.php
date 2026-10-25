@@ -7,7 +7,7 @@ declare(strict_types=1);
 // capability systems, without removing either — hub_auth_has_capability()
 // now checks this matrix in addition to committee positions, so nothing
 // currently working stops working. See
-// /root/.claude/projects/-var-www-vhosts-myclubhub-co-uk/memory/admin-access-control-simplification.md
+// (see project notes: admin access control simplification)
 // for the full plan.
 //
 // - `capabilities` is the fixed, code-defined catalog (like WordPress's

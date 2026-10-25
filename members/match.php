@@ -400,6 +400,56 @@ $topStats = member_match_top_stats($detail['events']);
         .member-event-row__minute { width:2.35rem; height:2.35rem; }
         .venue-review-options { grid-template-columns:1fr; }
     }
+    /* Tablet and phone: the page was a fixed two-column layout (second column 420px wide), which pushed the page
+       wider than the screen. Stack it, and tighten the cards for small screens. */
+    @media (max-width: 991.98px) {
+        .member-page .member-grid--aside { grid-template-columns:minmax(0,1fr); }
+        .member-page .member-grid--aside > * { min-width:0; }
+        .member-page .member-grid--3 { grid-template-columns:repeat(3,minmax(0,1fr)); }
+    }
+    @media (max-width: 767.98px) {
+        .member-page .member-hero { padding:1.15rem 1.05rem; }
+        .member-page .member-hero h1 { font-size:1.45rem; line-height:1.15; }
+        .member-page .member-hero__actions { display:grid; grid-template-columns:1fr 1fr; gap:.55rem; }
+        .member-page .member-hero__actions .btn { width:100%; padding-inline:.5rem; }
+        /* Date / Kick-off / Venue: date and kick-off side by side, venue full width. Wins / Draws / Losses stay in a row. */
+        .member-page > .member-grid--3 { grid-template-columns:repeat(2,minmax(0,1fr)); gap:.6rem; }
+        .member-page > .member-grid--3 .member-stat:last-child { grid-column:1 / -1; }
+        .member-page .member-stat { padding:.75rem .85rem; }
+        .member-page .member-stat strong { font-size:1.15rem; overflow-wrap:anywhere; }
+        .member-page .member-card .member-grid--3 { grid-template-columns:repeat(3,minmax(0,1fr)); gap:.5rem; }
+        .member-page .member-card .member-stat { text-align:center; padding:.6rem .4rem; }
+        .member-page .member-card .member-stat span { font-size:.68rem; letter-spacing:.05em; }
+        .member-page .member-card .member-stat strong { font-size:1.35rem; }
+        .member-page .member-card__header { flex-wrap:wrap; }
+        .member-page .member-card__body { padding:1rem; }
+        /* Events: one column. Minute on the left, then the event; a coloured edge shows which team it belongs to. */
+        .member-events-timeline { padding:.25rem 0; }
+        .member-event-row { grid-template-columns:3rem minmax(0,1fr); gap:.6rem; min-height:0; padding:.55rem 0; border-bottom:1px solid #f0e8e8; align-items:start; }
+        .member-event-row__minute { grid-column:1; grid-row:1; width:auto; height:auto; min-height:2rem; padding:.2rem .25rem; border-radius:8px; font-size:.8rem; }
+        .member-event-row__team { grid-column:2; grid-row:1; gap:.55rem; min-width:0; }
+        .member-event-row__team:not(:has(*)) { display:none; }
+        .member-event-row__team--svfc { flex-direction:row-reverse; justify-content:flex-end; text-align:left; border-left:3px solid #4b0818; padding-left:.6rem; }
+        .member-event-row__team--opponent { border-left:3px solid #a79fa3; padding-left:.6rem; }
+        .member-event-row__title { font-size:.95rem; }
+        .member-event-row__detail { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+        .member-event-row__icon { width:1.45rem; height:1.45rem; flex-basis:1.45rem; margin-top:.1rem; }
+        .member-event-row--stage { grid-template-columns:1fr; text-align:center; padding:.35rem 0; background:#f7f2e6; border-radius:8px; border-bottom:0; }
+        .member-event-row--stage:before, .member-event-row--stage:after { display:none; }
+        /* Top stats: team names on a row of their own, left and right. */
+        .member-top-stats__teams { grid-template-columns:1fr 1fr; }
+        .member-top-stats__teams span:nth-child(2) { display:none; }
+        .member-top-stats__teams span:last-child { text-align:right; }
+        .member-top-stat { grid-template-columns:2.4rem minmax(0,1fr) 2.4rem; gap:.5rem; }
+        .member-top-stat__label { font-size:.7rem; }
+        .member-lineup__player { flex-wrap:wrap; }
+        .member-lineup__events { flex:1 0 100%; margin-left:2.65rem; justify-content:flex-start; }
+        .member-photo-carousel__control, .venue-review-option { min-height:44px; }
+        .member-photo-carousel__control { width:44px; height:44px; }
+        .member-page .member-card iframe { min-height:220px; }
+        .member-page .row > [class*="col-sm-"] { flex:1 1 100%; max-width:100%; }
+        .member-page .venue-star { min-width:44px; min-height:44px; }
+    }
 </style>
 
 <div class="member-page">
@@ -563,21 +613,11 @@ $topStats = member_match_top_stats($detail['events']);
                 </section>
             <?php endif; ?>
 
-            <?php if ($veoUrl !== '' || $matchPhotos): ?>
+            <?php if ($matchPhotos): ?>
                 <section class="member-card">
                     <div class="member-card__header"><h2>Match Media</h2></div>
                     <div class="member-card__body">
-                        <?php if ($veoUrl !== ''): ?>
-                            <a href="<?= h($veoUrl) ?>" target="_blank" rel="noopener" class="member-veo-card">
-                                <span class="member-veo-card__play"><i class="fa-solid fa-play" aria-hidden="true"></i></span>
-                                <span>
-                                    <strong>Watch the full match on VEO</strong>
-                                    <span class="d-block text-muted small">Opens in a new tab — VEO doesn't allow its player to be embedded on other sites.</span>
-                                </span>
-                            </a>
-                        <?php endif; ?>
                         <?php if ($matchPhotos): ?>
-                            <?php if ($veoUrl !== ''): ?><hr><?php endif; ?>
                             <div class="member-photo-carousel" data-member-photo-carousel>
                                 <div class="member-photo-carousel__top">
                                     <h3 class="h6 text-muted text-uppercase small mb-0">Photos (<?= count($matchPhotos) ?>)</h3>
@@ -624,7 +664,7 @@ $topStats = member_match_top_stats($detail['events']);
                             <div class="col-sm-4"><button type="submit" class="btn btn-brand w-100"><?= $myMotmVote ? 'Change Vote' : 'Vote' ?></button></div>
                         </form>
                         <?php else: ?>
-                        <p class="text-muted small mb-3"><a href="/members/login.php">Log in</a> or <a href="/members/register.php">create a free account</a> to cast your vote.</p>
+                        <p class="text-muted small mb-3"><a href="/members/login.php">Log in</a> to cast your vote.</p>
                         <?php endif; ?>
                         <?php if ($motmResults): ?>
                             <?php $topVotes = (int) $motmResults[0]['votes']; ?>
@@ -692,7 +732,7 @@ $topStats = member_match_top_stats($detail['events']);
                         })();</script>
                         <?php else: ?>
                         <h3 class="h6">Rate the facilities and matchday experience</h3>
-                        <p class="text-muted small mb-0"><a href="/members/login.php">Log in</a> or <a href="/members/register.php">create a free account</a> to leave a review.</p>
+                        <p class="text-muted small mb-0"><a href="/members/login.php">Log in</a> to leave a review.</p>
                         <?php endif; ?>
                     <?php else: ?>
                         <p class="text-muted small mb-0 mt-3">Venue reviews open once the match has been played.</p>

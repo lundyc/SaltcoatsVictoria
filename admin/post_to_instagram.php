@@ -233,7 +233,7 @@ if ($env === []) {
 $instagramAccountId = trim((string) ($env['IG_BUSINESS_ACCOUNT_ID'] ?? ''));
 $accessToken = trim((string) ($env['IG_ACCESS_TOKEN'] ?? ($env['PAGE_ACCESS_TOKEN'] ?? '')));
 $appSecret = trim((string) ($env['APP_SECRET'] ?? ''));
-$graphApiVersion = trim((string) ($env['GRAPH_API_VERSION'] ?? 'v24.0'));
+$graphApiVersion = trim((string) ($env['GRAPH_API_VERSION'] ?? 'v26.0'));
 
 if ($instagramAccountId === '' || $accessToken === '' || $appSecret === '') {
     fail($logFile, 'Missing required .env keys', [
@@ -244,7 +244,7 @@ if ($instagramAccountId === '' || $accessToken === '' || $appSecret === '') {
 if (!preg_match('/^v\d+\.\d+$/', $graphApiVersion)) {
     fail($logFile, 'Invalid GRAPH_API_VERSION format', [
         'graph_api_version' => $graphApiVersion,
-        'expected' => 'v24.0',
+        'expected' => 'v26.0',
     ]);
 }
 

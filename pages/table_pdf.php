@@ -29,6 +29,7 @@ $showBadges = in_array($seasonId, $recentSeasonIds, true);
 
 $table = pub_league_table_for_season($seasonId);
 $rowCount = count($table['rows']);
+$showBadges = $showBadges && pub_league_table_all_badges_exist($table['rows']);
 
 $h = static fn (mixed $v): string => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
 

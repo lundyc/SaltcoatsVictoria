@@ -16,6 +16,7 @@ require_once __DIR__ . '/lib/template_packs.php';
 require_once __DIR__ . '/matches_lib.php';
 require_once __DIR__ . '/lib/stripe.php';
 require_once __DIR__ . '/lib/audit.php';
+require_once __DIR__ . '/lib/site_settings.php';
 
 if (!hub_auth_is_authenticated()) {
     header('Location: /admin/login.php');
@@ -25,7 +26,7 @@ if (!hub_auth_is_authenticated()) {
 $currentUser = hub_auth_current_user();
 if (!hub_auth_has_capability('admin_settings')) {
     http_response_code(403);
-    echo '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Settings</title><link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"><link href="/admin/assets/css/style.css" rel="stylesheet"></head><body class="hub-shell"><main class="hub-main"><div class="container-fluid"><div class="alert alert-danger mb-0">You do not have permission to manage Hub settings.</div></div></main></body></html>';
+    echo '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Settings</title><link href="/admin/assets/vendor/bootstrap/bootstrap.min.css" rel="stylesheet"><link href="/admin/assets/css/style.css" rel="stylesheet"></head><body class="hub-shell"><main class="hub-main"><div class="container-fluid"><div class="alert alert-danger mb-0">You do not have permission to manage Hub settings.</div></div></main></body></html>';
     exit;
 }
 
@@ -112,6 +113,37 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             $updates['BASE_URL'] = $baseUrl !== '' ? $baseUrl : '/';
             $updates['ERROR_LOG_PATH'] = $errorLogPath !== '' ? $errorLogPath : hub_settings_value($fileEnv, 'ERROR_LOG_PATH', '/var/www/vhosts/lundy.me.uk/logs/error_log');
             $updates['HUB_APP_DEBUG'] = in_array(strtolower($appDebug), ['0', 'false', 'no', 'off'], true) ? '0' : '1';
+
+            // The General tab is one form: website settings and the default template pack save with it.
+            $canEditWebsite = hub_auth_has_capability('website');
+            $websiteIncoming = [];
+            if ($canEditWebsite) {
+                site_settings_ensure_schema($pdo);
+                foreach (array_keys(site_settings_defaults()) as $key) {
+                    if (array_key_exists($key, $_POST)) {
+                        $websiteIncoming[$key] = (string) $_POST[$key];
+                    }
+                }
+                $websiteErrors = [];
+                foreach (['brand_primary', 'brand_primary_ink', 'brand_secondary', 'brand_on_primary', 'brand_accent', 'brand_accent_ink'] as $c) {
+                    if (isset($websiteIncoming[$c]) && $websiteIncoming[$c] !== '' && !preg_match('/^#[0-9a-fA-F]{3}(?:[0-9a-fA-F]{3})?$/', trim($websiteIncoming[$c]))) {
+                        $websiteErrors[] = ucfirst(str_replace('_', ' ', $c)) . ' must be a hex colour like #d3122a.';
+                    }
+                }
+                if (!empty($websiteIncoming['contact_email']) && !filter_var($websiteIncoming['contact_email'], FILTER_VALIDATE_EMAIL)) {
+                    $websiteErrors[] = 'Contact email is not a valid address.';
+                }
+                foreach (['commercial', 'hire', 'media', 'supporters', 'volunteers'] as $dep) {
+                    $k = 'enquiry_email_' . $dep;
+                    if (!empty($websiteIncoming[$k]) && !filter_var($websiteIncoming[$k], FILTER_VALIDATE_EMAIL)) {
+                        $websiteErrors[] = 'The ' . $dep . ' enquiry email is not a valid address.';
+                    }
+                }
+                if ($websiteErrors) {
+                    $statusType = 'error';
+                    $statusMessage = implode(' ', $websiteErrors);
+                }
+            }
         } elseif ($section === 'database') {
             $dbHost = isset($_POST['db_host']) && is_string($_POST['db_host']) ? trim($_POST['db_host']) : '';
             $dbName = isset($_POST['db_name']) && is_string($_POST['db_name']) ? trim($_POST['db_name']) : '';
@@ -234,6 +266,28 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         }
 
             $saved = $section === 'notifications' || $statusType === 'error' ? false : hub_settings_save_env($updates);
+            if ($saved && $section === 'general') {
+                try {
+                    if (!empty($canEditWebsite)) {
+                        site_settings_save($pdo, $websiteIncoming);
+                        auditLog($pdo, 'site_settings_updated', 'Updated public website settings');
+                    }
+                    if (isset($_POST['template_pack_id'])) {
+                        $packId = max(0, (int) $_POST['template_pack_id']);
+                        if ($packId > 0) {
+                            template_packs_set_global_default($pdo, $packId, null, (int) ($currentUser['id'] ?? 0) ?: null);
+                            auditLog($pdo, 'settings_updated', 'Set global default template pack #' . $packId);
+                        } else {
+                            template_packs_clear_global_default($pdo);
+                            auditLog($pdo, 'settings_updated', 'Cleared global default template pack');
+                        }
+                    }
+                } catch (Throwable $exception) {
+                    $saved = false;
+                    $statusType = 'error';
+                    $statusMessage = $exception->getMessage();
+                }
+            }
             if ($saved) {
                 auditLog($pdo, 'settings_updated', 'Updated club settings (' . $section . ')');
                 header('Location: /admin/settings.php?tab=' . rawurlencode($activeTab) . '&saved=1');
@@ -256,25 +310,6 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             } catch (Throwable $e) {
                 $statusType = 'error';
                 $statusMessage = 'Navigation settings could not be saved. Please try again.';
-            }
-        } elseif ($section === 'global_template_pack') {
-            $activeTab = 'general';
-            $packId = max(0, (int) ($_POST['template_pack_id'] ?? 0));
-
-            try {
-                if ($packId > 0) {
-                    template_packs_set_global_default($pdo, $packId, null, (int) ($currentUser['id'] ?? 0) ?: null);
-                    auditLog($pdo, 'settings_updated', 'Set global default template pack #' . $packId);
-                } else {
-                    template_packs_clear_global_default($pdo);
-                    auditLog($pdo, 'settings_updated', 'Cleared global default template pack');
-                }
-
-                header('Location: /admin/settings.php?tab=general&global_pack_saved=1');
-                exit;
-            } catch (Throwable $exception) {
-                $statusType = 'error';
-                $statusMessage = $exception->getMessage();
             }
         } elseif ($section === 'publishing') {
             $activeTab = 'publishing';
@@ -424,13 +459,11 @@ try {
     if (stripe_table_exists($pdo, 'accounts') && stripe_table_exists($pdo, 'people')) {
         $notificationAccountOptions = $pdo->query("SELECT a.id, a.person_id, a.email AS account_email, a.is_active AS account_is_active,
                 p.display_name, p.email AS profile_email, p.is_active AS person_is_active,
-                GROUP_CONCAT(DISTINCT r.name ORDER BY r.name SEPARATOR ', ') AS roles
+                (SELECT GROUP_CONCAT(DISTINCT t.name ORDER BY t.name SEPARATOR ', ') FROM person_access_templates pat JOIN access_templates t ON t.id = pat.template_id WHERE pat.person_id = p.id) AS roles
             FROM accounts a
             JOIN people p ON p.id = a.person_id
-            LEFT JOIN account_roles ar ON ar.account_id = a.id
-            LEFT JOIN roles r ON r.id = ar.role_id
             WHERE a.is_active = 1 AND p.is_active = 1
-            GROUP BY a.id, a.email, a.is_active, p.display_name, p.email, p.is_active
+            GROUP BY a.id, a.email, a.is_active, p.id, p.display_name, p.email, p.is_active
             ORDER BY p.display_name, a.email")->fetchAll(PDO::FETCH_ASSOC);
     }
 } catch (Throwable $e) {
@@ -517,6 +550,9 @@ require_once __DIR__ . '/header.php';
         <li class="nav-item">
             <a class="nav-link<?= $activeTab === 'publishing' ? ' active' : '' ?>" href="?tab=publishing">Publishing</a>
         </li>
+        <?php if (hub_auth_has_capability('shop')): ?>
+        <li class="nav-item"><a class="nav-link" href="/admin/shop_settings.php">Shop settings</a></li>
+        <?php endif; ?>
     </ul>
 
     <div class="tab-content">
@@ -525,80 +561,74 @@ require_once __DIR__ . '/header.php';
         <?php endif; ?>
         <?php if ($activeTab === 'general'): ?>
             <div class="tab-pane fade show active">
-                <form method="post" class="settings-card hub-form-card">
+                <form method="post" class="settings-general" id="general-settings-form">
                     <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(hub_auth_csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
                     <input type="hidden" name="section" value="general">
-                    <div class="settings-card__header">
-                        <div>
-                            <p class="settings-card__eyebrow">Core</p>
-                            <h2 class="settings-card__title">General settings</h2>
-                            <p class="settings-card__subtitle">Core values used across the Hub shell.</p>
+
+                    <h2 class="settings-group-title">Hub</h2>
+                    <div class="row g-4 mb-5">
+                        <div class="col-lg-6">
+                            <div class="card hub-section h-100"><div class="card-body">
+                                <h3 class="h6 mb-3">Application</h3>
+                                <div class="mb-3">
+                                    <label class="form-label" for="app_name">App name</label>
+                                    <input class="form-control" id="app_name" type="text" name="app_name" value="<?= htmlspecialchars($appName, ENT_QUOTES, 'UTF-8') ?>">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label" for="base_url">Base URL</label>
+                                    <input class="form-control" id="base_url" type="text" name="base_url" value="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label" for="app_debug">Debug mode</label>
+                                    <select class="form-select" id="app_debug" name="app_debug">
+                                        <option value="1"<?= in_array(strtolower($appDebug), ['1', 'true', 'yes', 'on'], true) ? ' selected' : '' ?>>Enabled</option>
+                                        <option value="0"<?= in_array(strtolower($appDebug), ['0', 'false', 'no', 'off'], true) ? ' selected' : '' ?>>Disabled</option>
+                                    </select>
+                                </div>
+                                <div class="mb-0">
+                                    <label class="form-label" for="error_log_path">Error log path</label>
+                                    <input class="form-control" id="error_log_path" type="text" name="error_log_path" value="<?= htmlspecialchars($errorLogPath, ENT_QUOTES, 'UTF-8') ?>">
+                                </div>
+                            </div></div>
+                        </div>
+
+                        <div class="col-lg-6">
+                            <div class="card hub-section h-100"><div class="card-body">
+                                <h3 class="h6 mb-3">Default template pack</h3>
+                                <p class="text-muted small">Used for graphics when neither the season nor the fixture has its own pack. Only published packs are listed; fixtures already assigned to a version are not changed.</p>
+                                <label class="form-label" for="global_template_pack_id">Default pack</label>
+                                <select class="form-select" id="global_template_pack_id" name="template_pack_id">
+                                    <option value="0">No global default</option>
+                                    <?php foreach ($availableTemplatePacks as $templatePack): ?>
+                                        <?php $packId = (int) ($templatePack['id'] ?? 0); ?>
+                                        <option value="<?= $packId ?>"<?= (int) ($globalTemplatePack['pack_id'] ?? 0) === $packId ? ' selected' : '' ?>>
+                                            <?= htmlspecialchars((string) ($templatePack['name'] ?? 'Untitled pack'), ENT_QUOTES, 'UTF-8') ?>
+                                            <?php if ((int) ($templatePack['current_version_number'] ?? 0) > 0): ?>
+                                                · Version <?= (int) $templatePack['current_version_number'] ?>
+                                            <?php endif; ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <?php if ($availableTemplatePacks === []): ?>
+                                    <div class="alert alert-info mt-3 mb-0">
+                                        Publish a pack in <a class="alert-link" href="/admin/template_packs.php">Template Packs</a> before setting a default.
+                                    </div>
+                                <?php endif; ?>
+                            </div></div>
                         </div>
                     </div>
 
-                    <div class="settings-form-grid">
-                        <div class="settings-field">
-                            <label class="form-label fw-semibold" for="app_name">App name</label>
-                            <input class="form-control" id="app_name" type="text" name="app_name" value="<?= htmlspecialchars($appName, ENT_QUOTES, 'UTF-8') ?>">
-                        </div>
-                        <div class="settings-field">
-                            <label class="form-label fw-semibold" for="base_url">Base URL</label>
-                            <input class="form-control" id="base_url" type="text" name="base_url" value="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>">
-                        </div>
-                        <div class="settings-field">
-                            <label class="form-label fw-semibold" for="app_debug">Debug mode</label>
-                            <select class="form-select" id="app_debug" name="app_debug">
-                                <option value="1"<?= in_array(strtolower($appDebug), ['1', 'true', 'yes', 'on'], true) ? ' selected' : '' ?>>Enabled</option>
-                                <option value="0"<?= in_array(strtolower($appDebug), ['0', 'false', 'no', 'off'], true) ? ' selected' : '' ?>>Disabled</option>
-                            </select>
-                        </div>
-                        <div class="settings-field">
-                            <label class="form-label fw-semibold" for="error_log_path">Error log path</label>
-                            <input class="form-control" id="error_log_path" type="text" name="error_log_path" value="<?= htmlspecialchars($errorLogPath, ENT_QUOTES, 'UTF-8') ?>">
-                        </div>
-                    </div>
-
-                    <div class="settings-card__footer">
-                        <button class="btn btn-primary" type="submit">Save General</button>
-                    </div>
-                </form>
-
-                <form method="post" class="settings-card hub-form-card mt-4">
-                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(hub_auth_csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
-                    <input type="hidden" name="section" value="global_template_pack">
-                    <div class="settings-card__header">
-                        <div>
-                            <p class="settings-card__eyebrow">Graphic design system</p>
-                            <h2 class="settings-card__title">Global default template pack</h2>
-                            <p class="settings-card__subtitle">This pack is used when neither the season nor the fixture has its own selection.</p>
-                        </div>
-                    </div>
-
-                    <div class="settings-field">
-                        <label class="form-label fw-semibold" for="global_template_pack_id">Default pack</label>
-                        <select class="form-select" id="global_template_pack_id" name="template_pack_id">
-                            <option value="0">No global default</option>
-                            <?php foreach ($availableTemplatePacks as $templatePack): ?>
-                                <?php $packId = (int) ($templatePack['id'] ?? 0); ?>
-                                <option value="<?= $packId ?>"<?= (int) ($globalTemplatePack['pack_id'] ?? 0) === $packId ? ' selected' : '' ?>>
-                                    <?= htmlspecialchars((string) ($templatePack['name'] ?? 'Untitled pack'), ENT_QUOTES, 'UTF-8') ?>
-                                    <?php if ((int) ($templatePack['current_version_number'] ?? 0) > 0): ?>
-                                        · Version <?= (int) $templatePack['current_version_number'] ?>
-                                    <?php endif; ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                        <div class="form-text">Only published packs are available. New fixture assignments use the latest published version; fixtures already assigned to a version are not changed.</div>
-                    </div>
-
-                    <?php if ($availableTemplatePacks === []): ?>
-                        <div class="alert alert-info mt-3 mb-0">
-                            Publish a pack in <a class="alert-link" href="/admin/template_packs.php">Template Packs</a> before setting a default.
-                        </div>
+                    <?php if (hub_auth_has_capability('website')): ?>
+                        <?php
+                        site_settings_ensure_schema($pdo);
+                        $websiteSettings = array_merge(site_settings_all($pdo), $websiteIncoming ?? []);
+                        require __DIR__ . '/partials/website_settings.php';
+                        ?>
                     <?php endif; ?>
 
-                    <div class="settings-card__footer">
-                        <button class="btn btn-primary" type="submit">Save Global Default</button>
+                    <div class="settings-savebar">
+                        <span class="text-muted small">Changes to all sections above are saved together.</span>
+                        <button class="btn btn-primary" type="submit">Save settings</button>
                     </div>
                 </form>
             </div>

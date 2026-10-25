@@ -85,13 +85,11 @@ function notification_recipients_data(PDO $pdo): array
         if (stripe_table_exists($pdo, 'accounts') && stripe_table_exists($pdo, 'people')) {
             $accountOptions = $pdo->query("SELECT a.id, a.person_id, a.email AS account_email, a.is_active AS account_is_active,
                     p.display_name, p.email AS profile_email, p.is_active AS person_is_active,
-                    GROUP_CONCAT(DISTINCT r.name ORDER BY r.name SEPARATOR ', ') AS roles
+                    (SELECT GROUP_CONCAT(DISTINCT t.name ORDER BY t.name SEPARATOR ', ') FROM person_access_templates pat JOIN access_templates t ON t.id = pat.template_id WHERE pat.person_id = p.id) AS roles
                 FROM accounts a
                 JOIN people p ON p.id = a.person_id
-                LEFT JOIN account_roles ar ON ar.account_id = a.id
-                LEFT JOIN roles r ON r.id = ar.role_id
                 WHERE a.is_active = 1 AND p.is_active = 1
-                GROUP BY a.id, a.email, a.is_active, p.display_name, p.email, p.is_active
+                GROUP BY a.id, a.email, a.is_active, p.id, p.display_name, p.email, p.is_active
                 ORDER BY p.display_name, a.email")->fetchAll(PDO::FETCH_ASSOC);
         }
     } catch (Throwable $e) {

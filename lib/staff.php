@@ -6,7 +6,8 @@ declare(strict_types=1);
  * Public people data from person_club_roles × club_roles × people.
  *   - pub_staff_management()  -> football department  (shown on /staff)
  *   - pub_staff_officials()   -> committee department  (shown on /club/officials)
- * The `other` department (volunteers etc.) is intentionally excluded.
+ * The `other` department (volunteers etc.) is shown by pub_staff_volunteers() on
+ * /club/officials only; it never appears in the committee or management lists.
  */
 
 /** Rough seniority ordering within a department. */
@@ -81,4 +82,77 @@ function pub_staff_photo_html(array $person): string
         return '<img src="' . e('/' . ltrim($image, '/')) . '" alt="' . e((string) $person['name']) . '" loading="lazy">';
     }
     return '<span aria-hidden="true">' . e(mb_strtoupper(mb_substr((string) $person['name'], 0, 1))) . '</span>';
+}
+
+/**
+ * Volunteers — current holders of `other` department roles, one card per person
+ * with their specific roles joined (just "Volunteer" if that is all they hold).
+ * People already shown on the committee are left out so nobody appears twice.
+ * @param list<string> $excludeNames
+ * @return list<array{name:string,label:string,image:string}>
+ */
+function pub_staff_volunteers(array $excludeNames = []): array
+{
+    $stmt = db()->prepare(
+        "SELECT p.id, p.display_name, p.profile_image_path, hp.name AS role, hp.sort_order
+         FROM person_club_roles pp
+         JOIN club_roles hp ON hp.id = pp.club_role_id
+         JOIN people p ON p.id = pp.person_id
+         WHERE hp.department = 'other'
+           AND (pp.end_date IS NULL OR pp.end_date >= CURDATE())
+           AND (pp.start_date IS NULL OR pp.start_date <= CURDATE())
+           AND p.is_active = 1
+         ORDER BY hp.sort_order ASC, hp.name ASC"
+    );
+    $stmt->execute();
+    $skip = array_map('strtolower', $excludeNames);
+    $by = [];
+    foreach ($stmt->fetchAll() as $r) {
+        $name = (string) $r['display_name'];
+        if (in_array(strtolower($name), $skip, true)) {
+            continue;
+        }
+        $by[(int) $r['id']] ??= ['name' => $name, 'roles' => [], 'image' => trim((string) ($r['profile_image_path'] ?? ''))];
+        $by[(int) $r['id']]['roles'][(string) $r['role']] = true;
+    }
+    $out = [];
+    foreach ($by as $v) {
+        $roles = array_keys($v['roles']);
+        $specific = array_values(array_filter($roles, static fn (string $x): bool => strtolower($x) !== 'volunteer'));
+        $out[] = ['name' => $v['name'], 'label' => $specific !== [] ? implode(' · ', $specific) : 'Volunteer', 'image' => $v['image']];
+    }
+    usort($out, static fn ($a, $b) => strcmp($a['name'], $b['name']));
+    return $out;
+}
+
+/**
+ * Club roles nobody holds right now, for the Vacancies page. A role with no current
+ * holder is listed automatically unless it is marked "never list as a vacancy".
+ * @return list<array{id:int,name:string,department:string,blurb:string}>
+ */
+function pub_staff_vacancies(): array
+{
+    try {
+        $rows = db()->query(
+            "SELECT r.id, r.name, r.department, r.vacancy_blurb
+             FROM club_roles r
+             WHERE r.vacancy_hidden = 0
+               AND NOT EXISTS (
+                   SELECT 1 FROM person_club_roles pp
+                   JOIN people p ON p.id = pp.person_id AND p.is_active = 1
+                   WHERE pp.club_role_id = r.id
+                     AND (pp.end_date IS NULL OR pp.end_date >= CURDATE())
+                     AND (pp.start_date IS NULL OR pp.start_date <= CURDATE())
+               )
+             ORDER BY FIELD(r.department, 'committee', 'football', 'other'), r.sort_order, r.name"
+        )->fetchAll();
+    } catch (Throwable) {
+        return [];
+    }
+    return array_map(static fn (array $r): array => [
+        'id' => (int) $r['id'],
+        'name' => (string) $r['name'],
+        'department' => (string) $r['department'],
+        'blurb' => trim((string) ($r['vacancy_blurb'] ?? '')),
+    ], $rows);
 }

@@ -1,11 +1,22 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/schema_guard.php';
+
 require_once __DIR__ . '/people.php';
 require_once __DIR__ . '/season_tickets.php';
 require_once __DIR__ . '/season_pass_rules.php';
 
 function ensureSeasonPassSchema(PDO $pdo): void
+{
+    if (schema_guard_done('ensureSeasonPassSchema')) {
+        return;
+    }
+    ensureSeasonPassSchema_run($pdo);
+    schema_guard_mark('ensureSeasonPassSchema');
+}
+
+function ensureSeasonPassSchema_run(PDO $pdo): void
 {
     static $done = false;
     if ($done) {
@@ -639,7 +650,8 @@ function getSeasonPassOrderBundle(PDO $pdo, int $orderId): array
 {
     ensureSeasonPassSchema($pdo);
     $stmt = $pdo->prepare("SELECT o.*, oi.id AS order_item_id, oi.description_snapshot, oi.product_reference_id, oi.unit_price, oi.line_total,
-            pay.id AS payment_id, pay.provider, pay.provider_checkout_session_id, pay.payment_method, pay.status AS payment_status,
+            pay.id AS payment_id, pay.provider, pay.provider_checkout_session_id, pay.provider_payment_id,
+            pay.payment_method, pay.status AS payment_status, pay.amount AS payment_amount, pay.currency AS payment_currency, pay.paid_at,
             e.id AS entitlement_id, e.person_id AS owner_person_id, e.status AS entitlement_status,
             sp.id AS season_pass_id, sp.season_id, sp.season_ticket_type_id, sp.status AS pass_status,
             c.id AS credential_id, c.token, c.manual_code, c.is_active AS credential_is_active,
@@ -833,7 +845,21 @@ function refundSeasonPassOrder(PDO $pdo, int $orderId, float $amount, string $re
     }
     $paymentId = (int) $bundle['payment_id'];
     $total = (float) $bundle['total_amount'];
-    $fullRefund = $amount >= $total;
+    $refundedStmt = $pdo->prepare("SELECT COALESCE(SUM(amount), 0) FROM refunds WHERE payment_id = :payment_id AND status IN ('complete', 'completed', 'succeeded', 'paid')");
+    $refundedStmt->execute([':payment_id' => $paymentId]);
+    $alreadyRefunded = (float) $refundedStmt->fetchColumn();
+    $remaining = max(0.0, round($total - $alreadyRefunded, 2));
+    if ($amount <= 0 || $amount > $remaining + 0.0001) {
+        throw new RuntimeException('Refund amount must be between £0.01 and the remaining paid amount (' . gbp($remaining) . ').');
+    }
+    if ($providerRefundId !== null && $providerRefundId !== '') {
+        $duplicate = $pdo->prepare('SELECT id FROM refunds WHERE provider_refund_id = :provider_refund_id LIMIT 1');
+        $duplicate->execute([':provider_refund_id' => $providerRefundId]);
+        if ($duplicate->fetchColumn()) {
+            return;
+        }
+    }
+    $fullRefund = $amount >= $remaining - 0.0001;
     $pdo->beginTransaction();
     try {
         $pdo->prepare('INSERT INTO refunds (payment_id, amount, reason, provider_refund_id, status, requested_by_account_id, completed_at)
@@ -847,6 +873,8 @@ function refundSeasonPassOrder(PDO $pdo, int $orderId, float $amount, string $re
             ]);
         $pdo->prepare('UPDATE orders SET status = :status WHERE id = :order_id')
             ->execute([':status' => $fullRefund ? 'refunded' : 'partially_refunded', ':order_id' => $orderId]);
+        $pdo->prepare('UPDATE payments SET status = :status WHERE id = :payment_id')
+            ->execute([':status' => $fullRefund ? 'refunded' : 'partially_refunded', ':payment_id' => $paymentId]);
         if ($fullRefund) {
             $pdo->prepare("UPDATE entitlements e JOIN order_items oi ON oi.id = e.order_item_id SET e.status = 'refunded', e.cancelled_at = COALESCE(e.cancelled_at, NOW()) WHERE oi.order_id = :order_id")
                 ->execute([':order_id' => $orderId]);
@@ -862,6 +890,47 @@ function refundSeasonPassOrder(PDO $pdo, int $orderId, float $amount, string $re
         }
         throw $e;
     }
+}
+
+/** Remaining amount that can still be refunded for this shared order. */
+function seasonPassOrderRefundableAmount(PDO $pdo, array $bundle): float
+{
+    $stmt = $pdo->prepare("SELECT COALESCE(SUM(amount), 0) FROM refunds WHERE payment_id = :payment_id AND status IN ('complete', 'completed', 'succeeded', 'paid')");
+    $stmt->execute([':payment_id' => (int) $bundle['payment_id']]);
+    return max(0.0, round((float) $bundle['total_amount'] - (float) $stmt->fetchColumn(), 2));
+}
+
+function sendSeasonPassOrderActionEmail(PDO $pdo, int $orderId, string $action, string $reason, float $refundAmount = 0.0): bool
+{
+    $bundle = getSeasonPassOrderBundle($pdo, $orderId);
+    if (!$bundle) {
+        return false;
+    }
+    $email = trim((string) ($bundle['customer_email'] ?? $bundle['holder_email'] ?? ''));
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        return false;
+    }
+    $name = trim((string) ($bundle['customer_name'] ?? $bundle['holder_name'] ?? ''));
+    $ticket = trim((string) ($bundle['type_name'] ?? 'Season ticket'));
+    $season = trim((string) ($bundle['season_name'] ?? ''));
+    $reasonLine = trim($reason) !== '' ? 'Reason: ' . trim($reason) : '';
+    if ($action === 'refund') {
+        $subject = 'Your Saltcoats Victoria FC season ticket refund';
+        $lines = [
+            'Hi ' . ($name !== '' ? $name : 'there') . ',', '',
+            'We have processed a refund of ' . gbp($refundAmount) . ' for your ' . $ticket . ($season !== '' ? ' (' . $season . ')' : '') . '.',
+            $reasonLine, '',
+            'Stripe will return the money to the original payment method. The time it takes to appear depends on your bank.',
+        ];
+    } else {
+        $subject = 'Your Saltcoats Victoria FC season ticket has been cancelled';
+        $lines = [
+            'Hi ' . ($name !== '' ? $name : 'there') . ',', '',
+            'Your ' . $ticket . ($season !== '' ? ' (' . $season . ')' : '') . ' has been cancelled and can no longer be used.',
+            $reasonLine,
+        ];
+    }
+    return hub_send_mail($email, $subject, implode("\n", array_values(array_filter($lines, static fn(string $line): bool => $line !== ''))), false);
 }
 
 function seasonPassLegacyOrderShape(array $pass): array
